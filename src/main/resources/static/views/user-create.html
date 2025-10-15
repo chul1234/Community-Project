@@ -1,0 +1,28 @@
+<div class="container"> <!--DB 사용자 관리 전체 섹션을 감싸는 컨테이너-->
+    <div style="text-align: left; margin-bottom: 10px;">
+        <a href="#!/users">취소 (목록으로 돌아가기)</a>
+    </div> <!-- 뒤로가기 링크 -->
+
+    <h1>새 사용자 등록
+        <button type="button" ng-click="addUserField()" style="float: right;">+</button>
+    </h1> <!-- 새 사용자 등록 제목과 사용자 입력 필드 추가 버튼(busController.js) -->
+    <hr style="clear: both;" />
+
+    <form name="multiUserForm" novalidate> <!-- 다중 사용자 등록 폼, novalidate 속성으로 브라우저 기본 검증 비활성화 -->
+        <!--ng-repeat의 지시어, UserCreateController에 있는 $scope.newUsers배열의 요소 개수 만큼 div블록을 반복 생성-->
+        <div ng-repeat="user in newUsers track by $index" style="border:1px solid #eee; padding:10px; margin-bottom:10px;">
+            <h4>사용자 {{ $index + 1 }}
+                <!-- -버튼, 항목 순선$index를 removeUserField함수로 전달  -->
+                <button type="button" ng-click="removeUserField($index)" style="float: right;">-</button>
+            </h4>
+            이름: <input type="text" ng-model="user.name" required placeholder="이름" /><br />
+            전화번호: <input type="text" ng-model="user.phone" required placeholder="전화번호" /><br />
+            이메일: <input type="text" ng-model="user.email" required placeholder="이메일" /><br />
+        </div> <!-- 각 사용자 입력 필드 세트의 컨테이너, required속성은 필드가 비어 있으면 폼 전체가 유효하지 않은 (invalid상태)가 되도록한다. -->
+    </form>
+    <hr/>
+    <!-- 클릭시 submitUsers() 함수 호출, mutiUserForm안에 있는 required필드중 하나라도 비어있다면 invalie가 true가 되면서 클릭이 비활성화 -->
+    <button type="button" ng-click="submitUsers()" ng-disabled="multiUserForm.$invalid">
+        입력한 사용자 모두 추가
+    </button>
+</div>

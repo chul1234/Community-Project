@@ -1,0 +1,17 @@
+spring:
+    # MVC 설정을 통해 모든 정적 리소스 경로를 루트('/')에서 찾도록 합니다.
+    mvc:
+        static-path-pattern: /**
+
+    # 데이터베이스 연결 설정
+    datasource:
+        driver-class-name: org.mariadb.jdbc.Driver
+        url: jdbc:mariadb://localhost:3306/ipp_db
+        username: ipp_user_local
+        password: '0000'
+
+    # JPA 설정
+    jpa:
+        hibernate:
+            ddl-auto: update # 앱 시작 시 테이블을 새로 만들어서 DB 충돌을 방지합니다.
+        show-sql: true

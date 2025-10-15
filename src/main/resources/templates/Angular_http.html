@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html
+    lang="ko"
+    ng-app="busApp"
+>
+    <head>
+        <meta charset="UTF-8" />
+        <title>정보 조회 시스템</title>
+
+        <head>
+            <script src="/lib/angular.js"></script>
+            <script src="/lib/angular-route.js"></script>
+
+            <script src="/app.js"></script>
+            <script src="/busController.js"></script>
+            <script src="/userController.js"></script>
+        </head>
+
+        <style>
+            body {
+                font-family: sans-serif;
+            }
+            .container {
+                border: 1px solid #ccc;
+                padding: 10px;
+                margin-bottom: 20px;
+            }
+            .user-table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            .user-table th,
+            .user-table td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+            }
+            .user-table th {
+                background-color: #f2f2f2;
+            }
+            .edit-form {
+                border: 1px solid #007bff;
+                padding: 10px;
+                margin-top: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div style="text-align: right; padding: 10px;">
+             <a href="/logout">
+                <button type="button">로그아웃</button>
+            </a>
+        </div>
+
+
+        <div
+            class="container"
+            ng-controller="BusController"
+        >
+            <h1>대구 버스 노선 정보 조회</h1>
+            <button ng-click="fetchData()">데이터 요청하기</button>
+            <hr />
+            <div>
+                <label for="search-input">정류장 이름 검색:</label>
+                <input
+                    type="text"
+                    id="search-input"
+                    ng-model="searchTerm"
+                    placeholder="정류장 이름을 입력하세요"
+                />
+                <button ng-click="searchBusStops()">검색</button>
+            </div>
+            <hr />
+            <h2>서버 응답 결과 :</h2>
+            <pre ng-bind="resultText"></pre>
+        </div>
+
+        <div ng-view></div>
+    </body>
+</html>

@@ -1,0 +1,14 @@
+<div class="container">
+    <h1>사용자 정보 수정
+        <a href="#!/users" style="float: right; font-size: 16px; line-height: 38px;">목록으로</a>
+    </h1>
+    <hr style="clear: both;" />
+    
+    <form name="editForm" novalidate>
+        ID: {{ userForm.id }} <br/><br/>
+        이름: <input type="text" ng-model="userForm.name" required style="width: 95%;" /><br /><br/>
+        전화번호: <input type="text" ng-model="userForm.phone" required style="width: 95%;" /><br /><br/>
+        이메일: <input type="text" ng-model="userForm.email" required style="width: 95%;" /><br /><br/>
+        <button type="button" ng-click="updateUser()" ng-disabled="editForm.$invalid">저장</button>
+    </form>
+</div>
