@@ -2,23 +2,19 @@ package com.example.demo.controller;
 
 import com.example.demo.service.user.IUserService;
 import java.util.List;
-import java.util.Map; // Map import 추가
+import java.util.Map;
 
-//spring 의존성 주입 기능
 import org.springframework.beans.factory.annotation.Autowired;
-//HTTP 응답을 나타내는 ResponseEntity import
 import org.springframework.http.ResponseEntity;
-//REST 컨트롤러임을 spring에게 알림
-import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
 
-
-
-@RestController //@RestController: 이 클래스가 RESTful API의 컨트롤러,반환값을 자동으로 JSON 형태로 변환
+@RestController
 public class UserController {
     @Autowired
     private IUserService userService;
+
     // HTTP GET 요청이 "/users" 경로로 들어오면 이 메소드가 호출
     @GetMapping("/users")
     public List<Map<String, Object>> getAllUsers() {
@@ -27,43 +23,32 @@ public class UserController {
     
     // HTTP GET 요청이 "/users/{id}" 경로로 들어오면 이 메소드가 호출
     @GetMapping("/users/{id}")
-    // @PathVariable: URL 경로에서 {id} 값을 추출하여 메소드 매개변수 id에 할당
     public Map<String, Object> getUser(@PathVariable String id) {
-        //userService의 getUser 메소드 호출, DB에서 사용자 조회
         return userService.getUser(id);
     }
 
     // HTTP POST 요청이 "/users" 경로로 들어오면 이 메소드가 호출
     @PostMapping("/users")
-    // @RequestBody: HTTP 요청 본문에 담긴 JSON 데이터를 Map<String, Object> 타입의 user 매개변수로 변환
     public Map<String, Object> createUser(@RequestBody Map<String, Object> user) {
-        //userService의 createUser 메소드 호출, DB에 사용자 생성
         return userService.createUser(user);
     }
 
     // HTTP PUT 요청이 "/users/{id}" 경로로 들어오면 이 메소드가 호출
     @PutMapping("/users/{id}")
-    // @PathVariable: URL 경로에서 {id} 값을 추출하여 메소드 매개변수 id에 할당
     public Map<String, Object> updateUser(@PathVariable String id, @RequestBody Map<String, Object> user) {
-        //userService의 updateUser 메소드 호출, DB에서 사용자 정보 업데이트
         return userService.updateUser(id, user);
     }
 
     // HTTP DELETE 요청이 "/users/{id}" 경로로 들어오면 이 메소드가 호출
     @DeleteMapping("/users/{id}")
-    // @PathVariable: URL 경로에서 {id} 값을 추출하여 메소드 매개변수 id에 할당
     public ResponseEntity<Void> deleteUser(@PathVariable String id) {
-        //userService의 deleteUser 메소드 호출, DB에서 사용자 삭제
         userService.deleteUser(id);
-        //삭제 후 응답 본문 없이 상태 코드 204(No Content) 반환
         return ResponseEntity.noContent().build();
     }
 
     // HTTP POST 요청이 "/users/bulk" 경로로 들어오면 이 메소드가 호출
     @PostMapping("/users/bulk")
-    // @RequestBody: HTTP 요청 본문에 담긴 JSON 데이터를 List<Map<String, Object>> 타입의 users 매개변수로 변환
     public List<Integer> createUsers(@RequestBody List<Map<String, Object>> users) {
-        //userService의 createUsers 메소드 호출, DB에 여러 사용자 생성
         return userService.createUsers(users);
     }
 
@@ -78,11 +63,10 @@ public class UserController {
         String username = authentication.getName();
 
         String role = authentication.getAuthorities().stream()
-                .findFirst() // 첫 번째 권한을 가져옵니다.
-                .map(grantedAuthority -> grantedAuthority.getAuthority().replace("ROLE_", "")) // "ROLE_" 접두사 제거
-                .orElse("NONE"); // 권한이 없으면 "NONE"
+                .findFirst()
+                .map(grantedAuthority -> grantedAuthority.getAuthority().replace("ROLE_", ""))
+                .orElse("NONE");
 
-        // Map에 username과 role을 함께 담아 반환합니다.
         Map<String, String> response = new java.util.HashMap<>();
         response.put("username", username);
         response.put("role", role);
@@ -90,4 +74,26 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * [신규/교체] 특정 사용자의 역할을 변경하는 API 엔드포인트입니다.
+     * 프론트엔드로부터 사용자 ID와 새로운 역할 ID 목록을 받아 처리합니다.
+     * @param id 변경할 사용자의 ID
+     * @param payload 프론트에서 보낸 JSON 데이터. {"roleIds": [1, 2]} 형태를 기대합니다.
+     */
+    @PutMapping("/api/users/{id}/roles") // 프론트엔드에서 호출할 새 주소입니다.
+    public ResponseEntity<Void> updateUserRoles(@PathVariable("id") Integer id, @RequestBody Map<String, List<Integer>> payload) {
+        // JSON 데이터에서 "roleIds" 라는 키로 역할 ID 리스트를 꺼냅니다.
+        List<Integer> roleIds = payload.get("roleIds");
+
+        if (roleIds == null) {
+            // 잘못된 요청이라는 의미로 400 Bad Request 응답을 보냅니다.
+            return ResponseEntity.badRequest().build();
+        }
+
+        // 이전에 수정한 서비스 메소드를 호출하여 역할을 변경합니다.
+        userService.updateUserRoles(id, roleIds);
+
+        // 성공적으로 처리되었음을 알리는 200 OK 응답을 보냅니다.
+        return ResponseEntity.ok().build();
+    }
 }

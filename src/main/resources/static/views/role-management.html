@@ -1,34 +1,32 @@
 <div ng-controller="RoleManagementController" class="container">
     <h1>권한 관리</h1>
     <hr />
-    <p>이 페이지에서 사용자의 권한을 변경할 수 있습니다.</p>
+    <p>이 페이지에서 사용자의 권한을 변경할 수 있습니다. (다중 선택 가능)</p>
 
     <table class="user-table">
         <thead>
             <tr>
-                <th>ID (PK)</th>
                 <th>로그인 ID</th>
                 <th>이름</th>
-                <th>현재 권한</th>
-                <th>권한 변경</th>
+                <th>권한 설정 (체크박스)</th>
+                <th>저장</th>
             </tr>
         </thead>
         <tbody>
             <tr ng-repeat="user in userList">
-                <td>{{ user.id }}</td>
                 <td>{{ user.user_id }}</td>
                 <td>{{ user.name }}</td>
                 <td>
-                    <span ng-if="user.role_name == 'ADMIN'" style="color: blue; font-weight: bold;">{{ user.role_name }}</span>
-                    <span ng-if="user.role_name == 'USER'">{{ user.role_name }}</span>
+                    <label ng-repeat="role in roleList" style="margin-right: 15px; cursor: pointer;">
+                        <input 
+                            type="checkbox"
+                            ng-checked="isRoleAssigned(user, role.role_id)"
+                            ng-click="toggleRoleSelection(user, role.role_id)">
+                        {{ role.role_name }}
+                    </label>
                 </td>
                 <td>
-                    <select 
-                        ng-model="user.new_role_id" 
-                        ng-options="role.role_id as role.role_name for role in roleList"
-                        ng-change="updateRole(user, user.new_role_id)">
-                        <option value="">-- 변경 --</option>
-                    </select>
+                    <button ng-click="saveUserRoles(user)">변경사항 저장</button>
                 </td>
             </tr>
         </tbody>

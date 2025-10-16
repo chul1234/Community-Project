@@ -32,7 +32,6 @@ public class UserDAO {
                 pstmt.setString(3, (String) user.get("email"));
                 pstmt.setString(4, (String) user.get("user_id"));
                 pstmt.setString(5, (String) user.get("password"));
-                pstmt.setInt(6, (Integer) user.get("role_id"));
                 
                 int affectedRows = pstmt.executeUpdate();
 
@@ -80,8 +79,7 @@ public class UserDAO {
                     user.put("phone", rs.getString("phone"));
                     user.put("email", rs.getString("email"));
                     user.put("password", rs.getString("password"));
-                    user.put("role_id", rs.getInt("role_id"));
-                    user.put("role_name", rs.getString("role_name")); // 역할 이름 추가
+                    user.put("role_name", rs.getString("role_name"));
                     return Optional.of(user);
                 }
             }
@@ -106,8 +104,7 @@ public class UserDAO {
                     user.put("phone", rs.getString("phone"));
                     user.put("email", rs.getString("email"));
                     user.put("password", rs.getString("password"));
-                    user.put("role_id", rs.getInt("role_id"));
-                    user.put("role_name", rs.getString("role_name")); // 역할 이름 추가
+                    user.put("role_name", rs.getString("role_name"));
                     return Optional.of(user);
                 }
             }
@@ -132,8 +129,7 @@ public class UserDAO {
                 user.put("phone", rs.getString("phone"));
                 user.put("email", rs.getString("email"));
                 user.put("password", rs.getString("password"));
-                user.put("role_id", rs.getInt("role_id"));
-                user.put("role_name", rs.getString("role_name")); // 역할 이름 추가
+                user.put("role_name", rs.getString("role_name"));
                 userList.add(user);
             }
         } catch (SQLException e) {
@@ -156,24 +152,53 @@ public class UserDAO {
     }
 
     /**
-     * 특정 사용자의 role_id를 변경합니다.
-     * @param userId 권한을 변경할 사용자의 PK(id)
-     * @param roleId 새로 부여할 역할의 ID(role_id)
-     * @return 영향을 받은 행의 수 (성공 시 1)
+     * [수정] 특정 사용자의 모든 역할을 users_roles 테이블에서 삭제합니다.
+     * @param userId 역할을 삭제할 사용자의 ID
      */
-    public int updateRole(Integer userId, Integer roleId) {
-        // sql.properties에 추가할 새로운 쿼리를 사용합니다.
-        String sql = SqlLoader.getSql("user.update.role");
+    public void deleteUserRoles(Integer userId) throws SQLException {
+        String sql = SqlLoader.getSql("user_roles.delete.by_user_id");
+        // 이 메소드 안에서 직접 Connection을 얻고 관리합니다.
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, userId);
+            pstmt.executeUpdate();
+        }
+    }
 
-            pstmt.setInt(1, roleId);
-            pstmt.setInt(2, userId);
+    /**
+     * [수정] 특정 사용자에게 여러 역할을 users_roles 테이블에 추가합니다.
+     * @param userId 역할을 추가할 사용자의 ID
+     * @param roleIds 추가할 역할 ID 목록
+     */
+    public void insertUserRoles(Integer userId, List<Integer> roleIds) throws SQLException {
+        String sql = SqlLoader.getSql("user_roles.insert");
+        // 이 메소드 안에서 직접 Connection을 얻고 관리합니다.
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            for (Integer roleId : roleIds) {
+                pstmt.setInt(1, userId);
+                pstmt.setInt(2, roleId);
+                pstmt.addBatch();
+            }
+            pstmt.executeBatch();
+        }
+    }
 
-            return pstmt.executeUpdate();
+    /**
+     * [수정] 특정 사용자에게 단일 역할을 users_roles 테이블에 추가합니다.
+     * @param userId 역할을 추가할 사용자의 ID
+     * @param roleId 추가할 역할 ID
+     */
+    public void insertUserRole(Integer userId, Integer roleId) {
+        String sql = SqlLoader.getSql("user_roles.insert");
+        // 이 메소드 안에서 직접 Connection을 얻고 관리합니다.
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, userId);
+            pstmt.setInt(2, roleId);
+            pstmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
-            return 0;
         }
     }
 }
