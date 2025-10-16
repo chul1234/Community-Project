@@ -18,7 +18,8 @@ app.config(function ($routeProvider) {
             templateUrl: 'views/user-create.html',
             controller: 'UserCreateController',
         })
-        .when('/users/edit/:id', {
+        // [수정] URL 파라미터를 :id에서 :userId로 변경하여 의미를 명확히 합니다.
+        .when('/users/edit/:userId', {
             templateUrl: 'views/user-edit.html',
             controller: 'UserEditController',
         })
@@ -39,18 +40,12 @@ app.config(function ($routeProvider) {
  * 3. MainController: 헤더와 같이 공통 레이아웃을 제어합니다.
  */
 app.controller('MainController', function($scope, $http, $location, $rootScope) {
-    // 탭 메뉴의 활성화 상태를 CSS('active' 클래스)와 연동하기 위해 $location을 $scope에 할당합니다.
+    // 이 부분은 수정할 필요 없습니다.
     $scope.$location = $location;
-
-    // 사용자 정보를 앱 전체(모든 컨트롤러)에서 공유하기 위해 '$rootScope'를 사용합니다.
     $rootScope.currentUser = {};
-
-    // 백엔드 API(/api/me)를 호출하여 현재 로그인한 사용자 정보를 가져옵니다.
     $http.get('/api/me').then(function(response) {
-        // 성공 시, $rootScope에 사용자 정보(id, role 등)를 모두 저장합니다.
         $rootScope.currentUser = response.data;
     }).catch(function(error) {
-        // API 호출 실패 시 (예: 로그아웃 상태) 기본값을 설정합니다.
         $rootScope.currentUser.username = '정보 없음';
         console.error('사용자 정보를 불러오는 데 실패했습니다.', error);
     });

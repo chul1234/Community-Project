@@ -13,7 +13,7 @@
     <table class="user-table">
         <thead>
             <tr>
-                <th>ID</th>
+                <th>로그인 ID (PK)</th>
                 <th>이름</th>
                 <th>전화번호</th>
                 <th>이메일</th>
@@ -22,14 +22,13 @@
         </thead>
         <tbody>
             <tr ng-repeat="user in userList">
-                <td>{{ user.id }}</td>
+                <td>{{ user.user_id }}</td>
                 <td>{{ user.name }}</td>
                 <td>{{ user.phone }}</td>
                 <td>{{ user.email }}</td>
                 <td>
-                    <button ng-click="goToEditPage(user.id)">수정</button>
-                    
-                    <button ng-click="deleteUser(user.id)">삭제</button>
+                    <button ng-click="goToEditPage(user.user_id)">수정</button>
+                    <button ng-click="deleteUser(user.user_id)">삭제</button>
                 </td>
             </tr>
         </tbody>

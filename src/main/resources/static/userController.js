@@ -10,22 +10,21 @@ app.controller('UserListController', function ($scope, $http, $location) {
         });
     };
 
-    $scope.deleteUser = function (id) {
-        if (confirm(id + '번 사용자를 정말 삭제하시겠습니까?')) {
-            $http
-                .delete('/users/' + id)
-                .then(function (response) {
-                    $scope.fetchAllUsers();
-                })
-                .catch(function (error) {
-                    console.error('삭제 실패:', error);
-                    alert('사용자 삭제 중 오류가 발생했습니다.');
-                });
+    // [수정] 파라미터를 id 대신 user_id로 받고, API 호출 시 user_id를 사용합니다.
+    $scope.deleteUser = function (userId) {
+        if (confirm(userId + ' 사용자를 정말 삭제하시겠습니까?')) {
+            $http.delete('/users/' + userId).then(function (response) {
+                $scope.fetchAllUsers();
+            }).catch(function (error) {
+                console.error('삭제 실패:', error);
+                alert('사용자 삭제 중 오류가 발생했습니다.');
+            });
         }
     };
 
-    $scope.goToEditPage = function (id) {
-        $location.path('/users/edit/' + id);
+    // [수정] 파라미터를 id 대신 user_id로 받고, URL 경로에 user_id를 사용합니다.
+    $scope.goToEditPage = function (userId) {
+        $location.path('/users/edit/' + userId);
     };
 
     $scope.fetchAllUsers();
@@ -35,6 +34,7 @@ app.controller('UserListController', function ($scope, $http, $location) {
  * 3-2. UserCreateController: 새 사용자 등록 화면(user-create.html)을 제어합니다.
  */
 app.controller('UserCreateController', function ($scope, $http, $location) {
+    // 이 컨트롤러는 수정할 필요가 없습니다.
     $scope.newUsers = [{ user_id: '', password: '', name: '', phone: '', email: '' }];
 
     $scope.addUserField = function () {
@@ -66,14 +66,16 @@ app.controller('UserCreateController', function ($scope, $http, $location) {
  */
 app.controller('UserEditController', function ($scope, $http, $location, $routeParams) {
     $scope.userForm = {};
-    var id = $routeParams.id;
+    // [수정] 라우트 파라미터가 이제 user_id를 의미하지만, 변수명은 id를 그대로 사용해도 무방합니다.
+    var userId = $routeParams.id;
 
-    $http.get('/users/' + id).then(function (response) {
+    $http.get('/users/' + userId).then(function (response) {
         $scope.userForm = response.data;
     });
 
     $scope.updateUser = function () {
-        $http.put('/users/' + $scope.userForm.id, $scope.userForm).then(function () {
+        // [수정] API 호출 시 userForm에 담긴 user_id를 사용합니다.
+        $http.put('/users/' + $scope.userForm.user_id, $scope.userForm).then(function () {
             $location.path('/users');
         });
     };
@@ -83,47 +85,37 @@ app.controller('UserEditController', function ($scope, $http, $location, $routeP
  * 3-4. RoleManagementController: 권한 관리 화면(role-management.html)을 제어합니다.
  */
 app.controller('RoleManagementController', function ($scope, $http, $rootScope, $location) {
-    // 페이지 접근 권한을 확인하는 로직 (기존과 동일)
+
     const unwatch = $rootScope.$watch('currentUser.role', function (newRoleValue) {
         if (newRoleValue) {
             if (newRoleValue !== 'ADMIN') {
                 alert('관리자만 접근할 수 있는 페이지입니다.');
                 $location.path('/users');
             } else {
-                // 관리자일 경우에만 페이지 데이터 로딩 함수를 호출합니다.
                 initializePageData();
             }
             unwatch();
         }
     });
 
-    // 페이지에 필요한 데이터를 서버에서 불러오는 함수
     function initializePageData() {
         $scope.userList = [];
         $scope.roleList = [];
-        // [신규] 사용자의 역할 선택 상태를 임시로 저장할 객체입니다.
-        // 예: { 1: {1: true, 2: true}, 2: {2: true} } -> 1번 유저는 1,2번 역할, 2번 유저는 2번 역할 선택
         $scope.userRoleSelections = {};
 
-        // 1. 전체 역할 목록을 먼저 가져옵니다. (/api/roles)
         $http.get('/api/roles').then(function (response) {
             $scope.roleList = response.data;
-
-            // 2. 역할 목록을 가져온 후, 전체 사용자 목록을 가져옵니다. (/users)
             $http.get('/users').then(function (response) {
                 $scope.userList = response.data;
-
-                // 3. 각 사용자의 현재 역할 정보를 분석하여 userRoleSelections 객체에 체크박스 상태를 미리 저장합니다.
-                $scope.userList.forEach(function (user) {
-                    $scope.userRoleSelections[user.id] = {}; // 사용자 ID로 초기화
+                $scope.userList.forEach(function(user) {
+                    // [수정] userRoleSelections의 키로 숫자 id 대신 문자열 user_id를 사용합니다.
+                    $scope.userRoleSelections[user.user_id] = {};
                     if (user.role_name) {
-                        // "ADMIN, USER" 같은 문자열을 ["ADMIN", "USER"] 배열로 변환
                         const userAssignedRoles = user.role_name.split(', ');
-
-                        // 전체 역할 목록과 사용자의 역할 목록을 비교하여 체크 상태를 결정
-                        $scope.roleList.forEach(function (role) {
+                        $scope.roleList.forEach(function(role) {
                             if (userAssignedRoles.includes(role.role_name)) {
-                                $scope.userRoleSelections[user.id][role.role_id] = true;
+                                // [수정] 역할 ID도 이제 숫자 대신 문자열('ADMIN', 'USER')입니다.
+                                $scope.userRoleSelections[user.user_id][role.role_id] = true;
                             }
                         });
                     }
@@ -132,41 +124,39 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
         });
     }
 
-    // [신규] 특정 유저에게 특정 역할이 할당되었는지 확인하는 함수 (ng-checked에서 사용)
-    $scope.isRoleAssigned = function (user, roleId) {
-        return !!($scope.userRoleSelections[user.id] && $scope.userRoleSelections[user.id][roleId]);
+    $scope.isRoleAssigned = function(user, roleId) {
+        // [수정] user.user_id를 키로 사용합니다.
+        return !!($scope.userRoleSelections[user.user_id] && $scope.userRoleSelections[user.user_id][roleId]);
     };
 
-    // [신규] 체크박스를 클릭할 때마다 선택 상태를 토글(true/false)하는 함수
-    $scope.toggleRoleSelection = function (user, roleId) {
-        if (!$scope.userRoleSelections[user.id]) {
-            $scope.userRoleSelections[user.id] = {};
+    $scope.toggleRoleSelection = function(user, roleId) {
+        // [수정] user.user_id를 키로 사용합니다.
+        if (!$scope.userRoleSelections[user.user_id]) {
+            $scope.userRoleSelections[user.user_id] = {};
         }
-        $scope.userRoleSelections[user.id][roleId] = !$scope.userRoleSelections[user.id][roleId];
+        $scope.userRoleSelections[user.user_id][roleId] = !$scope.userRoleSelections[user.user_id][roleId];
     };
 
-    // [신규] '변경사항 저장' 버튼 클릭 시 백엔드 API를 호출하는 함수
-    $scope.saveUserRoles = function (user) {
-        // 현재 체크된 역할들의 ID만 추출하여 배열로 만듭니다. (예: [1, 2])
+    $scope.saveUserRoles = function(user) {
         const selectedRoleIds = [];
-        angular.forEach($scope.userRoleSelections[user.id], function (isSelected, roleId) {
+        // [수정] user.user_id를 키로 사용합니다.
+        angular.forEach($scope.userRoleSelections[user.user_id], function(isSelected, roleId) {
             if (isSelected) {
-                selectedRoleIds.push(parseInt(roleId));
+                // [수정] 이제 roleId는 문자열이므로 parseInt가 필요 없습니다.
+                selectedRoleIds.push(roleId);
             }
         });
 
         if (confirm(user.name + ' 사용자의 권한을 이대로 저장하시겠습니까?')) {
-            // 우리가 새로 만든 백엔드 API 주소로 PUT 요청을 보냅니다.
-            $http
-                .put('/api/users/' + user.id + '/roles', { roleIds: selectedRoleIds })
-                .then(function (response) {
+            // [수정] API 호출 시 user.user_id를 사용합니다.
+            $http.put('/api/users/' + user.user_id + '/roles', { roleIds: selectedRoleIds })
+                .then(function(response) {
                     alert('권한이 성공적으로 변경되었습니다.');
-                    // 변경된 내용을 화면에 즉시 반영하기 위해 페이지 데이터를 새로고침합니다.
                     initializePageData();
                 })
-                .catch(function (error) {
+                .catch(function(error) {
                     alert('권한 변경에 실패했습니다. 서버 로그를 확인해주세요.');
-                    console.error('Role update failed:', error);
+                    console.error("Role update failed:", error);
                 });
         }
     };

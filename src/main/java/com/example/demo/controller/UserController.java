@@ -15,38 +15,35 @@ public class UserController {
     @Autowired
     private IUserService userService;
 
-    // HTTP GET 요청이 "/users" 경로로 들어오면 이 메소드가 호출
     @GetMapping("/users")
     public List<Map<String, Object>> getAllUsers() {
         return userService.findAllUsers();
     }
     
-    // HTTP GET 요청이 "/users/{id}" 경로로 들어오면 이 메소드가 호출
-    @GetMapping("/users/{id}")
-    public Map<String, Object> getUser(@PathVariable String id) {
-        return userService.getUser(id);
+    // [수정] URL 경로 변수를 userId로 명확히 하고 String으로 받습니다.
+    @GetMapping("/users/{userId}")
+    public Map<String, Object> getUser(@PathVariable String userId) {
+        return userService.getUser(userId);
     }
 
-    // HTTP POST 요청이 "/users" 경로로 들어오면 이 메소드가 호출
     @PostMapping("/users")
     public Map<String, Object> createUser(@RequestBody Map<String, Object> user) {
         return userService.createUser(user);
     }
 
-    // HTTP PUT 요청이 "/users/{id}" 경로로 들어오면 이 메소드가 호출
-    @PutMapping("/users/{id}")
-    public Map<String, Object> updateUser(@PathVariable String id, @RequestBody Map<String, Object> user) {
-        return userService.updateUser(id, user);
+    // [수정] URL 경로 변수를 userId로 명확히 하고 String으로 받습니다.
+    @PutMapping("/users/{userId}")
+    public Map<String, Object> updateUser(@PathVariable String userId, @RequestBody Map<String, Object> user) {
+        return userService.updateUser(userId, user);
     }
 
-    // HTTP DELETE 요청이 "/users/{id}" 경로로 들어오면 이 메소드가 호출
-    @DeleteMapping("/users/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable String id) {
-        userService.deleteUser(id);
+    // [수정] URL 경로 변수를 userId로 명확히 하고 String으로 받습니다.
+    @DeleteMapping("/users/{userId}")
+    public ResponseEntity<Void> deleteUser(@PathVariable String userId) {
+        userService.deleteUser(userId);
         return ResponseEntity.noContent().build();
     }
 
-    // HTTP POST 요청이 "/users/bulk" 경로로 들어오면 이 메소드가 호출
     @PostMapping("/users/bulk")
     public List<Integer> createUsers(@RequestBody List<Map<String, Object>> users) {
         return userService.createUsers(users);
@@ -75,25 +72,17 @@ public class UserController {
     }
 
     /**
-     * [신규/교체] 특정 사용자의 역할을 변경하는 API 엔드포인트입니다.
-     * 프론트엔드로부터 사용자 ID와 새로운 역할 ID 목록을 받아 처리합니다.
-     * @param id 변경할 사용자의 ID
-     * @param payload 프론트에서 보낸 JSON 데이터. {"roleIds": [1, 2]} 형태를 기대합니다.
+     * [수정] 역할 변경 API의 모든 파라미터를 String 타입으로 변경합니다.
      */
-    @PutMapping("/api/users/{id}/roles") // 프론트엔드에서 호출할 새 주소입니다.
-    public ResponseEntity<Void> updateUserRoles(@PathVariable("id") Integer id, @RequestBody Map<String, List<Integer>> payload) {
-        // JSON 데이터에서 "roleIds" 라는 키로 역할 ID 리스트를 꺼냅니다.
-        List<Integer> roleIds = payload.get("roleIds");
+    @PutMapping("/api/users/{userId}/roles")
+    public ResponseEntity<Void> updateUserRoles(@PathVariable String userId, @RequestBody Map<String, List<String>> payload) {
+        List<String> roleIds = payload.get("roleIds");
 
         if (roleIds == null) {
-            // 잘못된 요청이라는 의미로 400 Bad Request 응답을 보냅니다.
             return ResponseEntity.badRequest().build();
         }
 
-        // 이전에 수정한 서비스 메소드를 호출하여 역할을 변경합니다.
-        userService.updateUserRoles(id, roleIds);
-
-        // 성공적으로 처리되었음을 알리는 200 OK 응답을 보냅니다.
+        userService.updateUserRoles(userId, roleIds);
         return ResponseEntity.ok().build();
     }
 }

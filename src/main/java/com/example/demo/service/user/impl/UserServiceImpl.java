@@ -17,35 +17,33 @@ public class UserServiceImpl implements IUserService {
     @Autowired
     private UserDAO userDAO;
 
-    // 비밀번호 암호화를 위해 PasswordEncoder를 주입받습니다.
     @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Override
-    public Map<String, Object> getUser(String id) {
-        return userDAO.findById(Integer.parseInt(id)).orElse(null);
+    public Map<String, Object> getUser(String userId) {
+        // [수정] findById 대신 findByUserId를 사용합니다.
+        return userDAO.findByUserId(userId).orElse(null);
     }
 
     /**
-     * [수정됨] 단일 사용자 생성 시 users_roles 테이블에 기본 역할을 추가하는 로직으로 변경
+     * [수정] 단일 사용자 생성 시 users_roles 테이블에 기본 역할을 '문자열'로 추가합니다.
      */
     @Override
-    @Transactional // users 테이블과 users_roles 테이블 작업을 하나의 트랜잭션으로 묶습니다.
+    @Transactional
     public Map<String, Object> createUser(Map<String, Object> user) {
-        // 1. 비밀번호를 암호화합니다.
         String rawPassword = (String) user.get("password");
         user.put("password", passwordEncoder.encode(rawPassword));
 
-        // 2. users 테이블에 사용자 정보를 저장합니다. (role_id는 이제 없음)
         int affectedRows = userDAO.save(user);
 
         if (affectedRows > 0) {
-            // 3. 저장이 성공하면, 생성된 사용자의 id를 가져옵니다.
-            Integer newUserId = (Integer) user.get("id");
+            // [수정] 생성된 사용자의 id(PK)는 이제 user_id(String)입니다.
+            String newUserId = (String) user.get("user_id");
             
-            // 4. users_roles 테이블에 기본 역할(USER, role_id=2)을 부여합니다.
             if (newUserId != null) {
-                userDAO.insertUserRole(newUserId, 2); // 기본 'USER' 역할 ID
+                // [수정] 기본 역할 'USER'를 문자열로 부여합니다.
+                userDAO.insertUserRole(newUserId, "USER"); 
             }
             return user;
         } else {
@@ -54,13 +52,16 @@ public class UserServiceImpl implements IUserService {
     }
 
     @Override
-    public Map<String, Object> updateUser(String id, Map<String, Object> userDetails) {
-        Map<String, Object> user = userDAO.findById(Integer.parseInt(id)).orElse(null);
+    public Map<String, Object> updateUser(String userId, Map<String, Object> userDetails) {
+        // [수정] user_id를 기준으로 사용자를 찾습니다.
+        Map<String, Object> user = userDAO.findByUserId(userId).orElse(null);
         if (user != null) {
             user.put("name", userDetails.get("name"));
             user.put("phone", userDetails.get("phone"));
             user.put("email", userDetails.get("email"));
             
+            // [수정] 업데이트 시 WHERE 조건절에 들어갈 키를 명확히 합니다.
+            user.put("id_for_update", userId);
             int affectedRows = userDAO.save(user);
 
             if (affectedRows == 1) {
@@ -71,10 +72,11 @@ public class UserServiceImpl implements IUserService {
     }
 
     @Override
-    public void deleteUser(String id) {
-        int affectedRows = userDAO.deleteById(Integer.parseInt(id));
+    public void deleteUser(String userId) {
+        // [수정] deleteById 대신 deleteByUserId를 사용합니다.
+        int affectedRows = userDAO.deleteByUserId(userId);
         if (affectedRows == 0) {
-            throw new RuntimeException("삭제할 사용자를 찾지 못했습니다. ID: " + id);
+            throw new RuntimeException("삭제할 사용자를 찾지 못했습니다. ID: " + userId);
         }
     }
 
@@ -84,55 +86,45 @@ public class UserServiceImpl implements IUserService {
     }
 
     /**
-     * [수정됨] 여러 사용자 등록 시 users_roles 테이블에 기본 역할을 추가하는 로직으로 변경
+     * [수정] 여러 사용자 등록 시 users_roles 테이블에 기본 역할을 '문자열'로 추가합니다.
      */
     @Override
     @Transactional
     public List<Integer> createUsers(List<Map<String, Object>> users) {
         return users.stream()
                     .map(user -> {
-                        // 1. 사용자가 입력한 비밀번호(평문)를 가져옵니다.
                         String rawPassword = (String) user.get("password");
-                        
-                        // 2. 비밀번호를 암호화하여 다시 user Map에 저장합니다.
                         user.put("password", passwordEncoder.encode(rawPassword));
-                        
-                        // 3. 암호화된 정보로 users 테이블에 저장합니다.
+
                         int affectedRows = userDAO.save(user);
 
                         if (affectedRows > 0) {
-                            // 4. 저장이 성공하면, 생성된 사용자의 id를 가져와 users_roles에 기본 역할을 부여합니다.
-                            Integer newUserId = (Integer) user.get("id");
+                            String newUserId = (String) user.get("user_id");
                             if (newUserId != null) {
-                                userDAO.insertUserRole(newUserId, 2); // 기본 'USER' 역할 ID
+                                // [수정] 기본 역할 'USER'를 문자열로 부여합니다.
+                                userDAO.insertUserRole(newUserId, "USER");
                             }
-                            return 1; // 성공
+                            return 1;
                         } else {
-                            return 0; // 실패
+                            return 0;
                         }
                     })
                     .collect(Collectors.toList());
     }
-
+    
     /**
-     * [교체됨] 기존 updateUserRole 메소드를 삭제하고 이 메소드로 대체합니다.
-     * 특정 사용자의 역할을 변경합니다.
-     * @param userId 변경할 사용자의 ID
-     * @param roleIds 새로 부여할 역할 ID 목록
+     * [수정] 특정 사용자의 역할을 변경하는 메소드 (모두 String 타입 사용)
      */
     @Override
-    @Transactional // 이 어노테이션 덕분에 내부의 모든 DB 작업이 하나의 단위로 묶여 안전하게 실행됩니다.
-    public void updateUserRoles(Integer userId, List<Integer> roleIds) {
+    @Transactional
+    public void updateUserRoles(String userId, List<String> roleIds) {
         try {
-            // 1. UserDAO를 통해 해당 사용자의 기존 역할을 모두 삭제합니다.
             userDAO.deleteUserRoles(userId);
             
-            // 2. 프론트엔드에서 새로운 역할 목록을 전달받았다면, 모두 새로 추가합니다.
             if (roleIds != null && !roleIds.isEmpty()) {
                 userDAO.insertUserRoles(userId, roleIds);
             }
         } catch (Exception e) {
-            // @Transactional에 의해 중간에 오류가 나면 모든 작업이 자동으로 롤백(취소)됩니다.
             throw new RuntimeException("사용자 역할 변경 중 오류가 발생했습니다.", e);
         }
     }
