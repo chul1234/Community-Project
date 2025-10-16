@@ -10,6 +10,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 //REST 컨트롤러임을 spring에게 알림
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+
 
 @RestController //@RestController: 이 클래스가 RESTful API의 컨트롤러,반환값을 자동으로 JSON 형태로 변환
 public class UserController {
@@ -62,4 +66,28 @@ public class UserController {
         //userService의 createUsers 메소드 호출, DB에 여러 사용자 생성
         return userService.createUsers(users);
     }
+
+    @GetMapping("/api/me")
+    public ResponseEntity<Map<String, String>> getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String username = authentication.getName();
+
+        String role = authentication.getAuthorities().stream()
+                .findFirst() // 첫 번째 권한을 가져옵니다.
+                .map(grantedAuthority -> grantedAuthority.getAuthority().replace("ROLE_", "")) // "ROLE_" 접두사 제거
+                .orElse("NONE"); // 권한이 없으면 "NONE"
+
+        // Map에 username과 role을 함께 담아 반환합니다.
+        Map<String, String> response = new java.util.HashMap<>();
+        response.put("username", username);
+        response.put("role", role);
+
+        return ResponseEntity.ok(response);
+    }
+
 }

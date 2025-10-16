@@ -10,4 +10,5 @@ public interface IUserService { //IUserService라는 인터페이스 선언
     void deleteUser(String id); //void 타입을 반환하는 deleteUser 메소드 선언(삭제후 변환할 데이터 X)
     List<Map<String, Object>> findAllUsers(); //List<Map<String, Object>> 타입을 반환하는 findAllUsers 메소드 선언
     List<Integer> createUsers(List<Map<String, Object>> users); //List<Integer> 타입을 반환하는 createUsers 메소드 선언,list를 받아서 db저장 
+    void updateUserRole(Integer userId, Integer roleId);
 }
