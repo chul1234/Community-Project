@@ -28,7 +28,7 @@
                 <td>{{ user.email }}</td>
                 <td>
                     <button ng-click="goToEditPage(user.id)">수정</button>
-                    <button ng-if="currentUser.role == 'ADMIN'" ng-click="deleteUser(user.id)">삭제</button>
+                    
                     <button ng-click="deleteUser(user.id)">삭제</button>
                 </td>
             </tr>
