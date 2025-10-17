@@ -3,11 +3,10 @@
     <hr/>
 
     <div ng-if="isAdmin">
-        <div>
+        <div class="action-bar">
             <button type="button" ng-click="fetchAllUsers()">사용자 목록 새로고침</button>
-            <a href="#!/users/new" style="float: right;">새 사용자 등록</a>
+            <a href="#!/users/new" class="action-btn create-btn">새 사용자 등록</a>
         </div>
-        <hr style="clear: both;" />
 
         <h2>사용자 목록</h2>
         <table class="user-table">

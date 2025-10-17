@@ -46,7 +46,7 @@ public class SecurityConfig { // 웹 보안 설정을 담기 위한 클래스 �
                 .loginProcessingUrl("/login")
                 // ★★★ 로그인 ID로 사용할 파라미터 이름을 명시합니다. ★★★
                 .usernameParameter("username") 
-                .defaultSuccessUrl("/", true)
+                .defaultSuccessUrl("/#!/bus", true)
                 .permitAll()
             )
 
