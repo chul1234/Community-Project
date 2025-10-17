@@ -92,4 +92,15 @@ public class UserController {
         userService.updateUserRoles(userId, roleIds);
         return ResponseEntity.ok().build();
     }
+    @DeleteMapping("/api/users/me")
+    public ResponseEntity<Void> deleteCurrentUser(Authentication authentication) {
+        // 1. 현재 로그인한 사용자의 ID(username)를 가져옵니다.
+        String currentUserId = authentication.getName();
+
+        // 2. UserService를 통해 해당 사용자를 삭제합니다.
+        userService.deleteUser(currentUserId);
+
+        // 3. 성공적으로 삭제되었음을 알리는 응답을 보냅니다.
+        return ResponseEntity.ok().build();
+    }
 }

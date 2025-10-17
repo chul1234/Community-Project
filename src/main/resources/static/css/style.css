@@ -239,3 +239,8 @@ header h1 {
     background-color: #28a745;
     color: white;
 }
+
+.user-info .delete-btn {
+    background-color: #dc3545; /* 위험을 의미하는 붉은색 */
+    margin-right: 10px; /* 로그아웃 버튼과의 간격 */
+}

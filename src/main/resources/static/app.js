@@ -40,7 +40,6 @@ app.config(function ($routeProvider) {
  * 3. MainController: 헤더와 같이 공통 레이아웃을 제어합니다.
  */
 app.controller('MainController', function($scope, $http, $location, $rootScope) {
-    // 이 부분은 수정할 필요 없습니다.
     $scope.$location = $location;
     $rootScope.currentUser = {};
     $http.get('/api/me').then(function(response) {
@@ -49,4 +48,16 @@ app.controller('MainController', function($scope, $http, $location, $rootScope) 
         $rootScope.currentUser.username = '정보 없음';
         console.error('사용자 정보를 불러오는 데 실패했습니다.', error);
     });
+
+    $scope.deleteMyAccount = function() {
+        if (confirm("정말 탈퇴하시겠습니까? 모든 정보는 영구적으로 삭제됩니다.")) {
+            $http.delete('/api/users/me').then(function() {
+                alert("회원 탈퇴가 완료되었습니다.");
+                window.location.href = '/logout'; 
+            }).catch(function(error) {
+                alert("회원 탈퇴 중 오류가 발생했습니다.");
+                console.error("Delete account failed:", error);
+            });
+        }
+    };
 });
