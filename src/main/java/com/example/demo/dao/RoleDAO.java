@@ -29,7 +29,6 @@ public class RoleDAO {
      */
     public List<Map<String, Object>> findAll() {
         List<Map<String, Object>> roleList = new ArrayList<>();
-        // roles 테이블의 모든 데이터를 조회하는 간단한 SQL 쿼리입니다.
         String sql = "SELECT * FROM roles";
 
         try (Connection conn = getConnection();
@@ -38,7 +37,8 @@ public class RoleDAO {
 
             while (rs.next()) {
                 Map<String, Object> role = new HashMap<>();
-                role.put("role_id", rs.getInt("role_id"));
+                // [수정] role_id는 VARCHAR(문자열)이므로 getString으로 읽어야 합니다.
+                role.put("role_id", rs.getString("role_id"));
                 role.put("role_name", rs.getString("role_name"));
                 roleList.add(role);
             }

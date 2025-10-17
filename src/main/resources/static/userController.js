@@ -66,8 +66,8 @@ app.controller('UserCreateController', function ($scope, $http, $location) {
  */
 app.controller('UserEditController', function ($scope, $http, $location, $routeParams) {
     $scope.userForm = {};
-    // [수정] 라우트 파라미터가 이제 user_id를 의미하지만, 변수명은 id를 그대로 사용해도 무방합니다.
-    var userId = $routeParams.id;
+    // 라우트 파라미터가 이제 user_id를 의미하지만, 변수명은 id를 그대로 사용해도 무방합니다.
+    var userId = $routeParams.userId; // app.js에서 :userId로 변경했으므로 $routeParams.userId로 받습니다.
 
     $http.get('/users/' + userId).then(function (response) {
         $scope.userForm = response.data;
@@ -108,13 +108,14 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
             $http.get('/users').then(function (response) {
                 $scope.userList = response.data;
                 $scope.userList.forEach(function(user) {
-                    // [수정] userRoleSelections의 키로 숫자 id 대신 문자열 user_id를 사용합니다.
                     $scope.userRoleSelections[user.user_id] = {};
                     if (user.role_name) {
+                        // user.role_name은 이제 'ADMIN,USER' 같은 role_id 목록입니다.
                         const userAssignedRoles = user.role_name.split(', ');
                         $scope.roleList.forEach(function(role) {
-                            if (userAssignedRoles.includes(role.role_name)) {
-                                // [수정] 역할 ID도 이제 숫자 대신 문자열('ADMIN', 'USER')입니다.
+                            // [수정] 사용자의 역할 ID 목록(userAssignedRoles)에
+                            // 전체 역할의 역할 ID(role.role_id)가 포함되어 있는지 비교합니다.
+                            if (userAssignedRoles.includes(role.role_id)) {
                                 $scope.userRoleSelections[user.user_id][role.role_id] = true;
                             }
                         });
@@ -125,12 +126,10 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
     }
 
     $scope.isRoleAssigned = function(user, roleId) {
-        // [수정] user.user_id를 키로 사용합니다.
         return !!($scope.userRoleSelections[user.user_id] && $scope.userRoleSelections[user.user_id][roleId]);
     };
 
     $scope.toggleRoleSelection = function(user, roleId) {
-        // [수정] user.user_id를 키로 사용합니다.
         if (!$scope.userRoleSelections[user.user_id]) {
             $scope.userRoleSelections[user.user_id] = {};
         }
@@ -139,16 +138,13 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
 
     $scope.saveUserRoles = function(user) {
         const selectedRoleIds = [];
-        // [수정] user.user_id를 키로 사용합니다.
         angular.forEach($scope.userRoleSelections[user.user_id], function(isSelected, roleId) {
             if (isSelected) {
-                // [수정] 이제 roleId는 문자열이므로 parseInt가 필요 없습니다.
                 selectedRoleIds.push(roleId);
             }
         });
 
         if (confirm(user.name + ' 사용자의 권한을 이대로 저장하시겠습니까?')) {
-            // [수정] API 호출 시 user.user_id를 사용합니다.
             $http.put('/api/users/' + user.user_id + '/roles', { roleIds: selectedRoleIds })
                 .then(function(response) {
                     alert('권한이 성공적으로 변경되었습니다.');
