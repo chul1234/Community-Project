@@ -20,57 +20,33 @@ public class UserDAO {
         return dataSource.getConnection();
     }
 
-    /**
-     * [수정] save 메소드는 이제 id가 아닌 user_id가 있는지 확인합니다.
-     * 또한, user_id는 자동 생성이 아니므로 generatedKeys 로직을 제거합니다.
-     */
+    // save, delete, insert 메소드들은 수정할 필요가 없습니다. (생략)
     public int save(Map<String, Object> user) {
-        // user_id가 없으면 INSERT, 있으면 UPDATE로 분기하는 로직은 유효하나,
-        // 이 프로젝트에서는 생성과 수정이 명확히 분리되어 있으므로
-        // 여기서는 INSERT 로직만 처리하는 것이 더 명확할 수 있습니다.
-        // (단, UserEdit 기능이 user_id를 수정하지 않으므로 UPDATE 로직은 그대로 둡니다.)
-        
-        // user 객체에 "id" 키 대신 "user_id" 키가 있는지 확인해야 하지만,
-        // 현재 로직은 신규 생성 시 id가 null인 점을 이용하므로 그대로 활용합니다.
-        // 단, createUser, createUsers 서비스 로직에서 PK인 user_id를 반드시 넣어줘야 합니다.
-
-        if (user.get("id_for_update") == null) { // 'id' 대신 명확한 키 사용 또는 다른 조건 사용
-            // INSERT 로직
-            String sql = SqlLoader.getSql("user.insert"); // user.insert 쿼리도 수정 필요
+        if (user.get("id_for_update") == null) {
+            String sql = SqlLoader.getSql("user.insert");
             try (Connection conn = getConnection();
                  PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                
-                pstmt.setString(1, (String) user.get("user_id")); // PK인 user_id를 직접 설정
+                pstmt.setString(1, (String) user.get("user_id"));
                 pstmt.setString(2, (String) user.get("name"));
                 pstmt.setString(3, (String) user.get("phone"));
                 pstmt.setString(4, (String) user.get("email"));
                 pstmt.setString(5, (String) user.get("password"));
-                
                 return pstmt.executeUpdate();
-            } catch (SQLException e) {
-                e.printStackTrace();
-                return 0;
-            }
+            } catch (SQLException e) { e.printStackTrace(); return 0; }
         } else {
-            // UPDATE 로직
             String sql = SqlLoader.getSql("user.update");
             try (Connection conn = getConnection();
                  PreparedStatement pstmt = conn.prepareStatement(sql)) {
                 pstmt.setString(1, (String) user.get("name"));
                 pstmt.setString(2, (String) user.get("phone"));
                 pstmt.setString(3, (String) user.get("email"));
-                pstmt.setString(4, (String) user.get("id_for_update")); // WHERE 조건절에 user_id 사용
+                pstmt.setString(4, (String) user.get("id_for_update"));
                 return pstmt.executeUpdate();
-            } catch (SQLException e) {
-                e.printStackTrace();
-                return 0;
-            }
+            } catch (SQLException e) { e.printStackTrace(); return 0; }
         }
     }
 
-    /**
-     * [수정] PK인 user_id(String)로 사용자를 조회합니다.
-     */
+    // [수정] findByUserId 메소드: 로그인 시 필요한 role_ids만 정확히 담도록 수정
     public Optional<Map<String, Object>> findByUserId(String userId) {
         String sql = SqlLoader.getSql("user.select.by_user_id");
         try (Connection conn = getConnection();
@@ -84,7 +60,7 @@ public class UserDAO {
                     user.put("phone", rs.getString("phone"));
                     user.put("email", rs.getString("email"));
                     user.put("password", rs.getString("password"));
-                    user.put("role_name", rs.getString("role_name"));
+                    user.put("role_ids", rs.getString("role_ids")); // 로그인용 역할 ID
                     return Optional.of(user);
                 }
             }
@@ -94,7 +70,7 @@ public class UserDAO {
         return Optional.empty();
     }
 
-    // 모든 사용자 조회 (내부 로직은 GROUP_CONCAT으로 이미 잘 되어 있음)
+    // [수정] findAll 메소드: 역할 ID와 역할 이름을 모두 담도록 수정
     public List<Map<String, Object>> findAll() {
         List<Map<String, Object>> userList = new ArrayList<>();
         String sql = SqlLoader.getSql("user.select.all");
@@ -108,7 +84,8 @@ public class UserDAO {
                 user.put("phone", rs.getString("phone"));
                 user.put("email", rs.getString("email"));
                 user.put("password", rs.getString("password"));
-                user.put("role_name", rs.getString("role_name"));
+                user.put("role_ids", rs.getString("role_ids"));       // 내부 로직용 역할 ID
+                user.put("role_names", rs.getString("role_names")); // 화면 표시용 역할 이름
                 userList.add(user);
             }
         } catch (SQLException e) {
@@ -116,25 +93,16 @@ public class UserDAO {
         }
         return userList;
     }
-
-    /**
-     * [수정] PK인 user_id(String)로 사용자를 삭제합니다.
-     */
+    
+    // deleteByUserId, deleteUserRoles, insertUserRoles, insertUserRole 메소드는 수정할 필요가 없습니다.
     public int deleteByUserId(String userId) {
-        String sql = SqlLoader.getSql("user.delete.by_user_id"); // 쿼리 키 변경 필요
+        String sql = SqlLoader.getSql("user.delete.by_user_id");
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, userId);
             return pstmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return 0;
-        }
+        } catch (SQLException e) { e.printStackTrace(); return 0; }
     }
-
-    /**
-     * [수정] user_id(String)를 기준으로 역할을 삭제합니다.
-     */
     public void deleteUserRoles(String userId) throws SQLException {
         String sql = SqlLoader.getSql("user_roles.delete.by_user_id");
         try (Connection conn = getConnection();
@@ -143,10 +111,6 @@ public class UserDAO {
             pstmt.executeUpdate();
         }
     }
-
-    /**
-     * [수정] user_id(String)와 role_id(String) 목록을 기준으로 역할을 추가합니다.
-     */
     public void insertUserRoles(String userId, List<String> roleIds) throws SQLException {
         String sql = SqlLoader.getSql("user_roles.insert");
         try (Connection conn = getConnection();
@@ -159,10 +123,6 @@ public class UserDAO {
             pstmt.executeBatch();
         }
     }
-
-    /**
-     * [수정] user_id(String)와 role_id(String)를 기준으로 단일 역할을 추가합니다.
-     */
     public void insertUserRole(String userId, String roleId) {
         String sql = SqlLoader.getSql("user_roles.insert");
         try (Connection conn = getConnection();
@@ -170,8 +130,6 @@ public class UserDAO {
             pstmt.setString(1, userId);
             pstmt.setString(2, roleId);
             pstmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        } catch (SQLException e) { e.printStackTrace(); }
     }
 }
