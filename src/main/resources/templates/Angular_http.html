@@ -15,88 +15,38 @@
         <script src="/userController.js"></script>
 
         <style>
-            /* 기본 스타일 */
-            body {
-                font-family: sans-serif;
-                margin: 0;
-                padding: 20px;
-            }
-            .container {
-                border: 1px solid #ccc;
-                padding: 20px;
-                margin-top: 20px;
-            }
-            a {
-                text-decoration: none;
-                color: #007bff;
-            }
-
-            /* 헤더 스타일 */
-            header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 10px 20px;
-                border-bottom: 2px solid #eee;
-                margin-bottom: 20px;
-            }
-            header h1 {
-                margin: 0;
-                font-size: 24px;
-            }
-            .user-info span {
-                margin-right: 15px;
-            }
-
-            /* 탭 메뉴 스타일 */
-            .tab-nav {
-                display: flex;
-                border-bottom: 1px solid #ccc;
-            }
-            .tab-link {
-                padding: 10px 20px;
-                cursor: pointer;
-                border: 1px solid transparent;
-                border-bottom: none;
-            }
-            .tab-link:hover {
-                background-color: #f5f5f5;
-            }
-            /* AngularJS가 활성화된 탭에 자동으로 추가해주는 'active' 클래스 스타일 */
-            .tab-link.active {
-                border-color: #ccc;
-                border-bottom: 1px solid white;
-                font-weight: bold;
-                margin-bottom: -1px;
-            }
-
-            /* 테이블 등 기존 스타일 (생략) */
-            .user-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 20px;
-            }
-            .user-table th,
-            .user-table td {
-                border: 1px solid #ddd;
-                padding: 8px;
-                text-align: left;
-            }
-            .user-table th {
-                background-color: #f2f2f2;
-            }
+            /* CSS 스타일은 변경할 필요 없습니다. (기존 스타일 생략) */
+            body { font-family: sans-serif; margin: 0; padding: 20px; }
+            .container { border: 1px solid #ccc; padding: 20px; margin-top: 20px; }
+            a { text-decoration: none; color: #007bff; }
+            header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; border-bottom: 2px solid #eee; margin-bottom: 20px; }
+            header h1 { margin: 0; font-size: 24px; }
+            .user-info span { margin-right: 15px; }
+            .tab-nav { display: flex; border-bottom: 1px solid #ccc; }
+            .tab-link { padding: 10px 20px; cursor: pointer; border: 1px solid transparent; border-bottom: none; }
+            .tab-link:hover { background-color: #f5f5f5; }
+            .tab-link.active { border-color: #ccc; border-bottom: 1px solid white; font-weight: bold; margin-bottom: -1px; }
+            .user-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            .user-table th, .user-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            .user-table th { background-color: #f2f2f2; }
         </style>
     </head>
     <body ng-controller="MainController">
         <header>
             <h1>실습프로젝트</h1>
             <div class="user-info">
-                <span>[{{currentUser.username}}]님</span>
+                <span>[{{currentUser.name}}]님</span>
                 <a href="/logout"><button type="button">로그아웃</button></a>
             </div>
         </header>
 
         <nav class="tab-nav">
+            <a
+                href="#!/bus"
+                class="tab-link"
+                ng-class="{ active: $location.path() == '/bus' }"
+                >대구 버스 노선 정보</a
+            >
             <a
                 href="#!/users"
                 class="tab-link"
@@ -108,12 +58,6 @@
                 class="tab-link"
                 ng-class="{ active: $location.path() == '/roles' }"
                 >권한 관리</a
-            >
-            <a
-                href="#!/bus"
-                class="tab-link"
-                ng-class="{ active: $location.path() == '/bus' }"
-                >대구 버스 노선 정보</a
             >
         </nav>
 
