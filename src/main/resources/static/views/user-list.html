@@ -1,46 +1,45 @@
 <div class="container">
     <h1>DB 사용자 관리</h1>
-    <hr />
+    <hr/>
 
-    <div>
-        <button
-            type="button"
-            ng-click="fetchAllUsers()"
-        >
-            사용자 목록 새로고침
-        </button>
-        <a
-            href="#!/users/new"
-            style="float: right"
-            >새 사용자 등록</a
-        >
+    <div ng-if="isAdmin">
+        <div>
+            <button type="button" ng-click="fetchAllUsers()">사용자 목록 새로고침</button>
+            <a href="#!/users/new" style="float: right;">새 사용자 등록</a>
+        </div>
+        <hr style="clear: both;" />
+
+        <h2>사용자 목록</h2>
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th>로그인 ID (PK)</th>
+                    <th>이름</th>
+                    <th>전화번호</th>
+                    <th>이메일</th>
+                    <th>역할</th>
+                    <th>작업</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr ng-repeat="user in userList">
+                    <td>{{ user.user_id }}</td>
+                    <td>{{ user.name }}</td>
+                    <td>{{ user.phone }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>{{ user.role_names || '역할 없음' }}</td>
+                    <td>
+                        <button ng-click="goToEditPage(user.user_id)">수정</button>
+                        <button ng-click="deleteUser(user.user_id)">삭제</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
-    <hr style="clear: both" />
 
-    <h2>사용자 목록</h2>
-    <table class="user-table">
-        <thead>
-            <tr>
-                <th>로그인 ID (PK)</th>
-                <th>이름</th>
-                <th>전화번호</th>
-                <th>이메일</th>
-                <th>역할</th>
-                <th>작업</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr ng-repeat="user in userList">
-                <td>{{ user.user_id }}</td>
-                <td>{{ user.name }}</td>
-                <td>{{ user.phone }}</td>
-                <td>{{ user.email }}</td>
-                <td>{{ user.role_names || '역할 없음' }}</td>
-                <td>
-                    <button ng-click="goToEditPage(user.user_id)">수정</button>
-                    <button ng-click="deleteUser(user.user_id)">삭제</button>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+    <div ng-if="!isAdmin">
+        <p style="text-align: center; font-size: 1.2em; color: #777; margin-top: 50px;">
+            관리자만 사용 가능한 페이지입니다.
+        </p>
+    </div>
 </div>

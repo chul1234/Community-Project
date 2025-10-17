@@ -1,34 +1,43 @@
 <div ng-controller="RoleManagementController" class="container">
     <h1>권한 관리</h1>
     <hr />
-    <p>이 페이지에서 사용자의 권한을 변경할 수 있습니다. (다중 선택 가능)</p>
 
-    <table class="user-table">
-        <thead>
-            <tr>
-                <th>로그인 ID</th>
-                <th>이름</th>
-                <th>권한 설정 (체크박스)</th>
-                <th>저장</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr ng-repeat="user in userList">
-                <td>{{ user.user_id }}</td>
-                <td>{{ user.name }}</td>
-                <td>
-                    <label ng-repeat="role in roleList" style="margin-right: 15px; cursor: pointer;">
-                        <input 
-                            type="checkbox"
-                            ng-checked="isRoleAssigned(user, role.role_id)"
-                            ng-click="toggleRoleSelection(user, role.role_id)">
-                        {{ role.role_name }}
-                    </label>
-                </td>
-                <td>
-                    <button ng-click="saveUserRoles(user)">변경사항 저장</button>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+    <div ng-if="isAdmin">
+        <p>이 페이지에서 사용자의 권한을 변경할 수 있습니다. (다중 선택 가능)</p>
+
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th>로그인 ID</th>
+                    <th>이름</th>
+                    <th>권한 설정 (체크박스)</th>
+                    <th>저장</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr ng-repeat="user in userList">
+                    <td>{{ user.user_id }}</td>
+                    <td>{{ user.name }}</td>
+                    <td>
+                        <label ng-repeat="role in roleList" style="margin-right: 15px; cursor: pointer;">
+                            <input 
+                                type="checkbox"
+                                ng-checked="isRoleAssigned(user, role.role_id)"
+                                ng-click="toggleRoleSelection(user, role.role_id)">
+                            {{ role.role_name }}
+                        </label>
+                    </td>
+                    <td>
+                        <button ng-click="saveUserRoles(user)">변경사항 저장</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div ng-if="!isAdmin">
+        <p style="text-align: center; font-size: 1.2em; color: #777; margin-top: 50px;">
+            관리자만 사용 가능한 페이지입니다.
+        </p>
+    </div>
 </div>

@@ -15,52 +15,145 @@
         <script src="/userController.js"></script>
 
         <style>
-            /* CSS 스타일은 변경할 필요 없습니다. (기존 스타일 생략) */
-            body { font-family: sans-serif; margin: 0; padding: 20px; }
-            .container { border: 1px solid #ccc; padding: 20px; margin-top: 20px; }
-            a { text-decoration: none; color: #007bff; }
-            header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; border-bottom: 2px solid #eee; margin-bottom: 20px; }
-            header h1 { margin: 0; font-size: 24px; }
-            .user-info span { margin-right: 15px; }
-            .tab-nav { display: flex; border-bottom: 1px solid #ccc; }
-            .tab-link { padding: 10px 20px; cursor: pointer; border: 1px solid transparent; border-bottom: none; }
-            .tab-link:hover { background-color: #f5f5f5; }
-            .tab-link.active { border-color: #ccc; border-bottom: 1px solid white; font-weight: bold; margin-bottom: -1px; }
-            .user-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            .user-table th, .user-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            .user-table th { background-color: #f2f2f2; }
+            /* --- 전체 페이지 스타일 --- */
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                margin: 0;
+                background-color: #f8f9fa; /* 부드러운 회색 배경 */
+                color: #212529;
+            }
+
+            /* --- 컨텐츠 영역 중앙 정렬 및 디자인 --- */
+            .main-container {
+                max-width: 1000px; /* 최대 너비 지정 */
+                margin: 40px auto; /* 위아래 여백 및 중앙 정렬 */
+                background-color: #ffffff;
+                border: 1px solid #dee2e6;
+                border-radius: 8px; /* 모서리 둥글게 */
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); /* 은은한 그림자 효과 */
+            }
+
+            /* --- 헤더 --- */
+            header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 20px 30px; /* 여백 조정 */
+                border-bottom: 1px solid #dee2e6;
+            }
+            header h1 {
+                margin: 0;
+                font-size: 24px;
+                color: #343a40;
+            }
+
+            /* --- 사용자 정보 및 로그아웃 버튼 --- */
+            .user-info span {
+                margin-right: 15px;
+                font-weight: 500;
+                color: #495057;
+            }
+
+            /* --- 버튼 공통 스타일 --- */
+            button {
+                border: 1px solid transparent;
+                padding: 8px 15px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-weight: 500;
+                transition: background-color 0.2s; /* 부드러운 색상 전환 효과 */
+            }
+            button:hover {
+                opacity: 0.9;
+            }
+
+            /* 로그아웃 버튼 */
+            .user-info button {
+                background-color: #6c757d;
+                color: white;
+            }
+
+            /* 컨테이너 내부 일반 버튼 */
+            .container button, .main-container .container button {
+                background-color: #007bff;
+                color: white;
+            }
+
+            /* --- 탭 네비게이션 --- */
+            .tab-nav {
+                display: flex;
+                padding: 0 30px; /* 헤더와 여백 맞춤 */
+                border-bottom: 2px solid #dee2e6;
+            }
+            .tab-link {
+                padding: 12px 20px;
+                cursor: pointer;
+                border-bottom: 2px solid transparent;
+                color: #6c757d;
+                font-weight: 500;
+                margin-bottom: -2px;
+                transition: color 0.2s, border-bottom-color 0.2s;
+            }
+            .tab-link:hover {
+                color: #0056b3;
+            }
+            .tab-link.active {
+                color: #007bff;
+                border-bottom-color: #007bff; /* 활성 탭에 파란색 밑줄 */
+            }
+
+            /* --- 실제 내용이 표시될 ng-view 영역 --- */
+            .content-view {
+                padding: 30px;
+            }
+
+            /* --- 테이블 스타일 --- */
+            .user-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+            }
+            .user-table th, .user-table td {
+                border-bottom: 1px solid #dee2e6; /* 아래쪽 선만 표시 */
+                padding: 12px;
+                text-align: left;
+            }
+            .user-table th {
+                background-color: #f8f9fa;
+                font-weight: 600;
+                color: #495057;
+            }
+            /* 테이블 행에 마우스를 올렸을 때 */
+            .user-table tbody tr:hover {
+                background-color: #f1f3f5;
+            }
+            
+            /* 링크 스타일 */
+            a {
+                text-decoration: none;
+                color: #007bff;
+            }
         </style>
     </head>
     <body ng-controller="MainController">
-        <header>
-            <h1>실습프로젝트</h1>
-            <div class="user-info">
-                <span>[{{currentUser.name}}]님</span>
-                <a href="/logout"><button type="button">로그아웃</button></a>
+        <div class="main-container">
+            <header>
+                <h1>실습프로젝트</h1>
+                <div class="user-info">
+                    <span>[{{currentUser.name}}]님</span>
+                    <a href="/logout"><button type="button">로그아웃</button></a>
+                </div>
+            </header>
+
+            <nav class="tab-nav">
+                <a href="#!/bus" class="tab-link" ng-class="{ active: $location.path() == '/bus' }">대구 버스 노선 정보</a>
+                <a href="#!/users" class="tab-link" ng-class="{ active: $location.path().startsWith('/users') }">DB 사용자 관리</a>
+                <a href="#!/roles" class="tab-link" ng-class="{ active: $location.path() == '/roles' }">권한 관리</a>
+            </nav>
+
+            <div class="content-view">
+                <div ng-view></div>
             </div>
-        </header>
-
-        <nav class="tab-nav">
-            <a
-                href="#!/bus"
-                class="tab-link"
-                ng-class="{ active: $location.path() == '/bus' }"
-                >대구 버스 노선 정보</a
-            >
-            <a
-                href="#!/users"
-                class="tab-link"
-                ng-class="{ active: $location.path().startsWith('/users') }"
-                >DB 사용자 관리</a
-            >
-            <a
-                href="#!/roles"
-                class="tab-link"
-                ng-class="{ active: $location.path() == '/roles' }"
-                >권한 관리</a
-            >
-        </nav>
-
-        <div ng-view></div>
+        </div>
     </body>
 </html>
