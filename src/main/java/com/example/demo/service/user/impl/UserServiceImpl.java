@@ -60,11 +60,27 @@ public class UserServiceImpl implements IUserService {
         return null;
     }
 
+    /**
+     * [수정] 사용자를 삭제하기 전에, 연관된 역할 정보(users_roles)부터 먼저 삭제하도록 변경
+     * @param userId 삭제할 사용자의 ID
+     */
     @Override
+    @Transactional // 두 개의 삭제 작업을 하나의 트랜잭션으로 묶어 데이터 정합성을 보장합니다.
     public void deleteUser(String userId) {
-        int affectedRows = userDAO.deleteByUserId(userId);
-        if (affectedRows == 0) {
-            throw new RuntimeException("삭제할 사용자를 찾지 못했습니다. ID: " + userId);
+        try {
+            // 1. 먼저 users_roles 테이블에서 해당 사용자의 모든 역할 정보를 삭제합니다.
+            userDAO.deleteUserRoles(userId);
+
+            // 2. 역할 정보가 성공적으로 삭제되면, users 테이블에서 사용자 정보를 삭제합니다.
+            int affectedRows = userDAO.deleteByUserId(userId);
+            
+            // 만약 users 테이블에서 삭제된 행이 없다면, 예외를 발생시켜 롤백합니다.
+            if (affectedRows == 0) {
+                throw new RuntimeException("삭제할 사용자를 찾지 못했습니다. ID: " + userId);
+            }
+        } catch (Exception e) {
+            // @Transactional에 의해 중간에 오류가 발생하면 모든 작업이 자동으로 롤백(취소)됩니다.
+            throw new RuntimeException("사용자 삭제 중 오류가 발생했습니다.", e);
         }
     }
 
