@@ -21,7 +21,8 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         Map<String, Object> user = userDAO.findByUserId(username)
                 .orElseThrow(() -> new UsernameNotFoundException("계정을 찾을 수 없습니다: " + username));
 
-        String concatenatedRoles = (String) user.get("role_name");
+        // ▼▼▼▼▼ [최종 수정] user.get("role_name") 대신 user.get("role_ids")를 사용합니다. ▼▼▼▼▼
+        String concatenatedRoles = (String) user.get("role_ids");
         
         String[] roles = new String[0]; 
         if (concatenatedRoles != null && !concatenatedRoles.isEmpty()) {

@@ -10,7 +10,6 @@ app.controller('UserListController', function ($scope, $http, $location) {
         });
     };
 
-    // [수정] 파라미터를 id 대신 user_id로 받고, API 호출 시 user_id를 사용합니다.
     $scope.deleteUser = function (userId) {
         if (confirm(userId + ' 사용자를 정말 삭제하시겠습니까?')) {
             $http.delete('/users/' + userId).then(function (response) {
@@ -22,7 +21,6 @@ app.controller('UserListController', function ($scope, $http, $location) {
         }
     };
 
-    // [수정] 파라미터를 id 대신 user_id로 받고, URL 경로에 user_id를 사용합니다.
     $scope.goToEditPage = function (userId) {
         $location.path('/users/edit/' + userId);
     };
@@ -34,7 +32,6 @@ app.controller('UserListController', function ($scope, $http, $location) {
  * 3-2. UserCreateController: 새 사용자 등록 화면(user-create.html)을 제어합니다.
  */
 app.controller('UserCreateController', function ($scope, $http, $location) {
-    // 이 컨트롤러는 수정할 필요가 없습니다.
     $scope.newUsers = [{ user_id: '', password: '', name: '', phone: '', email: '' }];
 
     $scope.addUserField = function () {
@@ -66,15 +63,13 @@ app.controller('UserCreateController', function ($scope, $http, $location) {
  */
 app.controller('UserEditController', function ($scope, $http, $location, $routeParams) {
     $scope.userForm = {};
-    // 라우트 파라미터가 이제 user_id를 의미하지만, 변수명은 id를 그대로 사용해도 무방합니다.
-    var userId = $routeParams.userId; // app.js에서 :userId로 변경했으므로 $routeParams.userId로 받습니다.
+    var userId = $routeParams.userId;
 
     $http.get('/users/' + userId).then(function (response) {
         $scope.userForm = response.data;
     });
 
     $scope.updateUser = function () {
-        // [수정] API 호출 시 userForm에 담긴 user_id를 사용합니다.
         $http.put('/users/' + $scope.userForm.user_id, $scope.userForm).then(function () {
             $location.path('/users');
         });
@@ -86,15 +81,23 @@ app.controller('UserEditController', function ($scope, $http, $location, $routeP
  */
 app.controller('RoleManagementController', function ($scope, $http, $rootScope, $location) {
 
+    // [최종 수정] 역할 정보가 로딩될 때까지 기다렸다가, 딱 한 번만 검사하는 로직
     const unwatch = $rootScope.$watch('currentUser.role', function (newRoleValue) {
-        if (newRoleValue) {
-            if (newRoleValue !== 'ADMIN') {
-                alert('관리자만 접근할 수 있는 페이지입니다.');
-                $location.path('/users');
-            } else {
-                initializePageData();
-            }
-            unwatch();
+        // newRoleValue가 undefined나 null이면 아직 로딩 중이므로 아무것도 하지 않고 기다립니다.
+        if (newRoleValue === undefined || newRoleValue === null) {
+            return; 
+        }
+
+        // 역할 값이 도착하면, 감시를 종료하여 더 이상 중복 실행되지 않도록 합니다.
+        unwatch();
+
+        // 이제 도착한 값을 기준으로 권한을 확인합니다.
+        if (newRoleValue !== 'ADMIN') {
+            alert('관리자만 접근할 수 있는 페이지입니다.');
+            $location.path('/users');
+        } else {
+            // 관리자일 경우에만 페이지 데이터를 불러옵니다.
+            initializePageData();
         }
     });
 
@@ -109,12 +112,9 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
                 $scope.userList = response.data;
                 $scope.userList.forEach(function(user) {
                     $scope.userRoleSelections[user.user_id] = {};
-                    if (user.role_name) {
-                        // user.role_name은 이제 'ADMIN,USER' 같은 role_id 목록입니다.
-                        const userAssignedRoles = user.role_name.split(', ');
+                    if (user.role_ids) {
+                        const userAssignedRoles = user.role_ids.split(', ');
                         $scope.roleList.forEach(function(role) {
-                            // [수정] 사용자의 역할 ID 목록(userAssignedRoles)에
-                            // 전체 역할의 역할 ID(role.role_id)가 포함되어 있는지 비교합니다.
                             if (userAssignedRoles.includes(role.role_id)) {
                                 $scope.userRoleSelections[user.user_id][role.role_id] = true;
                             }

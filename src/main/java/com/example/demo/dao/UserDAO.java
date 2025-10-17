@@ -46,7 +46,7 @@ public class UserDAO {
         }
     }
 
-    // [수정] findByUserId 메소드: 로그인 시 필요한 role_ids만 정확히 담도록 수정
+    // [최종 수정] findByUserId 메소드: role_ids와 role_names를 모두 담도록 수정
     public Optional<Map<String, Object>> findByUserId(String userId) {
         String sql = SqlLoader.getSql("user.select.by_user_id");
         try (Connection conn = getConnection();
@@ -60,7 +60,8 @@ public class UserDAO {
                     user.put("phone", rs.getString("phone"));
                     user.put("email", rs.getString("email"));
                     user.put("password", rs.getString("password"));
-                    user.put("role_ids", rs.getString("role_ids")); // 로그인용 역할 ID
+                    user.put("role_ids", rs.getString("role_ids"));
+                    user.put("role_names", rs.getString("role_names"));
                     return Optional.of(user);
                 }
             }
@@ -70,7 +71,7 @@ public class UserDAO {
         return Optional.empty();
     }
 
-    // [수정] findAll 메소드: 역할 ID와 역할 이름을 모두 담도록 수정
+    // [최종 수정] findAll 메소드: 역할 ID와 역할 이름을 모두 담도록 수정
     public List<Map<String, Object>> findAll() {
         List<Map<String, Object>> userList = new ArrayList<>();
         String sql = SqlLoader.getSql("user.select.all");
@@ -93,7 +94,7 @@ public class UserDAO {
         }
         return userList;
     }
-    
+
     // deleteByUserId, deleteUserRoles, insertUserRoles, insertUserRole 메소드는 수정할 필요가 없습니다.
     public int deleteByUserId(String userId) {
         String sql = SqlLoader.getSql("user.delete.by_user_id");
