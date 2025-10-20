@@ -10,6 +10,11 @@ var app = angular.module('busApp', ['ngRoute']);
  */
 app.config(function ($routeProvider) {
     $routeProvider
+        .when('/board', {
+            templateUrl: 'views/board-list.html',
+            controller: 'BoardController'
+        })
+
         .when('/users', {
             templateUrl: 'views/user-list.html',
             controller: 'UserListController',

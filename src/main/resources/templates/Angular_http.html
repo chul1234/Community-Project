@@ -5,7 +5,8 @@
 >
     <head>
         <meta charset="UTF-8" />
-        <title>실습 프로젝트</title><link rel="stylesheet" href="/css/style.css" />
+        <title>실습 프로젝트</title>
+        <link rel="stylesheet" href="/css/style.css" />
 
         <script src="/lib/angular.js"></script>
         <script src="/lib/angular-route.js"></script>
@@ -13,8 +14,8 @@
         <script src="/app.js"></script>
         <script src="/busController.js"></script>
         <script src="/userController.js"></script>
-
         
+        <script src="/boardController.js"></script>
     </head>
     <body ng-controller="MainController">
         <div class="main-container">
@@ -28,6 +29,12 @@
             </header>
 
             <nav class="tab-nav">
+                <a
+                    href="#!/board"
+                    class="tab-link"
+                    ng-class="{ active: $location.path().startsWith('/board') }"
+                    >게시판</a
+                >
                 <a
                     href="#!/bus"
                     class="tab-link"
