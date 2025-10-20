@@ -15,6 +15,11 @@ app.config(function ($routeProvider) {
             controller: 'BoardController'
         })
 
+        .when('/board/new', {
+            templateUrl: 'views/board-new.html',
+            controller: 'BoardNewController'
+        })
+
         .when('/users', {
             templateUrl: 'views/user-list.html',
             controller: 'UserListController',
