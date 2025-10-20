@@ -238,24 +238,18 @@ header h1 {
     width: 100%;
     padding: 12px;
     font-size: 16px;
-    background-color: #007bff;
+    background-color: #007bff; /* [수정] 초록색을 파란색으로 변경 */
     color: white;
-}
-
-.user-info .delete-btn {
-    background-color: #dc3545; /* 위험을 의미하는 붉은색 */
-    margin-right: 10px; /* 로그아웃 버튼과의 간격 */
 }
 
 /* --- (user-list.html) 버튼 바 스타일 --- */
 .action-bar {
-    display: flex; /* 버튼들을 한 줄에 나란히 배치 */
-    justify-content: space-between; /* 양쪽 끝으로 정렬 */
-    align-items: center; /* 세로 중앙 정렬 */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 20px;
 }
 
-/* 링크를 버튼처럼 보이게 하는 공통 스타일 */
 .action-btn {
     display: inline-block;
     padding: 8px 15px;
@@ -269,8 +263,21 @@ header h1 {
     opacity: 0.9;
 }
 
-/* '새 사용자 등록' 버튼 전용 스타일 */
 .create-btn {
-    background-color: #007bff; /* 초록색 배경 */
+    background-color: #007bff; /* [수정] 초록색을 파란색으로 변경 */
     color: white;
+}
+
+/* --- 게시글 수정 페이지의 버튼 그룹 스타일 --- */
+.button-group {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+
+.button-group .submit-btn-full,
+.button-group .secondary-btn {
+    flex: 1;
+    width: auto;
+    margin-top: 0;
 }

@@ -101,4 +101,39 @@ public class BoardDAO {
         }
         return Optional.empty(); // 데이터를 찾지 못하면 빈 Optional 반환
     }
+
+    /**
+     * post_id로 특정 게시글의 제목과 내용을 수정합니다.
+     */
+    public int update(Map<String, Object> post) {
+        String sql = SqlLoader.getSql("post.update");
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, (String) post.get("title"));
+            pstmt.setString(2, (String) post.get("content"));
+            pstmt.setInt(3, (Integer) post.get("post_id"));
+
+            return pstmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    /**
+     * post_id로 특정 게시글을 삭제합니다.
+     */
+    public int delete(int postId) {
+        String sql = SqlLoader.getSql("post.delete.by_id");
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, postId);
+            return pstmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }
 }

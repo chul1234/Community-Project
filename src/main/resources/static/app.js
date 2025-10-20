@@ -25,6 +25,11 @@ app.config(function ($routeProvider) {
             controller: 'BoardDetailController'
         })
 
+        // .when('/board/edit/:postId', {
+        //     templateUrl: 'views/board-edit.html',
+        //     controller: 'BoardEditController'
+        // })
+
         .when('/users', {
             templateUrl: 'views/user-list.html',
             controller: 'UserListController',
