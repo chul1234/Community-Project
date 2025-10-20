@@ -20,7 +20,7 @@
                 </td>
             </tr>
             <tr ng-repeat="post in postList">
-                <td>{{ post.post_id }}</td>
+                <td>{{ $index + 1 }}</td>
                 <td>
                     <a href="#!/board/{{ post.post_id }}">{{ post.title }}</a>
                 </td>
