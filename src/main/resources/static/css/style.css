@@ -281,3 +281,57 @@ header h1 {
     width: auto;
     margin-top: 0;
 }
+
+/* --- (board-detail.html) 댓글 영역 스타일 --- */
+.comments-section {
+    margin-top: 40px;
+}
+.comment-list {
+    margin-bottom: 30px;
+}
+.no-comments {
+    text-align: center;
+    color: #868e96;
+    padding: 40px 0;
+}
+.comment-item {
+    border-bottom: 1px solid #e9ecef;
+    padding: 15px 0;
+}
+.comment-item:last-child {
+    border-bottom: none;
+}
+.comment-header {
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #495057;
+}
+.comment-date {
+    float: right;
+    font-size: 13px;
+    color: #adb5bd;
+}
+.comment-content {
+    margin: 0 0 10px 0;
+    line-height: 1.6;
+}
+.comment-actions .action-btn-sm {
+    padding: 4px 8px;
+    font-size: 12px;
+    margin-right: 5px;
+    background-color: #f1f3f5;
+    color: #495057;
+    border: 1px solid #dee2e6;
+}
+.comment-actions .action-btn-sm.delete {
+    color: #dc3545;
+}
+.comment-actions .action-btn-sm.save {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+.comment-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+}

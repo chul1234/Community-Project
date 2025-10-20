@@ -14,13 +14,13 @@ import java.util.stream.Collectors;
 @RestController
 public class BoardController {
 
-    // [수정] BoardDAO에 대한 직접적인 의존성을 제거합니다.
+    // BoardDAO에 대한 직접적인 의존성을 제거합니다.
     @Autowired
     private IBoardService boardService;
 
     @GetMapping("/api/posts")
     public List<Map<String, Object>> getAllPosts() {
-        // [수정] 이제 DAO가 아닌 Service를 통해 데이터를 조회합니다.
+        // 이제 DAO가 아닌 Service를 통해 데이터를 조회합니다.
         return boardService.getAllPosts();
     }
 
@@ -45,25 +45,25 @@ public class BoardController {
         }
     }
 
-    @PutMapping("/api/posts/{postId}")
-    public ResponseEntity<Map<String, Object>> updatePost(@PathVariable int postId, @RequestBody Map<String, Object> postDetails, Authentication authentication) {
-        String currentUserId = authentication.getName();
-        // [수정] 관리자도 수정 가능하도록 로직 추가 (선택 사항이지만 좋은 개선입니다)
-        List<String> roles = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .map(auth -> auth.replace("ROLE_", ""))
-                .collect(Collectors.toList());
+    // @PutMapping("/api/posts/{postId}")
+    // public ResponseEntity<Map<String, Object>> updatePost(@PathVariable int postId, @RequestBody Map<String, Object> postDetails, Authentication authentication) {
+    //     String currentUserId = authentication.getName();
+    //     // 관리자도 수정 가능하도록 로직 추가 (선택 사항이지만 좋은 개선입니다)
+    //     List<String> roles = authentication.getAuthorities().stream()
+    //             .map(GrantedAuthority::getAuthority)
+    //             .map(auth -> auth.replace("ROLE_", ""))
+    //             .collect(Collectors.toList());
         
-        // updatePost 서비스 메소드는 아직 역할을 받도록 수정되지 않았지만, 향후 확장을 위해 미리 구조를 잡아둡니다.
-        // 현재는 작성자 본인만 수정 가능합니다.
-        Map<String, Object> updatedPost = boardService.updatePost(postId, postDetails, currentUserId);
+    //     // updatePost 서비스 메소드는 아직 역할을 받도록 수정되지 않았지만, 향후 확장을 위해 미리 구조를 잡아둡니다.
+    //     // 현재는 작성자 본인만 수정 가능합니다.
+    //     Map<String, Object> updatedPost = boardService.updatePost(postId, postDetails, currentUserId);
         
-        if (updatedPost != null) {
-            return ResponseEntity.ok(updatedPost);
-        } else {
-            return ResponseEntity.status(403).build();
-        }
-    }
+    //     if (updatedPost != null) {
+    //         return ResponseEntity.ok(updatedPost);
+    //     } else {
+    //         return ResponseEntity.status(403).build();
+    //     }
+    // }
 
     @DeleteMapping("/api/posts/{postId}")
     public ResponseEntity<Void> deletePost(@PathVariable int postId, Authentication authentication) {

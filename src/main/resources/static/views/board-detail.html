@@ -28,15 +28,48 @@
                 <textarea ng-model="editData.content" required rows="10" class="form-control" style="width: 100%;"></textarea>
             </div>
         </form>
-		<div class="action-bar">
-		    <div class="button-group">
-		        <button type="button" ng-click="saveChanges()" ng-disabled="editForm.$invalid" class="submit-btn-full">수정 완료</button>
-		        <button type="button" ng-click="cancelEdit()" class="secondary-btn">취소</button>
-		    </div>
-		</div>
+        <div class="action-bar">
+            <div class="button-group">
+                <button type="button" ng-click="saveChanges()" ng-disabled="editForm.$invalid" class="submit-btn-full">수정 완료</button>
+                <button type="button" ng-click="cancelEdit()" class="secondary-btn">취소</button>
+            </div>
+        </div>
     </div>
 
     <hr>
-    <h2>댓글</h2>
-    <p>댓글 기능은 곧 추가될 예정입니다.</p>
+    <div class="comments-section">
+        <h2>댓글</h2>
+        <div class="comment-list">
+            <div ng-if="!comments.length" class="no-comments">
+                아직 댓글이 없습니다. 첫 댓글을 작성해보세요!
+            </div>
+            <div class="comment-item" ng-repeat="comment in comments">
+                <div ng-if="!comment.isEditing">
+                    <div class="comment-header">
+                        <strong>{{ comment.author_name }}</strong> ({{ comment.user_id }})
+                        <span class="comment-date">{{ comment.created_at | date:'yyyy-MM-dd HH:mm' }}</span>
+                    </div>
+                    <p class="comment-content">{{ comment.content }}</p>
+                    <div class="comment-actions" ng-if="canModifyComment(comment)">
+                        <button ng-click="switchToCommentEditMode(comment)" class="action-btn-sm">수정</button>
+                        <button ng-click="deleteComment(comment.comment_id)" class="action-btn-sm delete">삭제</button>
+                    </div>
+                </div>
+                <div ng-if="comment.isEditing">
+                    <textarea ng-model="comment.editContent" class="form-control" rows="3" style="width: 100%; box-sizing: border-box;"></textarea>
+                    <div class="comment-actions" style="margin-top: 5px;">
+                        <button ng-click="saveCommentChanges(comment)" class="action-btn-sm save">저장</button>
+                        <button ng-click="cancelCommentEdit(comment)" class="action-btn-sm">취소</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="comment-form">
+            <form name="commentForm">
+                <textarea ng-model="newComment.content" required placeholder="댓글을 입력하세요" class="form-control" rows="4"></textarea>
+                <button ng-click="submitComment()" ng-disabled="commentForm.$invalid" class="submit-btn" style="width: 100%; margin-top: 10px;">댓글 등록</button>
+            </form>
+        </div>
+    </div>
 </div>
