@@ -1,0 +1,15 @@
+<div ng-controller="BoardDetailController" class="container">
+    <h1>{{ post.title }}</h1>
+    <div style="color: #6c757d; margin-bottom: 20px; border-bottom: 1px solid #dee2e6; padding-bottom: 15px;">
+        <span>작성자: {{ post.author_name }} ({{ post.user_id }})</span>
+        <span style="float: right;">작성일: {{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</span>
+    </div>
+
+<div class="post-content" ng-bind-html="trustedContent" style="min-height: 200px; margin-bottom: 40px; white-space: pre-wrap;"></div>    <div class="action-bar">
+        <a href="#!/board" class="action-btn">목록으로</a>
+    </div>
+
+    <hr>
+    <h2>댓글</h2>
+    <p>댓글 기능은 곧 추가될 예정입니다.</p>
+</div>

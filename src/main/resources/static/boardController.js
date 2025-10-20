@@ -44,3 +44,28 @@ app.controller('BoardNewController', function ($scope, $http, $location) {
         }
     };
 });
+
+/**
+ * 게시글 상세 보기 페이지(/board/:postId)를 제어하는 컨트롤러
+ */
+app.controller('BoardDetailController', function ($scope, $http, $routeParams, $sce) {
+    // URL에서 게시글 ID를 가져옵니다. (예: #!/board/1 -> postId는 1)
+    const postId = $routeParams.postId;
+    $scope.post = {}; // 게시글 데이터를 담을 빈 객체
+
+    // 백엔드에 특정 게시글 데이터를 요청합니다.
+    $http.get('/api/posts/' + postId).then(function (response) {
+        $scope.post = response.data;
+    }).catch(function (error) {
+        alert("게시글을 불러오는 데 실패했습니다.");
+        console.error(error);
+    });
+
+    // AngularJS에서 줄바꿈(\n)을 <br> 태그로 변환해주는 필터
+    // (ng-bind-html과 함께 사용)
+    $scope.$watch('post.content', function(value) {
+        if (value) {
+            $scope.trustedContent = $sce.trustAsHtml(value.replace(/\n/g, '<br/>'));
+        }
+    });
+});
