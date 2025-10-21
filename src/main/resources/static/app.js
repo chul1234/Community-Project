@@ -59,23 +59,23 @@ app.config(function ($routeProvider) {
 /**
  * 3. MainController: 헤더와 같이 공통 레이아웃을 제어합니다.
  */
-app.controller('MainController', function($scope, $http, $location, $rootScope) {
-    $scope.$location = $location;
-    $rootScope.currentUser = {};
-    $http.get('/api/me').then(function(response) {
-        $rootScope.currentUser = response.data;
-    }).catch(function(error) {
-        $rootScope.currentUser.username = '정보 없음';
-        console.error('사용자 정보를 불러오는 데 실패했습니다.', error);
+app.controller('MainController', function($scope, $http, $location, $rootScope) { 
+    $scope.$location = $location; // 뷰에서 $location 접근 가능하도록 설정
+    $rootScope.currentUser = {}; // 전역 사용자 정보 객체 초기화
+    $http.get('/api/me').then(function(response) { // 현재 로그인한 사용자 정보 요청
+        $rootScope.currentUser = response.data; // 응답 데이터를 전역 변수에 저장
+    }).catch(function(error) { // 오류 처리
+        $rootScope.currentUser.username = '정보 없음'; // 기본값 설정
+        console.error('사용자 정보를 불러오는 데 실패했습니다.', error); // 오류 로그 출력
     });
 
-    $scope.deleteMyAccount = function() {
-        if (confirm("정말 탈퇴하시겠습니까? 모든 정보는 영구적으로 삭제됩니다.")) {
-            $http.delete('/api/users/me').then(function() {
-                alert("회원 탈퇴가 완료되었습니다.");
-                window.location.href = '/logout'; 
-            }).catch(function(error) {
-                alert("회원 탈퇴 중 오류가 발생했습니다.");
+    $scope.deleteMyAccount = function() { // 회원 탈퇴 함수
+        if (confirm("정말 탈퇴하시겠습니까? 모든 정보는 영구적으로 삭제됩니다.")) { // 사용자 확인
+            $http.delete('/api/users/me').then(function() { // HTTP DELETE 요청을 보내 회원 탈퇴를 요청
+                alert("회원 탈퇴가 완료되었습니다."); // 완료 알림
+                window.location.href = '/logout';  // 로그아웃 및 메인 페이지로 이동
+            }).catch(function(error) { // 오류 처리
+                alert("회원 탈퇴 중 오류가 발생했습니다."); // 오류 알림
                 console.error("Delete account failed:", error);
             });
         }
