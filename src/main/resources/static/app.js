@@ -62,12 +62,30 @@ app.config(function ($routeProvider) {
 app.controller('MainController', function($scope, $http, $location, $rootScope) { 
     $scope.$location = $location; // 뷰에서 $location 접근 가능하도록 설정
     $rootScope.currentUser = {}; // 전역 사용자 정보 객체 초기화
+    
+    // 메뉴 목록을 저장할 전역 변수 초기화
+    $rootScope.menuItems = []; 
+
     $http.get('/api/me').then(function(response) { // 현재 로그인한 사용자 정보 요청
         $rootScope.currentUser = response.data; // 응답 데이터를 전역 변수에 저장
     }).catch(function(error) { // 오류 처리
         $rootScope.currentUser.username = '정보 없음'; // 기본값 설정
         console.error('사용자 정보를 불러오는 데 실패했습니다.', error); // 오류 로그 출력
     });
+
+    // 백엔드에서 계층화된 메뉴 목록을 가져오는 함수
+    function fetchMenus() {
+        $http.get('/api/menus').then(function(response) {
+            //
+            // 백엔드 MenuServiceImpl에서 가공한 계층 구조의 메뉴 데이터를 menuItems에 저장
+            $rootScope.menuItems = response.data; 
+        }).catch(function(error) {
+            console.error('메뉴 정보를 불러오는 데 실패했습니다.', error);
+        });
+    }
+    
+    // 컨트롤러가 로드될 때 메뉴 목록을 즉시 불러옴
+    fetchMenus();
 
     $scope.deleteMyAccount = function() { // 회원 탈퇴 함수
         if (confirm("정말 탈퇴하시겠습니까? 모든 정보는 영구적으로 삭제됩니다.")) { // 사용자 확인
