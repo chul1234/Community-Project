@@ -24,7 +24,7 @@
                 <td>
                     <a href="#!/board/{{ post.post_id }}">{{ post.title }}</a>
                 </td>
-                <td>{{ post.author_name || '탈퇴한 사용자' }} ({{ post.user_id }})</td>
+                <td>{{ post.author_name || '탈퇴한 사용자' }} ({{ post.user_id }})</td> <!--탈퇴한 사용자의 author_name은 NULL 계정 삭제시 탈퇴한 사용자 나옴-->
                 <td>{{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</td>
             </tr>
         </tbody>
