@@ -1,134 +1,150 @@
 package com.example.demo.dao;
 
-import org.springframework.beans.factory.annotation.Autowired; // Spring의 의존성 주입 기능을 사용하기 위한 도구
-import org.springframework.stereotype.Repository; // 이 클래스가 DB와 통신하는 부품임을 알리는 도구
+import com.example.demo.dao.SqlLoader; // sql.properties 로더 import
+import org.springframework.beans.factory.annotation.Autowired; // @Autowired 사용
+import org.springframework.stereotype.Repository; // @Repository 사용
 
-import javax.sql.DataSource; // 데이터베이스 연결 정보를 관리하는 도구
-import java.sql.*; // Connection, PreparedStatement, ResultSet 등 JDBC(자바 DB 연결) 관련 핵심 도구들
-import java.util.ArrayList; // 여러 데이터를 목록 형태로 다루기 위한 도구
-import java.util.HashMap; // 데이터를 '이름표-값' 쌍으로 다루기 위한 도구
-import java.util.List; // ArrayList의 상위 설계도
-import java.util.Map; // HashMap의 상위 설계도
-import java.util.Optional; // 'null'일 수도 있는 값을 안전하게 다루기 위한 포장지
+import javax.sql.DataSource; // DataSource 사용 (DB 연결 풀)
+import java.sql.*; // Connection, PreparedStatement, ResultSet 사용 (JDBC API)
+import java.util.ArrayList; // ArrayList 사용 (List 구현체)
+import java.util.HashMap; // HashMap 사용 (Map 구현체)
+import java.util.List; // List 인터페이스 사용
+import java.util.Map; // Map 인터페이스 사용
+import java.util.Optional; // Optional 사용 (null 방지)
 
-@Repository
+@Repository // @Repository: 데이터 접근 계층(DAO) 컴포넌트 선언
 public class BoardDAO {
 
-    @Autowired
+    @Autowired // @Autowired: Spring이 DataSource Bean을 자동 주입
     private DataSource dataSource;
 
-    // 데이터베이스와 실제 연결을 생성하는 private 메소드
+    // getConnection(): 데이터 소스에서 DB Connection 객체 획득 메소드
     private Connection getConnection() throws SQLException {
-        // dataSource 객체로부터 현재 사용 가능한 DB 연결 통로(Connection)를 하나 빌려와서 반환
+        // dataSource.getConnection() 호출
         return dataSource.getConnection();
     }
 
     /**
-     * posts 테이블의 모든 게시글 목록을 조회합니다.
-     * @return 게시글 목록 (List of Maps)
+     * posts 테이블의 모든 게시글 목록 조회 메소드
+     * @return 게시글 목록 (List<Map<String, Object>>)
      */
-    //조회 결과를 담을 비어있는 리스트
     public List<Map<String, Object>> findAll() {
+        // 결과 담을 ArrayList 생성
         List<Map<String, Object>> postList = new ArrayList<>();
-        //sqlLoader로부터 'post.select.all' 키에 해당하는 SQL 명령어를 가져옴
+        // SqlLoader.getSql() 호출하여 SQL 로드 ('pinned_order' 없는 SQL 사용)
         String sql = SqlLoader.getSql("post.select.all");
 
-        //try-with-resources: 이 블록이 끝나면 conn, pstmt, rs 같은 자원들이 자동반환
-        try (Connection conn = getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
+        // try-with-resources: conn, pstmt, rs 자동 자원 해제 보장
+        try (Connection conn = getConnection(); // getConnection() 호출
+             PreparedStatement pstmt = conn.prepareStatement(sql); // SQL 준비
+             ResultSet rs = pstmt.executeQuery()) { // SQL 실행 및 결과(ResultSet) 받음
 
-            //rs.next(): 결과(ResultSet)에서 다음 행이 있는지 확인
+            // rs.next(): 결과 집합(ResultSet) 순회 루프
             while (rs.next()) {
-                //각 행의 데이터를 담을 맵 생성
+                // 각 행 데이터 담을 HashMap 생성
                 Map<String, Object> post = new HashMap<>();
-                //post_id는 INT(정수)이므로 getInt로 읽어와서  저장
+                // rs.getXXX("컬럼명")으로 데이터 추출 후 post 맵에 .put()으로 저장
                 post.put("post_id", rs.getInt("post_id"));
-                //title은 VARCHAR(문자열)이므로 getString으로 읽어와서 저장
                 post.put("title", rs.getString("title"));
-                //content도 VARCHAR(문자열)이므로 getString으로 읽어와서 저장
                 post.put("user_id", rs.getString("user_id"));
-                //SQL 쿼리의 별명(as)으로 지정한 'author_name' 값을 읽어와 저장
-                post.put("author_name", rs.getString("author_name")); // 작성자 이름 추가
-                //created_at은 TIMESTAMP(날짜+시간)이므로 getTimestamp로 읽어와서 저장
+                post.put("author_name", rs.getString("author_name")); // 작성자 이름
                 post.put("created_at", rs.getTimestamp("created_at"));
-                //완성된 게시글 데이터를 리스트에 추가
+                // [수정됨] pinned_order 읽는 코드 제거
+                // post.put("pinned_order", rs.getObject("pinned_order", Integer.class));
+                // [유지] view_count 읽기 (정수형)
+                post.put("view_count", rs.getInt("view_count"));
+                // postList 리스트에 .add()로 post 맵 추가
                 postList.add(post);
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } catch (SQLException e) { // SQLException 예외 처리
+            e.printStackTrace(); // 콘솔에 에러 로그 출력
         }
+        // 조회된 게시글 목록 반환
         return postList;
     }
 
     /**
-     * posts 테이블에 새로운 게시글을 저장합니다.
-     * @param post 저장할 게시글 정보 (Map)
-     * @return 영향을 받은 행의 수 (성공 시 1)
+     * posts 테이블에 새로운 게시글 저장 메소드
+     * @param post 저장할 게시글 정보 (Map) ('title', 'content', 'user_id' 포함)
+     * @return 영향을 받은 행의 수 (성공 시 1, 실패 시 0)
      */
-    public int save(Map<String, Object> post) { // post Map에는 'title', 'content', 'user_id' 키가 있어야 합니다.
-        String sql = SqlLoader.getSql("post.insert"); // 'post.insert' 키에 해당하는 SQL 명령어를 가져옴
-        try (Connection conn = getConnection(); // DB 연결 생성
+    public int save(Map<String, Object> post) {
+        // SqlLoader.getSql() 호출하여 SQL 로드
+        String sql = SqlLoader.getSql("post.insert");
+        try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
-            // SQL의 물음표(?) 부분에 게시글 데이터 채우기    
+
+            // SQL의 ? 파라미터 값 설정 (pstmt.setXXX() 메소드)
+            // post 맵에서 .get()으로 값 추출 및 형변환
             pstmt.setString(1, (String) post.get("title"));
             pstmt.setString(2, (String) post.get("content"));
             pstmt.setString(3, (String) post.get("user_id"));
 
+            // pstmt.executeUpdate(): INSERT/UPDATE/DELETE SQL 실행 후 영향받은 행 수 반환
             return pstmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
-            return 0;
+            return 0; // 실패 시 0 반환
         }
     }
 
     /**
-     * post_id로 특정 게시글 하나를 조회합니다.
-     * @param postId 조회할 게시글의 ID
-     * @return 게시글 정보 (Optional<Map>)
+     * post_id로 특정 게시글 하나 조회 메소드
+     * @param postId 조회할 게시글 ID (int)
+     * @return 게시글 정보 (Optional<Map<String, Object>>) (없으면 Optional.empty() 반환)
      */
-    public Optional<Map<String, Object>> findById(int postId) { // postId: 조회할 게시글의 고유 ID
-        String sql = SqlLoader.getSql("post.select.by_id"); // 'post.select.by_id' 키에 해당하는 SQL 명령어를 가져옴
-        try (Connection conn = getConnection(); 
+    public Optional<Map<String, Object>> findById(int postId) {
+        // SqlLoader.getSql() 호출하여 SQL 로드 ('pinned_order' 없는 SQL 사용)
+        String sql = SqlLoader.getSql("post.select.by_id");
+        try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-            pstmt.setInt(1, postId); 
-            // SQL의 ? 부분에 postId 값을 채웁니다.
-            
-            // SQL을 실행하고, 그 결과를 ResultSet(rs)
+            // SQL ? 파라미터 설정 (pstmt.setInt())
+            pstmt.setInt(1, postId);
+
+            // try-with-resources: ResultSet 자동 해제
             try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) { // 조회된 게시글이 있으면
+                // rs.next(): 결과 행이 존재하는지 확인 (존재하면 true)
+                if (rs.next()) {
                     Map<String, Object> post = new HashMap<>();
-                    //조회된 게시글 정보를 담을 새로운 Map 생성
+                    // rs.getXXX()으로 데이터 추출 및 post 맵에 저장
                     post.put("post_id", rs.getInt("post_id"));
                     post.put("title", rs.getString("title"));
                     post.put("content", rs.getString("content"));
                     post.put("user_id", rs.getString("user_id"));
                     post.put("author_name", rs.getString("author_name"));
                     post.put("created_at", rs.getTimestamp("created_at"));
-                    return Optional.of(post); // 찾은 데이터를 Optional로 감싸서 반환
+                    // [수정됨] pinned_order 읽는 코드 제거
+                    // post.put("pinned_order", rs.getObject("pinned_order", Integer.class));
+                    // [유지] view_count 읽기
+                    post.put("view_count", rs.getInt("view_count"));
+                    // Optional.of(): 조회된 post 맵을 Optional 객체로 감싸서 반환
+                    return Optional.of(post);
                 }
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return Optional.empty(); // 데이터를 찾지 못하면 빈 Optional 반환
+        // 데이터 없거나 오류 시 Optional.empty() 반환
+        return Optional.empty();
     }
 
     /**
-     * post_id로 특정 게시글의 제목과 내용을 수정합니다.
+     * post_id로 특정 게시글 제목/내용 수정 메소드
+     * @param post 수정할 게시글 정보 (Map) ('post_id', 'title', 'content' 포함)
+     * @return 영향을 받은 행의 수 (성공 시 1, 실패 시 0)
      */
-    // 게시글 데이터에 'post_id', 'title', 'content' 키가 있어야 합니다.
     public int update(Map<String, Object> post) {
+        // SqlLoader.getSql() 호출하여 SQL 로드
         String sql = SqlLoader.getSql("post.update");
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            // SQL의 물음표(?) 부분에 수정할 게시글 데이터 채우기
+            // SQL ? 파라미터 설정
             pstmt.setString(1, (String) post.get("title"));
             pstmt.setString(2, (String) post.get("content"));
             pstmt.setInt(3, (Integer) post.get("post_id"));
 
+            // pstmt.executeUpdate() 실행
             return pstmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
@@ -137,15 +153,38 @@ public class BoardDAO {
     }
 
     /**
-     * post_id로 특정 게시글을 삭제합니다.
+     * post_id로 특정 게시글 삭제 메소드
+     * @param postId 삭제할 게시글 ID (int)
+     * @return 영향을 받은 행의 수 (성공 시 1, 실패 시 0)
      */
-    // postId: 삭제할 게시글의 고유 ID
     public int delete(int postId) {
+        // SqlLoader.getSql() 호출하여 SQL 로드
         String sql = SqlLoader.getSql("post.delete.by_id");
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            // SQL의 물음표(?) 부분에 postId 값 채우기
+            // SQL ? 파라미터 설정
             pstmt.setInt(1, postId);
+            // pstmt.executeUpdate() 실행
+            return pstmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    /**
+     * [유지] post_id로 특정 게시글 조회수 1 증가 메소드
+     * @param postId 조회수 증가시킬 게시글 ID (int)
+     * @return 영향을 받은 행의 수 (성공 시 1, 실패 시 0)
+     */
+    public int incrementViewCount(int postId) {
+        // SqlLoader.getSql() 호출하여 SQL 로드
+        String sql = SqlLoader.getSql("post.increment.view_count");
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            // SQL ? 파라미터 설정
+            pstmt.setInt(1, postId);
+            // pstmt.executeUpdate() 실행
             return pstmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();

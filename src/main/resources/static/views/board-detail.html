@@ -1,10 +1,7 @@
-<div ng-controller="BoardDetailController" class="container">
-
-    <div ng-if="!isEditing">
-        <h1>{{ post.title }}</h1>
-        <div style="color: #6c757d; margin-bottom: 20px; border-bottom: 1px solid #dee2e6; padding-bottom: 15px;">
-            <span>작성자: {{ post.author_name || '탈퇴한 사용자' }} ({{ post.user_id }})</span> <!--탈퇴한 사용자의 author_name은 NULL 계정 삭제시 탈퇴한 사용자 나옴-->
-            <span style="float: right;">작성일: {{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</span>
+<div class="container"> <div ng-if="!isEditing">
+        <h1>{{ post.title }}</h1> <div style="color: #6c757d; margin-bottom: 20px; border-bottom: 1px solid #dee2e6; padding-bottom: 15px;">
+            <span>작성자: {{ post.author_name || '탈퇴한 사용자' }} ({{ post.user_id }})</span>
+            <span style="margin-left: 15px;">조회: {{ post.view_count }}</span> <span style="float: right;">작성일: {{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</span>
         </div>
         <div class="post-content" ng-bind-html="trustedContent" style="min-height: 200px; margin-bottom: 40px; white-space: pre-wrap;"></div>
         <div class="action-bar">
@@ -36,8 +33,7 @@
         </div>
     </div>
 
-    <hr>
-    <div class="comments-section">
+    <hr> <div class="comments-section">
         <h2>댓글</h2>
         <div class="comment-list">
             <div ng-if="!comments.length" class="no-comments">
@@ -46,7 +42,7 @@
             <div class="comment-item" ng-repeat="comment in comments">
                 <div ng-if="!comment.isEditing">
                     <div class="comment-header">
-                        <strong>{{ comment.author_name ||'탈퇴한 사용자' }}</strong> ({{ comment.user_id }}) <!--탈퇴한 사용자의 author_name은 NULL 계정 삭제시 탈퇴한 사용자 나옴-->
+                        <strong>{{ comment.author_name ||'탈퇴한 사용자' }}</strong> ({{ comment.user_id }})
                         <span class="comment-date">{{ comment.created_at | date:'yyyy-MM-dd HH:mm' }}</span>
                     </div>
                     <p class="comment-content">{{ comment.content }}</p>
@@ -64,7 +60,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="comment-form">
             <form name="commentForm">
                 <textarea ng-model="newComment.content" required placeholder="댓글을 입력하세요" class="form-control" rows="4"></textarea>

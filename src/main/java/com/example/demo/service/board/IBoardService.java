@@ -20,4 +20,6 @@ public interface IBoardService {
     // [수정] 게시글 삭제 (파라미터에 List<String> roles 추가)
     boolean deletePost(int postId, String currentUserId, List<String> roles);
     
+    // 특정 게시글의 조회수 증가
+    void incrementViewCount(int postId);
 }

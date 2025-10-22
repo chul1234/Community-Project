@@ -124,7 +124,7 @@ public class UserDAO {
         }
     }
 
-    // user_id를 이용해 users_roles 테이블에서 해당 사용자의 모든 역할 정보를 삭제
+    // user_id를 이용해 users_roles 테이블에서 해당 사용자의 모든 역할 정보
     public void insertUserRoles(String userId, List<String> roleIds) throws SQLException {
         String sql = SqlLoader.getSql("user_roles.insert");
         try (Connection conn = getConnection();

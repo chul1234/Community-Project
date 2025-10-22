@@ -1,21 +1,21 @@
 <div ng-controller="BoardController" class="container">
     <div class="action-bar">
-        <h1>게시판</h1>
-        <a href="#!/board/new" class="action-btn create-btn">글쓰기</a>
+        <h1>게시판</h1> <a href="#!/board/new" class="action-btn create-btn">글쓰기</a>
     </div>
 
     <table class="user-table">
         <thead>
             <tr>
                 <th style="width: 10%;">번호</th>
-                <th style="width: 50%;">제목</th>
+                <th style="width: 45%;">제목</th>
                 <th style="width: 15%;">작성자</th>
-                <th style="width: 25%;">작성일</th>
+                <th style="width: 20%;">작성일</th>
+                <th style="width: 10%;">조회수</th>
             </tr>
         </thead>
         <tbody>
             <tr ng-if="!postList.length">
-                <td colspan="4" style="text-align: center; color: #777;">
+                <td colspan="5" style="text-align: center; color: #777;">
                     작성된 게시글이 없습니다.
                 </td>
             </tr>
@@ -24,8 +24,9 @@
                 <td>
                     <a href="#!/board/{{ post.post_id }}">{{ post.title }}</a>
                 </td>
-                <td>{{ post.author_name || '탈퇴한 사용자' }} ({{ post.user_id }})</td> <!--탈퇴한 사용자의 author_name은 NULL 계정 삭제시 탈퇴한 사용자 나옴-->
+                <td>{{ post.author_name || '탈퇴한 사용자' }} ({{ post.user_id }})</td>
                 <td>{{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</td>
+                <td>{{ post.view_count }}</td>
             </tr>
         </tbody>
     </table>
