@@ -1,6 +1,5 @@
 package com.example.demo.dao;
 
-import com.example.demo.dao.SqlLoader; // sql.properties 로더 import
 import org.springframework.beans.factory.annotation.Autowired; // @Autowired 사용
 import org.springframework.stereotype.Repository; // @Repository 사용
 
