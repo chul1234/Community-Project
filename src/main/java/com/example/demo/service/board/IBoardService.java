@@ -5,8 +5,14 @@ import java.util.Map;
 
 public interface IBoardService {
 
+    /**
+     * [수정됨] 특정 페이지의 게시글 목록과 전체 페이지 정보를 조회
+     * @param page 요청 페이지 번호 (1부터 시작)
+     * @param size 페이지당 게시글 수
+     * @return Map (키: "posts" -> 게시글 목록, "totalPages" -> 전체 페이지 수, "totalItems" -> 전체 게시글 수, "currentPage" -> 현재 페이지 번호)
+     */
     // 모든 게시글을 조회하는 기능 선언 
-    List<Map<String, Object>> getAllPosts();
+    Map<String, Object> getAllPosts(int page, int size);
 
     // 게시글 생성
     Map<String, Object> createPost(Map<String, Object> post, String userId);

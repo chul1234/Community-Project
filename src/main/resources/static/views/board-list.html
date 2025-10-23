@@ -14,13 +14,13 @@
             </tr>
         </thead>
         <tbody>
-            <tr ng-if="!postList.length">
+            <tr ng-if="!postList.length && totalItems === 0">
                 <td colspan="5" style="text-align: center; color: #777;">
                     작성된 게시글이 없습니다.
                 </td>
             </tr>
             <tr ng-repeat="post in postList">
-                <td>{{ $index + 1 }}</td>
+                <td>{{ totalItems - (currentPage - 1) * pageSize - $index }}</td>
                 <td>
                     <a href="#!/board/{{ post.post_id }}">{{ post.title }}</a>
                 </td>
@@ -30,4 +30,18 @@
             </tr>
         </tbody>
     </table>
+
+    <div class="pagination-container" ng-if="totalPages > 1" style="text-align: center; margin-top: 20px;">
+        <button ng-click="goToPage(currentPage - 1)" ng-disabled="currentPage === 1" style="margin-right: 5px;">
+            &lt; 이전 </button>
+
+        <span ng-repeat="i in getNumber(totalPages) track by $index" style="margin: 0 2px;">
+            <a href="" ng-click="goToPage($index + 1)" ng-style="{ 'font-weight': (currentPage === $index + 1) ? 'bold' : 'normal', 'text-decoration': (currentPage === $index + 1) ? 'none' : 'underline' }">
+                {{ $index + 1 }} </a>
+        </span>
+
+        <button ng-click="goToPage(currentPage + 1)" ng-disabled="currentPage === totalPages" style="margin-left: 5px;">
+            다음 &gt; </button>
+    </div>
+
 </div>

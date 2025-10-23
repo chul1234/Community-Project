@@ -5,6 +5,7 @@ import com.example.demo.service.board.IBoardService; // 게시판 서비스의 �
 import org.springframework.beans.factory.annotation.Autowired; // Spring의 의존성 주입 기능을 사용하기 위한 도구
 import org.springframework.stereotype.Service; // 이 클래스가 서비스 부품임을 알리는 도구
 
+import java.util.HashMap; // HashMap 사용 (Map 구현체)
 import java.util.Map; // 데이터를 '이름표-값' 쌍으로 다루기 위한 도구
 import java.util.List; // 여러 데이터를 목록 형태로 다루기 위한 도구
 
@@ -14,10 +15,36 @@ public class BoardServiceImpl implements IBoardService {
     @Autowired
     private BoardDAO boardDAO;
 
-    @Override
-    public List<Map<String, Object>> getAllPosts() {
-        // boardDAO에게 모든 게시글을 찾아달라고 요청,받은 결과를 그대로 컨트롤러로 반환
-        return boardDAO.findAll(); // boardDAO.findAll() 호출
+    /**
+     * [수정됨] 특정 페이지의 게시글 목록과 전체 페이지 정보를 조회 메소드
+     * @param page 요청 페이지 번호 (int, 1부터 시작)
+     * @param size 페이지당 게시글 수 (int)
+     * @return Map (키: "posts" -> 게시글 목록, "totalPages" -> 전체 페이지 수, "totalItems" -> 전체 게시글 수, "currentPage" -> 현재 페이지 번호)
+     */
+    @Override // IBoardService 인터페이스 메소드 구현 명시
+    public Map<String, Object> getAllPosts(int page, int size) { // 메소드 시그니처 수정됨 (파라미터 추가, 반환 타입 변경)
+        // 1. offset 계산 (DB에서 건너뛸 게시글 수). 페이지는 1부터 시작하므로 page - 1
+        int offset = (page - 1) * size;
+
+        // 2. DAO를 통해 해당 페이지 게시글 목록 조회. boardDAO.findAll() 호출 시 limit(size), offset 전달
+        List<Map<String, Object>> posts = boardDAO.findAll(size, offset);
+
+        // 3. DAO를 통해 전체 게시글 수 조회. boardDAO.countAll() 호출
+        int totalItems = boardDAO.countAll();
+
+        // 4. 전체 페이지 수 계산. Math.ceil() 사용하여 올림 처리 (예: 21개 글 / 10개씩 = 2.1 -> 3페이지)
+        int totalPages = (int) Math.ceil((double) totalItems / size);
+
+        // 5. 결과를 담을 HashMap 생성
+        Map<String, Object> result = new HashMap<>();
+        // .put() 메소드로 결과 데이터 저장
+        result.put("posts", posts);         // 현재 페이지 게시글 목록
+        result.put("totalItems", totalItems); // 전체 게시글 수
+        result.put("totalPages", totalPages);   // 전체 페이지 수
+        result.put("currentPage", page);     // 요청된 현재 페이지 번호
+
+        // 6. 완성된 Map 반환
+        return result;
     }
 
     @Override
@@ -63,8 +90,7 @@ public class BoardServiceImpl implements IBoardService {
             post.put("content", postDetails.get("content")); // 내용 업데이트
 
             // 4.수정된 내용이 담긴 post Map을 boardDAO의 update 메소드로 전달,DB에 업데이트를 요청
-            // [수정 필요] DB 업데이트 로직 누락됨. boardDAO.update(post) 호출 필요
-            int affectedRows = boardDAO.update(post); // boardDAO.update() 호출 추가
+            int affectedRows = boardDAO.update(post); // boardDAO.update() 호출
             return affectedRows > 0 ? post : null; // 성공 시 post 반환, 실패 시 null 반환
         }
         // 게시글이 없거나 작성자가 아니면 null을 반환합니다.
@@ -87,7 +113,7 @@ public class BoardServiceImpl implements IBoardService {
     }
 
     /**
-     * [신규 추가] 특정 게시글의 조회수를 증가시킵니다.
+     * [유지] 특정 게시글의 조회수를 증가시킵니다.
      * @param postId 조회수를 증가시킬 게시글의 ID
      */
     @Override // IBoardService 인터페이스 메소드 구현 명시

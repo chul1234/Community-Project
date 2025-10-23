@@ -1,5 +1,6 @@
 package com.example.demo.dao;
 
+import com.example.demo.dao.SqlLoader; // sql.properties 로더 import
 import org.springframework.beans.factory.annotation.Autowired; // @Autowired 사용
 import org.springframework.stereotype.Repository; // @Repository 사용
 
@@ -24,43 +25,73 @@ public class BoardDAO {
     }
 
     /**
-     * posts 테이블의 모든 게시글 목록 조회 메소드
+     * [수정됨] posts 테이블의 특정 범위 게시글 목록 조회 메소드 (페이지네이션용)
+     * @param limit 가져올 개수 (int)
+     * @param offset 건너뛸 개수 (int)
      * @return 게시글 목록 (List<Map<String, Object>>)
      */
-    public List<Map<String, Object>> findAll() {
+    public List<Map<String, Object>> findAll(int limit, int offset) { // limit, offset 파라미터 추가됨
         // 결과 담을 ArrayList 생성
         List<Map<String, Object>> postList = new ArrayList<>();
-        // SqlLoader.getSql() 호출하여 SQL 로드 ('pinned_order' 없는 SQL 사용)
+        // SqlLoader.getSql() 호출하여 SQL 로드 (LIMIT ?, OFFSET ? 포함된 SQL)
         String sql = SqlLoader.getSql("post.select.all");
 
-        // try-with-resources: conn, pstmt, rs 자동 자원 해제 보장
+        // try-with-resources: conn, pstmt 자동 자원 해제 보장
         try (Connection conn = getConnection(); // getConnection() 호출
-             PreparedStatement pstmt = conn.prepareStatement(sql); // SQL 준비
-             ResultSet rs = pstmt.executeQuery()) { // SQL 실행 및 결과(ResultSet) 받음
+             // [수정됨] PreparedStatement 사용 (파라미터 설정 위해)
+             PreparedStatement pstmt = conn.prepareStatement(sql)) { // SQL 준비
 
-            // rs.next(): 결과 집합(ResultSet) 순회 루프
-            while (rs.next()) {
-                // 각 행 데이터 담을 HashMap 생성
-                Map<String, Object> post = new HashMap<>();
-                // rs.getXXX("컬럼명")으로 데이터 추출 후 post 맵에 .put()으로 저장
-                post.put("post_id", rs.getInt("post_id"));
-                post.put("title", rs.getString("title"));
-                post.put("user_id", rs.getString("user_id"));
-                post.put("author_name", rs.getString("author_name")); // 작성자 이름
-                post.put("created_at", rs.getTimestamp("created_at"));
-                // [수정됨] pinned_order 읽는 코드 제거
-                // post.put("pinned_order", rs.getObject("pinned_order", Integer.class));
-                // [유지] view_count 읽기 (정수형)
-                post.put("view_count", rs.getInt("view_count"));
-                // postList 리스트에 .add()로 post 맵 추가
-                postList.add(post);
-            }
+            // [신규 추가됨] SQL의 ? 파라미터 값 설정
+            pstmt.setInt(1, limit);  // 첫 번째 ? 에 limit 값 설정
+            pstmt.setInt(2, offset); // 두 번째 ? 에 offset 값 설정
+
+            // try-with-resources: rs 자동 자원 해제 보장
+            try (ResultSet rs = pstmt.executeQuery()) { // SQL 실행 및 결과(ResultSet) 받음
+                // rs.next(): 결과 집합(ResultSet) 순회 루프
+                while (rs.next()) {
+                    // 각 행 데이터 담을 HashMap 생성
+                    Map<String, Object> post = new HashMap<>();
+                    // rs.getXXX("컬럼명")으로 데이터 추출 후 post 맵에 .put()으로 저장
+                    post.put("post_id", rs.getInt("post_id"));
+                    post.put("title", rs.getString("title"));
+                    post.put("user_id", rs.getString("user_id"));
+                    post.put("author_name", rs.getString("author_name")); // 작성자 이름
+                    post.put("created_at", rs.getTimestamp("created_at"));
+                    // [유지] view_count 읽기 (정수형)
+                    post.put("view_count", rs.getInt("view_count"));
+                    // postList 리스트에 .add()로 post 맵 추가
+                    postList.add(post);
+                }
+            } // rs 자동 해제됨
         } catch (SQLException e) { // SQLException 예외 처리
             e.printStackTrace(); // 콘솔에 에러 로그 출력
         }
         // 조회된 게시글 목록 반환
         return postList;
     }
+
+    /**
+     * [신규 추가됨] posts 테이블의 전체 게시글 수 조회 메소드
+     * @return 전체 게시글 수 (int)
+     */
+    public int countAll() {
+        // SqlLoader.getSql() 호출하여 COUNT SQL 로드
+        String sql = SqlLoader.getSql("post.count.all");
+        // try-with-resources: conn, pstmt, rs 자동 자원 해제 보장
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            // rs.next(): 결과 행이 있는지 확인 (COUNT(*)는 항상 1개 행 반환)
+            if (rs.next()) {
+                // rs.getInt(1): 결과의 첫 번째 컬럼 값(전체 개수)을 정수로 반환
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) { // SQLException 예외 처리
+            e.printStackTrace(); // 콘솔에 에러 로그 출력
+        }
+        return 0; // 오류 발생 시 0 반환
+    }
+
 
     /**
      * posts 테이블에 새로운 게시글 저장 메소드
@@ -113,8 +144,6 @@ public class BoardDAO {
                     post.put("user_id", rs.getString("user_id"));
                     post.put("author_name", rs.getString("author_name"));
                     post.put("created_at", rs.getTimestamp("created_at"));
-                    // [수정됨] pinned_order 읽는 코드 제거
-                    // post.put("pinned_order", rs.getObject("pinned_order", Integer.class));
                     // [유지] view_count 읽기
                     post.put("view_count", rs.getInt("view_count"));
                     // Optional.of(): 조회된 post 맵을 Optional 객체로 감싸서 반환
