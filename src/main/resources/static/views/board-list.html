@@ -19,9 +19,13 @@
                     작성된 게시글이 없습니다.
                 </td>
             </tr>
-            <tr ng-repeat="post in postList">
-                <td>{{ totalItems - (currentPage - 1) * pageSize - $index }}</td>
+            <tr ng-repeat="post in postList" ng-class="{'pinned-post': post.pinned_order !== null}">
                 <td>
+                    <span ng-if="post.pinned_order !== null" style="font-weight: bold; color: #007bff;">공지</span>
+                    <span ng-if="post.pinned_order === null">{{ totalItems - (currentPage - 1) * pageSize - $index }}</span>
+                </td>
+                <td>
+                    <span ng-if="post.pinned_order !== null" style="margin-right: 5px;">🏷️</span>
                     <a href="#!/board/{{ post.post_id }}">{{ post.title }}</a>
                 </td>
                 <td>{{ post.author_name || '탈퇴한 사용자' }} ({{ post.user_id }})</td>

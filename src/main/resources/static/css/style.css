@@ -459,3 +459,12 @@ header h1 {
 .dropdown:hover .dropdown-content {
     display: block;
 }
+
+.pinned-post {
+        background-color: #f8f9fa; /* 약간 다른 배경색 */
+        font-weight: 500; /* 조금 굵게 (선택 사항) */
+    }
+    .pinned-post td {
+         border-top: 1px solid #dee2e6; /* 위쪽 경계선 추가 (선택 사항) */
+         border-bottom: 1px solid #dee2e6; /* 아래쪽 경계선 강화 (선택 사항) */
+    }

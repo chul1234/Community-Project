@@ -4,14 +4,29 @@
             <span style="margin-left: 15px;">조회: {{ post.view_count }}</span> <span style="float: right;">작성일: {{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</span>
         </div>
         <div class="post-content" ng-bind-html="trustedContent" style="min-height: 200px; margin-bottom: 40px; white-space: pre-wrap;"></div>
+        
         <div class="action-bar">
             <div ng-if="canModify">
                 <button type="button" ng-click="switchToEditMode()">수정</button>
                 <button type="button" ng-click="deletePost()" class="delete-btn">삭제</button>
+
+                <button type="button" 
+                        ng-if="currentUser.role === 'ADMIN' && post.pinned_order === null"
+                        ng-click="pinPost()">
+                    🏷️ 고정하기
+                </button>
+                
+                <button type="button" 
+                        ng-if="currentUser.role === 'ADMIN' && post.pinned_order !== null"
+                        ng-click="unpinPost()" 
+                        class="delete-btn">
+                    🏷️ 고정 해제
+                </button>
+
             </div>
             <a href="#!/board" class="action-btn">목록으로</a>
         </div>
-    </div>
+        </div>
 
     <div ng-if="isEditing">
         <h1>게시글 수정</h1>
