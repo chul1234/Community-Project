@@ -31,7 +31,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         String[] roles = new String[0]; 
         // 만약 DB에서 가져온 역할 문자열(concatenatedRoles)이 null이 아니고 비어있지도 않다면,
         if (concatenatedRoles != null && !concatenatedRoles.isEmpty()) { 
-            // ", " (쉼표와 공백)를 기준으로 문자열을 잘라서, 각 역할을 배열의 요소생성
+            // ", " (쉼표와 공백)를 기준으로 문자열을 잘라서, 각 역할을 배열의 요소생성(ex["ADMIN","USER"])
             roles = concatenatedRoles.split(", ");
         }
 
@@ -39,6 +39,6 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 .username((String) user.get("user_id"))
                 .password((String) user.get("password"))
                 .roles(roles)
-                .build();
+                .build(); //Spring Security의 User 객체를 생성 열할 배열을 전달 -> "ROLE_"접두어가 붙어 "ROLE_USER","ROLE_ADMIN"등으로 처리 
     }
 }

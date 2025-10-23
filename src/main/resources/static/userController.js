@@ -13,7 +13,7 @@ app.controller('UserListController', function ($scope, $http, $location, $rootSc
     // userList 변수: 사용자 목록 담을 빈 배열 생성
     $scope.userList = [];
 
-    // [수정됨] 현재 사용자 역할 감시($watch) 시작. 역할 확인 후 isAdmin 값 설정용.
+    // 현재 사용자 역할 감시($watch) 시작. 역할 확인 후 isAdmin 값 설정용.
     // $rootScope.currentUser.role 값의 변화를 감지함.
     const unwatch = $rootScope.$watch('currentUser.role', function(newRole) {
         // newRole 값이 없으면(undefined or null), 아직 로딩 중이므로 대기 (return).
