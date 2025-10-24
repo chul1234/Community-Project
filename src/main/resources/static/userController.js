@@ -137,6 +137,7 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
     $scope.isAdmin = false;
 
     // 현재 사용자 역할 감시($watch) 시작. 역할 확인 후 isAdmin 값 설정 및 데이터 로딩용.
+    //$watch (데이터가 변경될 때마다 즉시 특정 작업을 수행)
     const unwatch = $rootScope.$watch('currentUser.role', function (newRoleValue) {
         // 역할 정보 없으면(undefined or null) 대기 (return).
         if (newRoleValue === undefined || newRoleValue === null) return;
