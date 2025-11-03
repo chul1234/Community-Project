@@ -153,8 +153,9 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
     function fetchComments() { // fetchComments 함수 정의 시작
         // $http.get(url): 주소에 GET 요청 전송
         // 백엔드 CommentController.java의 @GetMapping("/api/posts/{postId}/comments") 메소드 호출
+        // [대댓글 수정] 이제 이 API는 계층형 JSON을 반환합니다.
         $http.get('/api/posts/' + postId + '/comments').then(function (response) { // .then(): 성공 콜백
-            $scope.comments = response.data; //성공시 받은 댓글 목록 $scope.comments에 저장
+            $scope.comments = response.data; //성공시 받은 계층형 댓글 목록 $scope.comments에 저장
         }); // .then() 끝
     } // fetchComments 함수 끝
     fetchComments(); // 함수 즉시 호출
@@ -262,22 +263,52 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
 
 
     // --- 댓글 관련 함수들 ---
-    // '댓글 등록' 버튼(HTML ng-click="submitComment()") 클릭 시 실행될 함수
-    $scope.submitComment = function() { // submitComment 함수 정의 시작
+
+    // ▼▼▼ [대댓글 수정] submitComment 함수가 parentId와 commentData를 받도록 수정 ▼▼▼
+    /**
+     * '댓글 등록' 또는 '답글 등록' 버튼 클릭 시 실행될 함수
+     * @param {number|null} parentId - 부모 댓글 ID. 최상위 댓글은 null.
+     * @param {object} commentData - 댓글 내용이 담긴 객체. (예: { content: "..." })
+     */
+    $scope.submitComment = function(parentId, commentData) { // submitComment 함수 정의 시작
+        
+        // 1. 서버로 전송할 데이터 객체(payload) 생성
+        var commentToSend = {
+            content: commentData.content, // 댓글 내용
+            parent_comment_id: parentId   // 부모 ID (null일 수도 있음)
+        };
+
         // $http.post(url, data): HTTP POST 데이터 전송
         // 백엔드 CommentController.java의 @PostMapping("/api/posts/{postId}/comments") 메소드 호출
-        $http.post('/api/posts/' + postId + '/comments', $scope.newComment).then(function() { // .then(): 성공 콜백
-            // 성공 시, 입력창($scope.newComment.content) 비움
-            $scope.newComment.content = ''; // content 속성 빈 문자열 할당
-            // fetchComments() 함수 호출하여 댓글 목록 다시 불러와 화면 갱신
+        // [대댓글 수정] 전송하는 데이터가 $scope.newComment에서 commentToSend로 변경됨
+        $http.post('/api/posts/' + postId + '/comments', commentToSend).then(function() { // .then(): 성공 콜백
+            
+            // 2. 성공 시 입력창 초기화
+            if (parentId === null) {
+                // 최상위 댓글 폼의 내용만 비움
+                $scope.newComment.content = ''; 
+            } else {
+                // 답글 폼의 내용은 HTML에서 (취소 버튼 클릭 시) 알아서 처리하므로
+                // 여기서는 commentData.content = ''; 를 할 필요가 없음 (오히려 오류 유발 가능)
+                // 대신 답글 폼을 닫아주기 위해 해당 댓글의 showReply를 false로 만들 수 있으나,
+                // fetchComments()가 어차피 전체를 새로 그리므로 생략 가능.
+            }
+
+            // 3. fetchComments() 함수 호출하여 댓글 목록 다시 불러와 화면 갱신
+            // (Service에서 계층형으로 조립된 새 목록을 받아옴)
             fetchComments();
+            
         }).catch(function(err) { alert("댓글 등록 실패"); }); // 실패 시 알림창
     }; // submitComment 함수 끝
+    // ▲▲▲ [대댓글 수정] submitComment 함수 수정 완료 ▲▲▲
+
+    
     // (HTML에서 ng-if="canModifyComment(comment)"로 사용) 댓글 수정/삭제 권한 확인 함수. comment 객체(c) 인자로 받음
     $scope.canModifyComment = function(c) { // canModifyComment 함수 정의 시작
         // 현재 사용자 역할($rootScope.currentUser.role)이 관리자(ADMIN) 이거나(||) 댓글 작성자 ID(c.user_id)가 현재 사용자 ID($rootScope.currentUser.username)와 같으면 true 반환
         return $rootScope.currentUser.role === 'ADMIN' || c.user_id === $rootScope.currentUser.username; // boolean 반환
     }; // canModifyComment 함수 끝
+    
     // 댓글 '삭제' 버튼(HTML ng-click="deleteComment(comment.comment_id)") 클릭 시 실행될 함수. commentId(cId) 인자로 받음
     $scope.deleteComment = function(cId) { // deleteComment 함수 정의 시작
         if (confirm("댓글을 삭제하시겠습니까?")) { // window.confirm() 함수
@@ -286,24 +317,26 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
             $http.delete('/api/comments/' + cId).then(() => fetchComments()); // 성공 시 fetchComments() 호출하여 목록 새로고침
         } // if 끝
     }; // deleteComment 함수 끝
+    
     // 댓글 '수정' 버튼(HTML ng-click="switchToCommentEditMode(comment)") 클릭 시 실행될 함수. comment 객체(c) 인자로 받음
     $scope.switchToCommentEditMode = function(c) { // switchToCommentEditMode 함수 정의 시작
         c.isEditing = true; // 해당 댓글 객체(c)의 isEditing 속성 true 설정 (수정 폼 보이게 됨)
         c.editContent = c.content; // 원본 내용(c.content)을 수정용 속성(c.editContent)에 복사
     }; // switchToCommentEditMode 함수 끝
+    
     // 댓글 '저장' 버튼(HTML ng-click="saveCommentChanges(comment)") 클릭 시 실행될 함수. comment 객체(c) 인자로 받음
     $scope.saveCommentChanges = function(c) { // saveCommentChanges 함수 정의 시작
         // $http.put(url, data): HTTP PUT 데이터 전송 (수정 요청). data: 수정 내용 객체 { content: ... }
         // 백엔드 CommentController.java의 @PutMapping("/api/comments/{commentId}") 메소드 호출
         
-        // ▼▼▼ [오타 수정 완료] '/api/comments/'C' + c.comment_id' -> '/api/comments/' + c.comment_id' ▼▼▼
+        // [오타 수정 완료] '/api/comments/'C' + c.comment_id' -> '/api/comments/' + c.comment_id'
         $http.put('/api/comments/' + c.comment_id, { content: c.editContent }).then(() => { // c.comment_id 사용, 성공 콜백
-        // ▲▲▲ [오타 수정 완료] ▲▲▲
             
             c.isEditing = false; // 성공 시 isEditing 속성 false 설정 ('보기 모드' 전환)
             fetchComments(); // fetchComments() 호출하여 목록 새로고침
         }); // .then() 끝
     }; // saveCommentChanges 함수 끝
+    
     // 댓글 수정 '취소' 버튼(HTML ng-click="cancelCommentEdit(comment)") 클릭 시 실행될 함수. comment 객체(c) 인자로 받음
     $scope.cancelCommentEdit = function(c) { c.isEditing = false; }; // isEditing 속성 false 설정 ('보기 모드' 전환)
 }); // BoardDetailController 정의 끝
