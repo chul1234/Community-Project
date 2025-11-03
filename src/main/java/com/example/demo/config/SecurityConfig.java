@@ -2,7 +2,6 @@ package com.example.demo.config;
 
 import org.springframework.context.annotation.Bean; // @Bean 어노테이션 사용
 import org.springframework.context.annotation.Configuration; // @Configuration 어노테이션 사용
-import org.springframework.http.HttpMethod; // [신규] HttpMethod를 import합니다 (특정 경로의 메소드를 지정하기 위함)
 import org.springframework.security.config.annotation.web.builders.HttpSecurity; // HttpSecurity: 웹 보안 설정을 위한 핵심 클래스
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity; // @EnableWebSecurity: Spring Security 활성화
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder; // BCryptPasswordEncoder: BCrypt 암호화 구현체
