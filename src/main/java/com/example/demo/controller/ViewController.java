@@ -8,7 +8,7 @@ public class ViewController { // ViewController 클래스 선언
     @GetMapping("/") // '/' 주소로 접속하면 메인 페이지를 보여줍니다.
     public String mainPage() { 
         // "forward:"를 제거하면 "Angular_http.html"이라는 뷰를 찾으라는 의미가 됨
-        return "Angular_http.html";
+        return "Angular_http.html"; //이때 로그인 우뮤 String X -> modelAndview를 사용해서 .html 말고 다른 정보도 같이 보내라
     }
 
     // '/login' 주소로 접속하면 로그인 페이지를 보여줍니다.

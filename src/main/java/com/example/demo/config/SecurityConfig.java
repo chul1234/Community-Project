@@ -2,6 +2,7 @@ package com.example.demo.config;
 
 import org.springframework.context.annotation.Bean; // @Bean 어노테이션 사용
 import org.springframework.context.annotation.Configuration; // @Configuration 어노테이션 사용
+import org.springframework.http.HttpMethod; // [신규] HttpMethod를 import합니다 (특정 경로의 메소드를 지정하기 위함)
 import org.springframework.security.config.annotation.web.builders.HttpSecurity; // HttpSecurity: 웹 보안 설정을 위한 핵심 클래스
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity; // @EnableWebSecurity: Spring Security 활성화
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder; // BCryptPasswordEncoder: BCrypt 암호화 구현체
@@ -26,21 +27,45 @@ public class SecurityConfig { // SecurityConfig: 웹 보안 설정을 위한 메
             .csrf(csrf -> csrf.disable())
 
             // 2. URL별 접근 권한 설정 시작. (authorizeHttpRequests() 메소드)
+            // [수정됨] 규칙의 순서가 매우 중요합니다. 구체적인 경로를 먼저, 넓은 범위를 나중에 설정해야 합니다.
             .authorizeHttpRequests(auth -> auth
+                // (1) 1순위: 인증 없이 누구나 접근 가능한 경로
                 // .requestMatchers(): 특정 경로(URL) 지정.
-                // [수정됨]: "/api/menus" 추가 (메뉴 API)
                 .requestMatchers(
-                    "/api/menus", // <-- 메뉴 API 경로 추가
-                    "/login", 
-                    "/register", 
-                    "/css/**",
-                    "/lib/**", 
-                    "/*.js", 
-                    "/views/**", 
-                    "/*.html"
+                    "/api/menus", // 메뉴 API 경로
+                    "/login", // 로그인 페이지
+                    "/register", // 회원가입 페이지
+                    "/css/**", // css 파일
+                    "/lib/**", // lib 파일
+                    "/*.js", // 루트의 모든 .js 파일 (app.js 등)
+                    "/views/**", // 모든 html 뷰 파일
+                    "/*.html" // 루트의 html 파일 (Angular_http.html)
                 )
                 .permitAll() // .permitAll(): 위 경로들에 대해 모든 사용자(비로그인 포함)의 접근 허용
-                // .anyRequest(): 위에서 지정한 경로 외의 모든 요청
+
+                // (2) 2순위: 인증(로그인)만 하면 누구나(USER, ADMIN) 사용 가능한 API
+                // (3순위의 관리자 전용 규칙보다 먼저 선언해야 합니다.)
+                .requestMatchers(
+                    "/api/me", // (GET) 내 정보 조회
+                    "/api/users/me" // (DELETE) 회원 탈퇴
+                ).authenticated() // .authenticated(): 'USER'든 'ADMIN'이든 "로그인한 사용자"면 허용
+                
+                // (3) 3순위: 관리자(ADMIN)만 접근 가능한 API
+                // .requestMatchers()로 관리자 전용 API 경로들을 지정
+                .requestMatchers(
+                    "/users",                   // (GET) 사용자 목록 조회, (POST) 단일 사용자 생성
+                    "/users/**",                // (GET/PUT/DELETE) /users/{id}, (POST) /users/bulk
+                    "/api/roles",               // (GET) /api/roles (전체 역할 목록 조회)
+                    "/api/users/**",            // (PUT) /api/users/{id}/roles (역할 변경)
+                    // 게시글 고정/해제 API도 관리자 전용
+                    "/api/posts/{postId}/pin",  // (PUT) 게시글 고정
+                    "/api/posts/{postId}/unpin" // (PUT) 게시글 고정 해제
+                )
+                .hasRole("ADMIN") // .hasRole("ADMIN"): "ROLE_ADMIN" 권한이 있는 사용자만 접근 허용
+
+                // (4) 4순위: 그 외 인증이 필요한 모든 요청
+                // .anyRequest(): 위 (1), (2), (3)에서 지정한 경로 외의 모든 요청
+                // (예: /api/posts, /api/comments/**, /api/bus-stops 등)
                 .anyRequest().authenticated() // .authenticated(): 반드시 인증(로그인)된 사용자만 접근 허용
             )
 
