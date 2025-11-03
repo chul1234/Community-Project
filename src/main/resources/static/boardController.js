@@ -5,7 +5,10 @@ app.controller('BoardController', function ($scope, $http) { // BoardController 
 
     // [신규 추가됨] 페이지네이션 상태 변수
     $scope.currentPage = 1; // 현재 페이지 번호 (int, 1부터 시작). 기본값 1
+    
+    // [수정됨] pageSize의 기본값을 '10' (숫자)로 설정. board-list.html의 ng-model과 연결됨
     $scope.pageSize = 10; // 페이지당 보여줄 게시글 수 (int). 기본값 10
+    
     $scope.totalPages = 0; // 총 페이지 수 (int). 백엔드 응답으로 업데이트됨
     $scope.totalItems = 0; // 총 게시글 수 (int). 백엔드 응답으로 업데이트됨
 
@@ -16,7 +19,16 @@ app.controller('BoardController', function ($scope, $http) { // BoardController 
     function fetchPosts(page) { // page 파라미터 받음
         // $http.get(url, config): GET 요청 전송. config 객체 사용
         // config.params: URL 쿼리 파라미터 설정 객체 (?page=...&size=...)
-        $http.get('/api/posts', { params: { page: page, size: $scope.pageSize } }) // page, size 파라미터 전송
+        
+        // [수정됨] params 객체를 생성하여 page와 size를 담음
+        // $scope.pageSize는 HTML <select>에 의해 문자열일 수 있으므로 parseInt로 숫자로 변환
+        var params = {
+            page: page,
+            size: parseInt($scope.pageSize, 10) // 10진수 정수로 변환하여 전송
+        };
+
+        // [수정됨] $http.get의 params 옵션으로 params 객체를 전달
+        $http.get('/api/posts', { params: params }) // page, size 파라미터 전송
             .then(function(response) { // .then(): 요청 성공 시 콜백 함수 실행. response: 응답 객체
                 // response.data: 서버 응답 본문 (BoardServiceImpl에서 반환한 Map 객체)
 
@@ -27,6 +39,16 @@ app.controller('BoardController', function ($scope, $http) { // BoardController 
                 $scope.currentPage = response.data.currentPage; // response.data.currentPage (현재 페이지 번호) 할당
             }); // .then() 끝
     } // fetchPosts 함수 끝
+
+    // ▼▼▼ [신규 추가됨] 페이지 크기(pageSize) 변경 시 호출되는 함수 ▼▼▼
+    /**
+     * HTML의 select 태그(ng-model="pageSize") 값이 변경될 때(ng-change) 호출됨.
+     */
+    $scope.pageSizeChanged = function() { // pageSizeChanged 함수 정의 시작
+        // 페이지 크기가 변경되었으므로, 1페이지부터 다시 조회
+        // 이때 $scope.pageSize는 ng-model에 의해 이미 새 값(예: "5")으로 변경된 상태
+        fetchPosts(1); 
+    }; // pageSizeChanged 함수 정의 끝
 
     /**
      * [신규 추가됨] 특정 페이지로 이동하는 함수. HTML의 페이지 번호/버튼 클릭 시 호출됨 (ng-click)
@@ -273,7 +295,11 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
     $scope.saveCommentChanges = function(c) { // saveCommentChanges 함수 정의 시작
         // $http.put(url, data): HTTP PUT 데이터 전송 (수정 요청). data: 수정 내용 객체 { content: ... }
         // 백엔드 CommentController.java의 @PutMapping("/api/comments/{commentId}") 메소드 호출
+        
+        // ▼▼▼ [오타 수정 완료] '/api/comments/'C' + c.comment_id' -> '/api/comments/' + c.comment_id' ▼▼▼
         $http.put('/api/comments/' + c.comment_id, { content: c.editContent }).then(() => { // c.comment_id 사용, 성공 콜백
+        // ▲▲▲ [오타 수정 완료] ▲▲▲
+            
             c.isEditing = false; // 성공 시 isEditing 속성 false 설정 ('보기 모드' 전환)
             fetchComments(); // fetchComments() 호출하여 목록 새로고침
         }); // .then() 끝
