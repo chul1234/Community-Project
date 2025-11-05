@@ -9,8 +9,9 @@
         <div class="post-content" ng-bind-html="trustedContent" style="min-height: 200px; margin-bottom: 40px; white-space: pre-wrap;"></div>
         
         <div class="action-bar">
-            <div ng-if="canModify">
-                <button type="button" ng-click="switchToEditMode()">수정</button>
+            <div ng-if="canModify"> <button type="button" 
+                        ng-click="switchToEditMode()"
+                        ng-if="post.user_id === currentUser.username">수정</button>
                 <button type="button" ng-click="deletePost()" class="delete-btn">삭제</button>
 
                 <button type="button" 
@@ -55,20 +56,20 @@
     <div class="comments-section">
         <h2>댓글</h2>
 
-        <div class="comment-list">
-            <div ng-if="!comments.length" class="no-comments">
-                아직 댓글이 없습니다. 첫 댓글을 작성해보세요!
-            </div>
-            
-            <div ng-repeat="comment in comments" ng-include="'comment-tree.html'"></div>
-        </div>
-
         <div class="comment-form">
             <form name="commentForm">
                 <textarea ng-model="newComment.content" required placeholder="댓글을 입력하세요" class="form-control" rows="4"></textarea>
                 <button ng-click="submitComment(null, newComment)" ng-disabled="commentForm.$invalid" class="submit-btn" style="width: 100%; margin-top: 10px;">댓글 등록</button>
             </form>
         </div>
+
+        <div class="comment-list" style="margin-top: 30px;"> <div ng-if="!comments.length" class="no-comments">
+                아직 댓글이 없습니다. 첫 댓글을 작성해보세요!
+            </div>
+            
+            <div ng-repeat="comment in comments" ng-include="'comment-tree.html'"></div>
+        </div>
+
     </div>
     </div> <script type="text/ng-template" id="comment-tree.html">
     <div class="comment-item" ng-if="!comment.isEditing">
@@ -82,7 +83,9 @@
             <button ng-click="comment.showReply = !comment.showReply" class="action-btn-sm">답글</button>
             
             <span ng-if="canModifyComment(comment)">
-                <button ng-click="switchToCommentEditMode(comment)" class="action-btn-sm">수정</button>
+                
+                <button ng-click="switchToCommentEditMode(comment)" class="action-btn-sm" 
+                        ng-if="comment.user_id === currentUser.username">수정</button>
                 <button ng-click="deleteComment(comment.comment_id)" class="action-btn-sm delete">삭제</button>
             </span>
         </div>
