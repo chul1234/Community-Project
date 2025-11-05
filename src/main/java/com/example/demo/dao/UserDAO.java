@@ -81,29 +81,55 @@ public class UserDAO {
         return Optional.empty();
     }
 
-    public List<Map<String, Object>> findAll() {
+    public List<Map<String, Object>> findAll(int limit, int offset) { // (1) 파라미터 추가
         List<Map<String, Object>> userList = new ArrayList<>();
-        String sql = SqlLoader.getSql("user.select.all");
+        String sql = SqlLoader.getSql("user.select.all"); // (2) LIMIT/OFFSET이 포함된 SQL
+        
+        // (3) Statement를 PreparedStatement로 변경
         try (Connection conn = getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            while (rs.next()) {
-                Map<String, Object> user = new HashMap<>();
-                user.put("user_id", rs.getString("user_id"));
-                user.put("name", rs.getString("name"));
-                user.put("phone", rs.getString("phone"));
-                user.put("email", rs.getString("email"));
-                user.put("password", rs.getString("password"));
-                // SQL 쿼리의 별명(as)으로 지정한 'role_ids'와 'role_names' 값을 가져와 저장
-                user.put("role_ids", rs.getString("role_ids"));
-                user.put("role_names", rs.getString("role_names"));
-                userList.add(user);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) { 
+
+            // (4) 파라미터 바인딩
+            pstmt.setInt(1, limit);  // 첫 번째 ? (LIMIT)
+            pstmt.setInt(2, offset); // 두 번째 ? (OFFSET)
+
+            try (ResultSet rs = pstmt.executeQuery()) { // (5) 쿼리 실행
+                while (rs.next()) {
+                    Map<String, Object> user = new HashMap<>();
+                    user.put("user_id", rs.getString("user_id"));
+                    user.put("name", rs.getString("name"));
+                    user.put("phone", rs.getString("phone"));
+                    user.put("email", rs.getString("email"));
+                    user.put("password", rs.getString("password"));
+                    user.put("role_ids", rs.getString("role_ids"));
+                    user.put("role_names", rs.getString("role_names"));
+                    userList.add(user);
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return userList;
     }
+
+    /**
+     * users 테이블의 전체 사용자 수를 조회합니다. (페이지네이션용)
+     * @return 전체 사용자 수 (int)
+     */
+    public int countAll() {
+        String sql = SqlLoader.getSql("user.count.all");
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            if (rs.next()) {
+                return rs.getInt(1); // COUNT(*) 결과 (첫 번째 컬럼 값)
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0; // 오류 시 0 반환
+    }
+
 //user_id를 이용해 사용자를 삭제
     public int deleteByUserId(String userId) {
         String sql = SqlLoader.getSql("user.delete.by_user_id");

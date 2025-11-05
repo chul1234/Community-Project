@@ -13,9 +13,17 @@ app.controller('UserListController', function ($scope, $http, $location, $rootSc
     // userList 변수: 사용자 목록 담을 빈 배열 생성
     $scope.userList = [];
 
+    // ▼▼▼ [페이지네이션 신규 추가] 페이지네이션 상태 변수 ▼▼▼
+    $scope.currentPage = 1; // 현재 페이지 번호 (int, 1부터 시작). 기본값 1
+    // boardController.js와 동일하게 '숫자' 10을 기본값으로 설정
+    $scope.pageSize = 10; // 페이지당 보여줄 사용자 수 (int). 기본값 10
+    $scope.totalPages = 0; // 총 페이지 수 (int). 백엔드 응답으로 업데이트됨
+    $scope.totalItems = 0; // 총 사용자 수 (int). 백엔드 응답으로 업데이트됨
+    // ▲▲▲ [페이지네이션 신규 추가] ▲▲▲
+
     // 현재 사용자 역할 감시($watch) 시작. 역할 확인 후 isAdmin 값 설정용.
     // $rootScope.currentUser.role 값의 변화를 감지함.
-    const unwatch = $rootScope.$watch('currentUser.role', function(newRole) {
+    const unwatch = $rootScope.$watch('currentUser.role', function (newRole) {
         // newRole 값이 없으면(undefined or null), 아직 로딩 중이므로 대기 (return).
         if (newRole === undefined || newRole === null) return;
         // 일단 역할 값이 확인되면, 더 이상 감시할 필요 없으므로 감시 중단 (unwatch 실행).
@@ -26,21 +34,68 @@ app.controller('UserListController', function ($scope, $http, $location, $rootSc
             // isAdmin을 true로 설정.
             $scope.isAdmin = true;
             // 관리자일 경우에만 fetchAllUsers 함수 호출하여 사용자 목록 불러옴.
-            $scope.fetchAllUsers();
+            // [페이지네이션 수정] 1페이지(기본값)부터 불러오도록 변경
+            $scope.fetchAllUsers($scope.currentPage);
         } else {
             // 'ADMIN'이 아니면 isAdmin을 false로 설정.
             $scope.isAdmin = false;
         }
     }); // 역할 감시($watch) 끝.
 
-    // fetchAllUsers 함수: 서버에서 모든 사용자 목록 가져오는 기능.
-    $scope.fetchAllUsers = function () {
+    // ▼▼▼ [페이지네이션 수정] fetchAllUsers 함수가 page 파라미터를 받도록 수정 ▼▼▼
+    /**
+     * [수정됨] 특정 페이지의 사용자 목록을 서버에서 불러오는 함수
+     * @param {number} page 불러올 페이지 번호
+     */
+    $scope.fetchAllUsers = function (page) {
+        // [타이밍 문제 해결] boardController.js처럼 params 객체를 먼저 정의
+        var params = {
+            page: page,
+            size: parseInt($scope.pageSize, 10), // size 값 전송
+        };
+
         // 서버 '/users' 주소로 GET 요청 보냄.
-        $http.get('/users').then(function (response) {
-            // 성공 시, 받은 데이터(response.data)를 $scope.userList에 저장 -> HTML 자동 갱신.
-            $scope.userList = response.data;
+        // [수정] params 객체를 config로 전달
+        $http.get('/users', { params: params }).then(function (response) {
+            // [수정] 성공 시, 백엔드에서 온 Map(JSON) 데이터(response.data)를 $scope 변수에 할당.
+            $scope.userList = response.data.users; // "users" 키로 받음
+            $scope.totalPages = response.data.totalPages; // 총 페이지 수
+            $scope.totalItems = response.data.totalItems; // 총 사용자 수
+            $scope.currentPage = response.data.currentPage; // 현재 페이지 번호
         });
     };
+    // ▲▲▲ [페이지네이션 수정] fetchAllUsers 함수 완료 ▲▲▲
+
+    // ▼▼▼ [페이지네이션 신규 추가] 페이지 이동 관련 함수 3개 (BoardController에서 가져옴) ▼▼▼
+
+    /**
+     * [신규] 페이지 크기(pageSize) 변경 시 호출되는 함수 (HTML ng-change에서 사용)
+     */
+    $scope.pageSizeChanged = function () {
+        // 페이지 크기가 변경되었으므로, 1페이지부터 다시 조회
+        $scope.fetchAllUsers(1);
+    };
+
+    /**
+     * [신규] 특정 페이지로 이동하는 함수. HTML의 페이지 번호/버튼 클릭 시 호출됨 (ng-click)
+     * @param {number} pageNumber 이동할 페이지 번호
+     */
+    $scope.goToPage = function (pageNumber) {
+        // 이동 요청된 pageNumber 유효성 검사 (1 이상, totalPages 이하)
+        if (pageNumber >= 1 && pageNumber <= $scope.totalPages) {
+            $scope.fetchAllUsers(pageNumber); // fetchAllUsers 함수 호출하여 해당 페이지 데이터 요청
+        }
+    };
+
+    /**
+     * [신규] HTML ng-repeat에서 페이지 번호 생성을 위한 헬퍼 함수
+     * @param {number} num 생성할 배열의 길이 (totalPages 값 전달됨)
+     * @returns {Array} 길이가 num인 빈 배열
+     */
+    $scope.getNumber = function (num) {
+        return new Array(num); // 배열 반환
+    };
+    // ▲▲▲ [페이지네이션 신규 추가] 함수 3개 완료 ▲▲▲
 
     // deleteUser 함수: 특정 사용자 삭제 기능. HTML 삭제 버튼(ng-click)에서 호출됨.
     $scope.deleteUser = function (userId) {
@@ -49,7 +104,8 @@ app.controller('UserListController', function ($scope, $http, $location, $rootSc
             // 서버 '/users/{userId}' 주소로 DELETE 요청 보냄.
             $http.delete('/users/' + userId).then(function (response) {
                 // 성공 시, fetchAllUsers 함수 호출하여 목록 새로고침.
-                $scope.fetchAllUsers();
+                // [페이지네이션 수정] 1페이지가 아닌 '현재 페이지'를 새로고침
+                $scope.fetchAllUsers($scope.currentPage);
             });
         }
     };
@@ -91,8 +147,9 @@ app.controller('UserCreateController', function ($scope, $http, $location) {
             // res.data.every(...): 배열 모든 요소가 1이면 true (모두 성공)
             if (res.data.every((code) => code === 1)) {
                 alert('모든 사용자가 성공적으로 추가되었습니다!');
-            // res.data.some(...): 배열 요소 중 하나라도 1이면 true (일부 성공)
-            } else { // (이전 코드에 else if가 있었으나, 실패 조건 통합 가능)
+                // res.data.some(...): 배열 요소 중 하나라도 1이면 true (일부 성공)
+            } else {
+                // (이전 코드에 else if가 있었으나, 실패 조건 통합 가능)
                 alert('사용자 추가에 실패했습니다.');
             }
             // 성공/실패 여부와 관계없이 사용자 목록('/users') 페이지로 이동.
@@ -136,6 +193,14 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
     // isAdmin 변수: 현재 사용자가 관리자인지 여부 저장 (기본값 false).
     $scope.isAdmin = false;
 
+    // ▼▼▼ [페이지네이션 신규 추가] 페이지네이션 상태 변수 ▼▼▼
+    $scope.currentPage = 1; // 현재 페이지 번호 (int, 1부터 시작). 기본값 1
+    // boardController.js와 동일하게 '숫자' 5를 기본값으로 설정
+    $scope.pageSize = 10; // ★ 권한 관리 페이지는 10개씩 보기로 설정
+    $scope.totalPages = 0; // 총 페이지 수 (int). 백엔드 응답으로 업데이트됨
+    $scope.totalItems = 0; // 총 사용자 수 (int). 백엔드 응답으로 업데이트됨
+    // ▲▲▲ [페이지네이션 신규 추가] ▲▲▲
+
     // 현재 사용자 역할 감시($watch) 시작. 역할 확인 후 isAdmin 값 설정 및 데이터 로딩용.
     //$watch (데이터가 변경될 때마다 즉시 특정 작업을 수행)
     const unwatch = $rootScope.$watch('currentUser.role', function (newRoleValue) {
@@ -149,15 +214,20 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
             // isAdmin을 true로 설정.
             $scope.isAdmin = true;
             // 관리자일 경우에만 initializePageData 함수 호출하여 화면 데이터 불러옴.
-            initializePageData();
+            // [페이지네이션 수정] 1페이지(기본값)부터 불러오도록 변경
+            initializePageData($scope.currentPage);
         } else {
             // 'ADMIN' 아니면 isAdmin을 false로 설정. (HTML에서 관리자 전용 아님 메시지 표시됨)
             $scope.isAdmin = false;
         }
     }); // 역할 감시($watch) 끝.
 
-    // initializePageData 함수: 권한 관리 페이지에 필요한 데이터(사용자 목록, 역할 목록) 로딩 기능.
-    function initializePageData() {
+    // ▼▼▼ [페이지네이션 수정] initializePageData 함수가 page 파라미터를 받도록 수정 ▼▼▼
+    /**
+     * [수정됨] 권한 관리 페이지 데이터 로딩 함수
+     * @param {number} page 불러올 페이지 번호
+     */
+    function initializePageData(page) {
         // 변수 초기화.
         $scope.userList = []; // 사용자 목록 담을 배열.
         $scope.roleList = []; // 전체 역할 목록 담을 배열.
@@ -168,23 +238,29 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
             // 성공 시, 받은 데이터(response.data)를 $scope.roleList에 저장.
             $scope.roleList = response.data;
 
-            // 2. 역할 목록 로딩 후, 서버 '/users' 주소로 GET 요청 보내 전체 사용자 목록 가져오기.
-            $http.get('/users').then(function (response) {
-                // 성공 시, 받은 데이터(response.data)를 $scope.userList에 저장.
-                $scope.userList = response.data;
-                // 각 사용자에 대해 반복(forEach) 실행.
-                $scope.userList.forEach(function(user) {
-                    // userRoleSelections 객체에 사용자 ID(user.user_id)를 키로 하는 빈 객체 생성.
+            // 2. 역할 목록 로딩 후, 서버 '/users' 주소로 GET 요청 보내 (페이지네이션 적용된) 사용자 목록 가져오기.
+
+            // [타이밍 문제 해결] boardController.js처럼 params 객체를 먼저 정의
+            var params = {
+                page: page,
+                size: parseInt($scope.pageSize, 10),
+            };
+
+            // [수정] $http.get에 params 객체 추가
+            $http.get('/users', { params: params }).then(function (response) {
+                // [수정] 백엔드에서 온 Map(JSON) 데이터(response.data)를 $scope 변수에 할당
+                $scope.userList = response.data.users; // "users" 키로 받음
+                $scope.totalPages = response.data.totalPages; // 총 페이지 수
+                $scope.totalItems = response.data.totalItems; // 총 사용자 수
+                $scope.currentPage = response.data.currentPage; // 현재 페이지 번호
+
+                // (기존 체크박스 초기화 로직은 그대로 유지)
+                $scope.userList.forEach(function (user) {
                     $scope.userRoleSelections[user.user_id] = {};
-                    // 사용자가 가진 역할 ID 목록(user.role_ids, 예: "ADMIN,USER")이 있으면,
                     if (user.role_ids) {
-                        // 쉼표+공백 기준으로 잘라서 배열(userAssignedRoles) 생성. 예: ["ADMIN", "USER"]
                         const userAssignedRoles = user.role_ids.split(', ');
-                        // 전체 역할 목록($scope.roleList)에 대해 반복 실행.
-                        $scope.roleList.forEach(function(role) {
-                            // 사용자가 가진 역할 배열(userAssignedRoles)에 현재 역할 ID(role.role_id)가 포함(includes)되어 있으면,
+                        $scope.roleList.forEach(function (role) {
                             if (userAssignedRoles.includes(role.role_id)) {
-                                // 해당 사용자의 해당 역할 선택 상태를 true로 설정 (체크박스 체크됨).
                                 $scope.userRoleSelections[user.user_id][role.role_id] = true;
                             }
                         });
@@ -193,15 +269,44 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
             }); // 사용자 목록 요청 끝.
         }); // 역할 목록 요청 끝.
     } // initializePageData 함수 끝.
+    // ▲▲▲ [페이지네이션 수정] initializePageData 함수 완료 ▲▲▲
+
+    // ▼▼▼ [페이지네이션 신규 추가] 페이지 이동 관련 함수 3개 (BoardController에서 가져옴) ▼▼▼
+
+    /**
+     * [신규] 페이지 크기(pageSize) 변경 시 호출되는 함수 (HTML ng-change에서 사용)
+     */
+    $scope.pageSizeChanged = function () {
+        // 페이지 크기가 변경되었으므로, 1페이지부터 다시 조회
+        initializePageData(1);
+    };
+
+    /**
+     * [신규] 특정 페이지로 이동하는 함수. HTML의 페이지 번호/버튼 클릭 시 호출됨 (ng-click)
+     * @param {number} pageNumber 이동할 페이지 번호
+     */
+    $scope.goToPage = function (pageNumber) {
+        if (pageNumber >= 1 && pageNumber <= $scope.totalPages) {
+            initializePageData(pageNumber); // initializePageData 함수 호출
+        }
+    };
+
+    /**
+     * [신규] HTML ng-repeat에서 페이지 번호 생성을 위한 헬퍼 함수
+     */
+    $scope.getNumber = function (num) {
+        return new Array(num); // 배열 반환
+    };
+    // ▲▲▲ [페이지네이션 신규 추가] 함수 3개 완료 ▲▲▲
 
     // isRoleAssigned 함수: 특정 사용자에게 특정 역할이 할당되었는지(체크 상태인지) 확인. HTML 체크박스(ng-checked)에서 사용됨.
-    $scope.isRoleAssigned = function(user, roleId) {
+    $scope.isRoleAssigned = function (user, roleId) {
         // userRoleSelections 객체에 해당 사용자 ID와 역할 ID의 값이 true인지 확인하여 반환. (!!는 boolean으로 변환)
         return !!($scope.userRoleSelections[user.user_id] && $scope.userRoleSelections[user.user_id][roleId]);
     };
 
     // toggleRoleSelection 함수: 체크박스(ng-click) 클릭 시, 선택 상태(true/false)를 토글(반전).
-    $scope.toggleRoleSelection = function(user, roleId) {
+    $scope.toggleRoleSelection = function (user, roleId) {
         // 해당 사용자의 선택 상태 객체가 없으면 빈 객체 생성 (최초 클릭 시).
         if (!$scope.userRoleSelections[user.user_id]) {
             $scope.userRoleSelections[user.user_id] = {};
@@ -211,13 +316,13 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
     };
 
     // saveUserRoles 함수: '변경사항 저장' 버튼(ng-click) 클릭 시 실행.
-    $scope.saveUserRoles = function(user) {
+    $scope.saveUserRoles = function (user) {
         // selectedRoleIds 변수: 현재 체크된 역할들의 ID만 담을 빈 배열 생성.
         const selectedRoleIds = [];
         // angular.forEach: userRoleSelections 객체에서 해당 사용자의 역할 선택 상태들을 반복 확인.
         // isSelected: 현재 역할의 체크 여부(true/false)
         // roleId: 현재 역할의 ID ('ADMIN', 'USER')
-        angular.forEach($scope.userRoleSelections[user.user_id], function(isSelected, roleId) {
+        angular.forEach($scope.userRoleSelections[user.user_id], function (isSelected, roleId) {
             // 만약 체크되어 있다면(isSelected가 true),
             if (isSelected) {
                 // selectedRoleIds 배열에 해당 역할 ID 추가.
@@ -228,13 +333,13 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
         if (confirm(user.name + ' 사용자의 권한을 이대로 저장하시겠습니까?')) {
             // 서버 '/api/users/{user_id}/roles' 주소로 PUT 요청 전송.
             // 요청 본문(body)에는 { roleIds: ['ADMIN', 'USER'] } 형태의 JSON 데이터 전송.
-            $http.put('/api/users/' + user.user_id + '/roles', { roleIds: selectedRoleIds })
-                .then(function(response) {
-                    // 성공 시 알림창.
-                    alert('권한이 성공적으로 변경되었습니다.');
-                    // 변경된 내용을 화면에 반영하기 위해 데이터 다시 로딩.
-                    initializePageData();
-                });
+            $http.put('/api/users/' + user.user_id + '/roles', { roleIds: selectedRoleIds }).then(function (response) {
+                // 성공 시 알림창.
+                alert('권한이 성공적으로 변경되었습니다.');
+                // 변경된 내용을 화면에 반영하기 위해 데이터 다시 로딩.
+                // [페이지네이션 수정] 1페이지가 아닌 '현재 페이지'를 다시 로딩
+                initializePageData($scope.currentPage);
+            });
         }
     };
 }); // RoleManagementController 끝.

@@ -21,9 +21,12 @@ public class UserController {
     
     //@GetMapping("/users"): HTTP GET 방식으로 '/users' 주소에 요청이 오면 이 메소드를 실행
     @GetMapping("/users")
-    public List<Map<String, Object>> getAllUsers() {
-        //userService에게 모든 사용자 찾아달라고 요청, 결과 웹에 표시
-        return userService.findAllUsers();
+    public Map<String, Object> getAllUsers( // [수정] 반환 타입 List -> Map
+            @RequestParam(defaultValue = "1") int page, // [추가] page 파라미터
+            @RequestParam(defaultValue = "10") int size // [추가] size 파라미터
+    ) {
+        // [수정] page와 size를 서비스로 전달
+        return userService.findAllUsers(page, size); 
     }
     // @GetMapping("/users/{userId}"): HTTP GET 방식으로 '/users/{userId}' 주소에 요청이 오면 이 메소드를 실행
     @GetMapping("/users/{userId}")

@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -85,8 +87,27 @@ public class UserServiceImpl implements IUserService {
     }
 
     @Override
-    public List<Map<String, Object>> findAllUsers() {
-        return userDAO.findAll();
+    public Map<String, Object> findAllUsers(int page, int size) {
+        // 1. offset 계산
+        int offset = (page - 1) * size;
+        
+        // 2. DAO에서 현재 페이지 목록 조회 (limit, offset 전달)
+        List<Map<String, Object>> users = userDAO.findAll(size, offset); // [수정] findAll에 파라미터 전달
+        
+        // 3. DAO에서 전체 아이템 개수 조회
+        int totalItems = userDAO.countAll(); // [신규] countAll 호출
+        
+        // 4. 전체 페이지 수 계산
+        int totalPages = (int) Math.ceil((double) totalItems / size);
+
+        // 5. 결과를 Map에 담아 반환 (BoardServiceImpl과 동일한 구조)
+        Map<String, Object> result = new HashMap<>();
+        result.put("users", users); // "posts" 대신 "users" 라는 키 사용
+        result.put("totalItems", totalItems);
+        result.put("totalPages", totalPages);
+        result.put("currentPage", page);
+        
+        return result;
     }
 
     @Override

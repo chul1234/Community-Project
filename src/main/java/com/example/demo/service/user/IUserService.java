@@ -14,7 +14,7 @@ public interface IUserService {
 
     void deleteUser(String userId);
 
-    List<Map<String, Object>> findAllUsers();
+    Map<String, Object> findAllUsers(int page, int size);
 
     List<Integer> createUsers(List<Map<String, Object>> users);
     
