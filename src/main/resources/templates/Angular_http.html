@@ -6,7 +6,10 @@
     <head>
         <meta charset="UTF-8" />
         <title>실습 프로젝트</title>
-        <link rel="stylesheet" href="/css/style.css" />
+        <link
+            rel="stylesheet"
+            href="/css/style.css"
+        />
 
         <script src="/lib/angular.js"></script>
         <script src="/lib/angular-route.js"></script>
@@ -14,7 +17,7 @@
         <script src="/app.js"></script>
         <script src="/busController.js"></script>
         <script src="/userController.js"></script>
-        
+
         <script src="/boardController.js"></script>
     </head>
     <body ng-controller="MainController">
@@ -23,22 +26,35 @@
                 <h1>실습프로젝트</h1>
                 <div class="user-info">
                     <span>[{{currentUser.name}}]님</span>
-                    <button type="button" ng-click="deleteMyAccount()" class="delete-btn">회원탈퇴</button>
+                    <button
+                        type="button"
+                        ng-click="deleteMyAccount()"
+                        class="delete-btn"
+                    >
+                        회원탈퇴
+                    </button>
                     <a href="/logout"><button type="button">로그아웃</button></a>
                 </div>
             </header>
 
             <nav class="tab-nav">
-                <div 
-                    class="tab-link dropdown" 
+                <div
+                    class="tab-link dropdown"
                     ng-repeat="mainMenu in menuItems"
                     ng-class="{ active: $location.path().startsWith(mainMenu.pathPrefix) }"
                 >
-                    <span>{{ mainMenu.menu_name }}</span>
-                    
+                    <a
+                        ng-if="mainMenu.subMenus.length > 0"
+                        ng-href="{{ mainMenu.subMenus[0].path }}"
+                    >
+                        {{ mainMenu.menu_name }}
+                    </a>
+
+                    <span ng-if="!mainMenu.subMenus.length"> {{ mainMenu.menu_name }} </span>
+
                     <div class="dropdown-content">
-                        <a 
-                            ng-repeat="subMenu in mainMenu.subMenus" 
+                        <a
+                            ng-repeat="subMenu in mainMenu.subMenus"
                             href="{{ subMenu.path }}"
                         >
                             {{ subMenu.menu_name }}

@@ -20,14 +20,22 @@ public class UserController {
     private IUserService userService;
     
     //@GetMapping("/users"): HTTP GET 방식으로 '/users' 주소에 요청이 오면 이 메소드를 실행
+    // ▼▼▼ [수정] getAllUsers 메소드 시그니처 변경 (BoardController.java 참고) ▼▼▼
     @GetMapping("/users")
-    public Map<String, Object> getAllUsers( // [수정] 반환 타입 List -> Map
-            @RequestParam(defaultValue = "1") int page, // [추가] page 파라미터
-            @RequestParam(defaultValue = "10") int size // [추가] size 파라미터
+    public Map<String, Object> getAllUsers( // [유지] 반환 타입 Map
+            @RequestParam(defaultValue = "1") int page, // [유지] page 파라미터
+            @RequestParam(defaultValue = "10") int size, // [유지] size 파라미터
+            
+            // ▼▼▼ [신규 추가] 검색 파라미터 2개 (BoardController.java 참고) ▼▼▼
+            @RequestParam(required = false) String searchType,
+            @RequestParam(required = false) String searchKeyword
+            // ▲▲▲ [신규 추가] ▲▲▲
     ) {
-        // [수정] page와 size를 서비스로 전달
-        return userService.findAllUsers(page, size); 
+        // [수정] page, size, searchType, searchKeyword를 서비스로 전달
+        return userService.findAllUsers(page, size, searchType, searchKeyword); 
     }
+    // ▲▲▲ [수정] getAllUsers 메소드 완료 ▲▲▲
+
     // @GetMapping("/users/{userId}"): HTTP GET 방식으로 '/users/{userId}' 주소에 요청이 오면 이 메소드를 실행
     @GetMapping("/users/{userId}")
     //@PathVariable String userId: URL의 {userId} 부분을 String 타입의 userId 변수에 담음

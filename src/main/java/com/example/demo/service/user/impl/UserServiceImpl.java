@@ -63,7 +63,7 @@ public class UserServiceImpl implements IUserService {
     }
 
     /**
-     * [수정] 사용자를 삭제하기 전에, 연관된 역할 정보(users_roles)부터 먼저 삭제하도록 변경
+     * [유지] 사용자를 삭제하기 전에, 연관된 역할 정보(users_roles)부터 먼저 삭제하도록 변경
      * @param userId 삭제할 사용자의 ID
      */
     @Override
@@ -86,16 +86,20 @@ public class UserServiceImpl implements IUserService {
         }
     }
 
+    // ▼▼▼ [수정] findAllUsers 메소드 구현 변경 (BoardServiceImpl.java 참고) ▼▼▼
     @Override
-    public Map<String, Object> findAllUsers(int page, int size) {
+    // [수정] 3단계에서 IUserService 인터페이스에 추가한 파라미터를 받습니다.
+    public Map<String, Object> findAllUsers(int page, int size, String searchType, String searchKeyword) {
         // 1. offset 계산
         int offset = (page - 1) * size;
         
         // 2. DAO에서 현재 페이지 목록 조회 (limit, offset 전달)
-        List<Map<String, Object>> users = userDAO.findAll(size, offset); // [수정] findAll에 파라미터 전달
+        // [수정] DAO 호출 시 검색 파라미터 전달
+        List<Map<String, Object>> users = userDAO.findAll(size, offset, searchType, searchKeyword); 
         
         // 3. DAO에서 전체 아이템 개수 조회
-        int totalItems = userDAO.countAll(); // [신규] countAll 호출
+        // [수정] DAO 호출 시 검색 파라미터 전달
+        int totalItems = userDAO.countAll(searchType, searchKeyword);
         
         // 4. 전체 페이지 수 계산
         int totalPages = (int) Math.ceil((double) totalItems / size);
@@ -109,6 +113,7 @@ public class UserServiceImpl implements IUserService {
         
         return result;
     }
+    // ▲▲▲ [수정] findAllUsers 메소드 완료 ▲▲▲
 
     @Override
     @Transactional
