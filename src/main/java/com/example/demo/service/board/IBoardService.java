@@ -7,13 +7,15 @@ import java.util.Map; // Map 인터페이스 import
 public interface IBoardService {
 
     /**
-     * [유지] 특정 페이지의 게시글 목록과 전체 페이지 정보를 조회
+     * [수정됨] 특정 페이지의 게시글 목록과 전체 페이지 정보를 조회
      * @param page 요청 페이지 번호 (1부터 시작) - 파라미터 설명
      * @param size 페이지당 게시글 수 - 파라미터 설명
+     * @param searchType [신규] 검색 타입 (String, 예: "author") - 파라미터 설명
+     * @param searchKeyword [신규] 검색어 (String) - 파라미터 설명
      * @return Map (키: "posts", "totalPages", "totalItems", "currentPage") - 반환 타입 설명
      */
-    // 모든 게시글을 조회하는 기능 선언
-    Map<String, Object> getAllPosts(int page, int size); // getAllPosts 메소드 선언
+    // [신규] searchType, searchKeyword 파라미터 2개 추가
+    Map<String, Object> getAllPosts(int page, int size, String searchType, String searchKeyword); // getAllPosts 메소드 선언
 
     /**
      * 게시글 생성

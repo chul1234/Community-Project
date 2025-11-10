@@ -1,14 +1,15 @@
 package com.example.demo.service.board.impl; // 패키지 선언
 
 // 필요한 클래스 import
-import com.example.demo.dao.BoardDAO; // BoardDAO 클래스 import
-import com.example.demo.service.board.IBoardService; // IBoardService 인터페이스 import
-import org.springframework.beans.factory.annotation.Autowired; // @Autowired 어노테이션 import
-import org.springframework.stereotype.Service; // @Service 어노테이션 import
+import java.util.HashMap; // BoardDAO 클래스 import
+import java.util.List; // IBoardService 인터페이스 import
+import java.util.Map; // @Autowired 어노테이션 import
 
-import java.util.HashMap; // HashMap 클래스 import
-import java.util.Map; // Map 인터페이스 import
-import java.util.List; // List 인터페이스 import
+import org.springframework.beans.factory.annotation.Autowired; // @Service 어노테이션 import
+import org.springframework.stereotype.Service; // HashMap 클래스 import
+
+import com.example.demo.dao.BoardDAO; // Map 인터페이스 import
+import com.example.demo.service.board.IBoardService; // List 인터페이스 import
 
 @Service // @Service: 서비스 계층 컴포넌트 선언
 public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클래스 정의 시작, IBoardService 구현
@@ -17,21 +18,26 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
     private BoardDAO boardDAO; // BoardDAO 객체 멤버 변수 선언
 
     /**
-     * [유지] 특정 페이지의 게시글 목록과 전체 페이지 정보를 조회 메소드 정의 시작
+     * [수정됨] 특정 페이지의 게시글 목록과 전체 페이지 정보를 조회 메소드 정의 시작
      * @param page 요청 페이지 번호 (int, 1부터 시작) - 파라미터 설명
      * @param size 페이지당 게시글 수 (int) - 파라미터 설명
+     * @param searchType [신규] 검색 타입 (String) - 파라미터 설명
+     * @param searchKeyword [신규] 검색어 (String) - 파라미터 설명
      * @return Map (키: "posts", "totalPages", "totalItems", "currentPage") - 반환 타입 설명
      */
     @Override // IBoardService 인터페이스 메소드 구현 명시
-    public Map<String, Object> getAllPosts(int page, int size) { // getAllPosts 메소드 정의 시작
+    // [신규] searchType, searchKeyword 파라미터 2개 추가
+    public Map<String, Object> getAllPosts(int page, int size, String searchType, String searchKeyword) {
         // 1. offset 계산 (DB 건너뛸 개수). page는 1부터 시작
         int offset = (page - 1) * size; // offset 변수 계산 및 할당
 
         // 2. DAO findAll 호출하여 해당 페이지 게시글 목록 조회. limit(size), offset 전달
-        List<Map<String, Object>> posts = boardDAO.findAll(size, offset); // posts 변수 초기화
+        // [신규] searchType, searchKeyword 파라미터를 DAO로 전달
+        List<Map<String, Object>> posts = boardDAO.findAll(size, offset, searchType, searchKeyword); // posts 변수 초기화
 
         // 3. DAO countAll 호출하여 전체 게시글 수 조회
-        int totalItems = boardDAO.countAll(); // totalItems 변수 초기화
+        // [신규] searchType, searchKeyword 파라미터를 DAO로 전달 (검색 조건에 맞는 전체 개수)
+        int totalItems = boardDAO.countAll(searchType, searchKeyword); // totalItems 변수 초기화
 
         // 4. 전체 페이지 수 계산. Math.ceil() 메소드 사용하여 올림 처리
         int totalPages = (int) Math.ceil((double) totalItems / size); // totalPages 변수 계산 및 할당

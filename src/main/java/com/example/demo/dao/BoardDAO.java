@@ -1,16 +1,21 @@
 package com.example.demo.dao; // 패키지 선언
 
 // 필요한 클래스 import
-import org.springframework.beans.factory.annotation.Autowired; // @Autowired 어노테이션 import
-import org.springframework.stereotype.Repository; // @Repository 어노테이션 import
+import java.sql.Connection; // @Autowired 어노테이션 import
+import java.sql.PreparedStatement; // @Repository 어노테이션 import
+import java.sql.ResultSet; // DataSource 인터페이스 import (DB 커넥션 풀)
+import java.sql.SQLException; // JDBC API 클래스들 import (Connection, PreparedStatement, ResultSet, SQLException)
+import java.sql.Types; // ArrayList 클래스 import (List 구현체)
+import java.util.ArrayList; // HashMap 클래스 import (Map 구현체)
+import java.util.HashMap; // List 인터페이스 import
+import java.util.List; // Map 인터페이스 import
+import java.util.Map; // Optional 클래스 import (null 처리용)
+import java.util.Optional;
 
-import javax.sql.DataSource; // DataSource 인터페이스 import (DB 커넥션 풀)
-import java.sql.*; // JDBC API 클래스들 import (Connection, PreparedStatement, ResultSet, SQLException)
-import java.util.ArrayList; // ArrayList 클래스 import (List 구현체)
-import java.util.HashMap; // HashMap 클래스 import (Map 구현체)
-import java.util.List; // List 인터페이스 import
-import java.util.Map; // Map 인터페이스 import
-import java.util.Optional; // Optional 클래스 import (null 처리용)
+import javax.sql.DataSource;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
 
 @Repository // @Repository: 데이터 접근 계층(DAO) 컴포넌트 선언
 public class BoardDAO { // BoardDAO 클래스 정의 시작
@@ -25,28 +30,111 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
     } // getConnection() 메소드 끝
 
     /**
-     * [수정됨] posts 테이블의 특정 범위 게시글 목록 조회 메소드 (페이지네이션 + 고정글 정렬) 정의 시작
+     * [수정됨] posts 테이블의 특정 범위 게시글 목록 조회 메소드 (페이지네이션 + 고정글 정렬 + **동적 검색**) 정의 시작
      * @param limit 가져올 개수 (int) - 파라미터 설명
      * @param offset 건너뛸 개수 (int) - 파라미터 설명
+     * @param searchType [신규] 검색 타입 (String, 예: "author", "content", "title") - 파라미터 설명
+     * @param searchKeyword [신규] 검색어 (String) - 파라미터 설명
      * @return 게시글 목록 (List<Map<String, Object>>) - 반환 타입 설명
      */
-    public List<Map<String, Object>> findAll(int limit, int offset) { // limit, offset 파라미터 받음
+    // [유지] searchType, searchKeyword 파라미터 2개 추가
+    public List<Map<String, Object>> findAll(int limit, int offset, String searchType, String searchKeyword) {
         // 결과 담을 ArrayList 객체 생성 및 postList 변수 초기화
         List<Map<String, Object>> postList = new ArrayList<>();
-        // SqlLoader.getSql() 메소드 호출하여 "post.select.all" SQL 문자열 로드 (고정글 정렬 SQL)
-        String sql = SqlLoader.getSql("post.select.all");
+        
+        // [유지] 동적 SQL 조립을 위한 StringBuilder 사용
+        // [유지] 기본 SELECT SQL문 (FROM posts p, LEFT JOIN users u)
+        StringBuilder sql = new StringBuilder(
+            "SELECT p.post_id, p.title, p.user_id, u.name as author_name, p.created_at, p.view_count, p.pinned_order " +
+            "FROM posts p LEFT JOIN users u ON p.user_id = u.user_id "
+        );
+
+        // [유지] PreparedStatement의 ? 에 바인딩할 파라미터를 순서대로 담을 리스트
+        List<Object> params = new ArrayList<>();
+
+        // [유지] WHERE 절을 동적으로 조립 (검색어가 없어도 SQL 오류가 나지 않도록 1=1 기본값 추가)
+        StringBuilder whereSql = new StringBuilder(" WHERE 1=1 ");
+        
+        // [유지] 검색어(searchKeyword)가 null이 아니고 빈 문자열("")이 아닐 경우에만
+        if (searchKeyword != null && !searchKeyword.isEmpty()) {
+            // ▼▼▼ [신규 추가] '제목' 검색 로직 ▼▼▼
+            // [신규] 만약 검색 타입(searchType)이 "title"(제목)이라면
+            if ("title".equals(searchType)) {
+                // [신규] WHERE 절에 '게시글 제목(p.title) LIKE ?' 조건 추가
+                whereSql.append(" AND p.title LIKE ? ");
+                // [신규] 파라미터 리스트에 ? 에 바인딩할 값(검색어) 추가
+                params.add("%" + searchKeyword + "%");
+            }
+            // ▲▲▲ [신규 추가] '제목' 검색 로직 끝 ▲▲▲
+            // [유지] 만약 검색 타입(searchType)이 "author"(작성자)라면
+            else if ("author".equals(searchType)) {
+                // [유지] WHERE 절에 '작성자 이름(u.name) LIKE ?' 조건 추가
+                whereSql.append(" AND u.name LIKE ? ");
+                // [유지] 파라미터 리스트에 ? 에 바인딩할 값(검색어) 추가 (SQL 인젝션 방지)
+                params.add("%" + searchKeyword + "%");
+            } 
+            // [유지] 만약 검색 타입(searchType)이 "content"(내용)라면
+            else if ("content".equals(searchType)) {
+                // [유지] WHERE 절에 '게시글 내용(p.content) LIKE ?' 조건 추가
+                whereSql.append(" AND p.content LIKE ? ");
+                // [유지] 파라미터 리스트에 ? 에 바인딩할 값(검색어) 추가
+                params.add("%" + searchKeyword + "%");
+            }
+            // ▼▼▼ [신규 추가] '제목+내용' 검색 로직 ▼▼▼
+            // [신규] 만약 검색 타입(searchType)이 "title_content"(제목+내용)라면
+            else if ("title_content".equals(searchType)) {
+                // [신규] WHERE 절에 '제목 LIKE ? 또는 내용 LIKE ?' (OR) 조건 추가
+                whereSql.append(" AND (p.title LIKE ? OR p.content LIKE ?) ");
+                // [신규] 파라미터 리스트에 첫 번째 ? (p.title) 값 추가
+                params.add("%" + searchKeyword + "%");
+                // [신규] 파라미터 리스트에 두 번째 ? (p.content) 값 추가
+                params.add("%" + searchKeyword + "%");
+            }
+            // ▲▲▲ [신규 추가] '제목+내용' 검색 로직 끝 ▲▲▲
+            // [유지] 만약 검색 타입(searchType)이 "author_content"(작성자+내용)라면
+            else if ("author_content".equals(searchType)) {
+                // [유지] WHERE 절에 '작성자 이름 LIKE ? 또는 게시글 내용 LIKE ?' (OR) 조건 추가
+                whereSql.append(" AND (u.name LIKE ? OR p.content LIKE ?) ");
+                // [유지] 파라미터 리스트에 첫 번째 ? (u.name) 값 추가
+                params.add("%" + searchKeyword + "%");
+                // [유지] 파라미터 리스트에 두 번째 ? (p.content) 값 추가
+                params.add("%" + searchKeyword + "%");
+            }
+            // [유지] 만약 검색 타입(searchType)이 "time"(작성된 시간)이라면
+            else if ("time".equals(searchType)) {
+                // [유지] WHERE 절에 'p.created_at의 시간(HOUR) = ?' 조건 추가
+                whereSql.append(" AND HOUR(p.created_at) = ? ");
+                // [유지] 파라미터 리스트에 ? 에 바인딩할 값(검색어, 예: '15') 추가
+                params.add(searchKeyword);
+            }
+        }
+
+        // [유지] 기본 SELECT SQL에 동적으로 생성된 WHERE 절 추가
+        sql.append(whereSql);
+        // [유지] 고정글/최신순 정렬을 위한 ORDER BY 절 추가
+        sql.append(" ORDER BY CASE WHEN p.pinned_order IS NULL THEN 1 ELSE 0 END ASC, p.pinned_order ASC, p.post_id DESC ");
+        // [유지] 페이지네이션을 위한 LIMIT/OFFSET 절 추가
+        sql.append(" LIMIT ? OFFSET ? ");
+
+        // [유지] 파라미터 리스트에 LIMIT ? 에 바인딩할 값(limit) 추가
+        params.add(limit);
+        // [유지] 파라미터 리스트에 OFFSET ? 에 바인딩할 값(offset) 추가
+        params.add(offset);
+
 
         // try-with-resources: conn, pstmt 자동 자원 해제 시작
         try (Connection conn = getConnection(); // getConnection() 호출하여 Connection 객체 생성
-             PreparedStatement pstmt = conn.prepareStatement(sql)) { // Connection 객체로 PreparedStatement 생성
-
-            // [유지] SQL의 ? 파라미터 값 설정 시작 (LIMIT, OFFSET)
-            pstmt.setInt(1, limit);  // 첫 번째 ? 에 limit 값 설정 (setInt 메소드 사용)
-            pstmt.setInt(2, offset); // 두 번째 ? 에 offset 값 설정 (setInt 메소드 사용)
-            // [유지] SQL의 ? 파라미터 값 설정 끝
+             // [유지] 완성된 동적 SQL 문자열(sql.toString())로 PreparedStatement 생성
+             PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
+            
+            // [유지] 파라미터 리스트(params)를 순회하며
+            for (int i = 0; i < params.size(); i++) {
+                // [유지] PreparedStatement의 ? 순서(i+1)에 맞게 값 바인딩 (SQL 인젝션 방지)
+                pstmt.setObject(i + 1, params.get(i));
+            }
 
             // try-with-resources: rs 자동 자원 해제 시작
-            try (ResultSet rs = pstmt.executeQuery()) { // pstmt.executeQuery() 메소드 호출하여 SQL 실행 및 ResultSet 객체 받음
+            try (ResultSet rs = pstmt.executeQuery()) {
                 // rs.next(): ResultSet 커서 다음 행 이동 루프 시작 (데이터 있으면 true)
                 while (rs.next()) {
                     // 각 행 데이터 담을 HashMap 객체 생성 및 post 변수 초기화
@@ -57,9 +145,7 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
                     post.put("user_id", rs.getString("user_id")); // user_id 컬럼 (String)
                     post.put("author_name", rs.getString("author_name")); // author_name 별명 컬럼 (String)
                     post.put("created_at", rs.getTimestamp("created_at")); // created_at 컬럼 (Timestamp)
-                    // [신규 추가됨] pinned_order 읽기 (정수형). rs.getObject() 사용하여 NULL 처리
                     post.put("pinned_order", rs.getObject("pinned_order", Integer.class));
-                    // [유지] view_count 읽기 (정수형)
                     post.put("view_count", rs.getInt("view_count")); // view_count 컬럼 (int)
                     // rs.getXXX("컬럼명") 메소드 호출하여 데이터 추출 후 post 맵에 .put() 메소드로 저장 끝
                     // postList 리스트에 .add() 메소드로 post 맵 추가
@@ -71,29 +157,110 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
         } // try-catch 끝 (conn, pstmt 자동 해제됨)
         // 조회된 게시글 목록(postList) 반환
         return postList;
-    } // findAll(int, int) 메소드 끝
+    } // findAll(int, int, String, String) 메소드 끝
 
     /**
-     * [유지] posts 테이블의 전체 게시글 수 조회 메소드 정의 시작
+     * [수정됨] posts 테이블의 전체 게시글 수 조회 메소드 (**검색 조건 포함**) 정의 시작
+     * @param searchType [신규] 검색 타입 (String) - 파라미터 설명
+     * @param searchKeyword [신규] 검색어 (String) - 파라미터 설명
      * @return 전체 게시글 수 (int) - 반환 타입 설명
      */
-    public int countAll() { // countAll 메소드 정의 시작
-        // SqlLoader.getSql() 호출하여 "post.count.all" SQL 문자열 로드
-        String sql = SqlLoader.getSql("post.count.all");
+    // [유지] searchType, searchKeyword 파라미터 2개 추가
+    public int countAll(String searchType, String searchKeyword) {
+        
+        // [유지] 동적 SQL 조립을 위한 StringBuilder 사용
+        // [유지] 기본 SELECT COUNT(*) SQL문 (FROM posts p, LEFT JOIN users u)
+        StringBuilder sql = new StringBuilder(
+            "SELECT COUNT(*) FROM posts p LEFT JOIN users u ON p.user_id = u.user_id "
+        );
+        
+        // [유지] PreparedStatement의 ? 에 바인딩할 파라미터를 순서대로 담을 리스트
+        List<Object> params = new ArrayList<>();
+        
+        // [유지] WHERE 절을 동적으로 조립 (findAll과 동일한 로직)
+        StringBuilder whereSql = new StringBuilder(" WHERE 1=1 ");
+
+        // [유지] 검색어(searchKeyword)가 null이 아니고 빈 문자열("")이 아닐 경우에만
+        if (searchKeyword != null && !searchKeyword.isEmpty()) {
+            // ▼▼▼ [신규 추가] '제목' 검색 로직 (findAll과 동일) ▼▼▼
+            // [신규] 만약 검색 타입(searchType)이 "title"(제목)이라면
+            if ("title".equals(searchType)) {
+                // [신규] WHERE 절에 '게시글 제목(p.title) LIKE ?' 조건 추가
+                whereSql.append(" AND p.title LIKE ? ");
+                // [신규] 파라미터 리스트에 ? 에 바인딩할 값(검색어) 추가
+                params.add("%" + searchKeyword + "%");
+            }
+            // ▲▲▲ [신규 추가] '제목' 검색 로직 끝 ▲▲▲
+            // [유지] 만약 검색 타입(searchType)이 "author"(작성자)라면
+            else if ("author".equals(searchType)) {
+                // [유지] WHERE 절에 '작성자 이름(u.name) LIKE ?' 조건 추가
+                whereSql.append(" AND u.name LIKE ? ");
+                // [유지] 파라미터 리스트에 ? 에 바인딩할 값(검색어) 추가
+                params.add("%" + searchKeyword + "%");
+            }
+            // [유지] 만약 검색 타입(searchType)이 "content"(내용)라면
+            else if ("content".equals(searchType)) {
+                // [유지] WHERE 절에 '게시글 내용(p.content) LIKE ?' 조건 추가
+                whereSql.append(" AND p.content LIKE ? ");
+                // [유지] 파라미터 리스트에 ? 에 바인딩할 값(검색어) 추가
+                params.add("%" + searchKeyword + "%");
+            }
+            // ▼▼▼ [신규 추가] '제목+내용' 검색 로직 (findAll과 동일) ▼▼▼
+            // [신규] 만약 검색 타입(searchType)이 "title_content"(제목+내용)라면
+            else if ("title_content".equals(searchType)) {
+                // [신규] WHERE 절에 '제목 LIKE ? 또는 내용 LIKE ?' (OR) 조건 추가
+                whereSql.append(" AND (p.title LIKE ? OR p.content LIKE ?) ");
+                // [신규] 파라미터 리스트에 첫 번째 ? (p.title) 값 추가
+                params.add("%" + searchKeyword + "%");
+                // [신규] 파라미터 리스트에 두 번째 ? (p.content) 값 추가
+                params.add("%" + searchKeyword + "%");
+            }
+            // ▲▲▲ [신규 추가] '제목+내용' 검색 로직 끝 ▲▲▲
+            // [유지] 만약 검색 타입(searchType)이 "author_content"(작성자+내용)라면
+            else if ("author_content".equals(searchType)) {
+                // [유지] WHERE 절에 '작성자 이름 LIKE ? 또는 게시글 내용 LIKE ?' (OR) 조건 추가
+                whereSql.append(" AND (u.name LIKE ? OR p.content LIKE ?) ");
+                // [유지] 파라미터 리스트에 첫 번째 ? (u.name) 값 추가
+                params.add("%" + searchKeyword + "%");
+                // [유지] 파라미터 리스트에 두 번째 ? (p.content) 값 추가
+                params.add("%" + searchKeyword + "%");
+            }
+            // [유지] 만약 검색 타입(searchType)이 "time"(작성된 시간)이라면
+            else if ("time".equals(searchType)) {
+                // [유지] WHERE 절에 'p.created_at의 시간(HOUR) = ?' 조건 추가
+                whereSql.append(" AND HOUR(p.created_at) = ? ");
+                // [유지] 파라미터 리스트에 ? 에 바인딩할 값(검색어, 예: '15') 추가
+                params.add(searchKeyword);
+            }
+        }
+
+        // [유지] 기본 SELECT COUNT SQL에 동적으로 생성된 WHERE 절 추가
+        sql.append(whereSql);
+
         // try-with-resources: conn, pstmt, rs 자동 자원 해제 시작
         try (Connection conn = getConnection(); // Connection 객체 생성
-             PreparedStatement pstmt = conn.prepareStatement(sql); // PreparedStatement 객체 생성
-             ResultSet rs = pstmt.executeQuery()) { // SQL 실행 및 ResultSet 객체 받음
-            // rs.next(): 결과 행 존재 확인 (COUNT(*)는 1개 행 반환)
-            if (rs.next()) {
-                // rs.getInt(1): 결과의 첫 번째 컬럼 값(전체 개수) 정수로 반환
-                return rs.getInt(1);
-            } // if 끝
+             // [유지] 완성된 동적 SQL 문자열(sql.toString())로 PreparedStatement 생성
+             PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
+            
+            // [유지] 파라미터 리스트(params)를 순회하며
+            for (int i = 0; i < params.size(); i++) {
+                // [유지] PreparedStatement의 ? 순서(i+1)에 맞게 값 바인딩
+                pstmt.setObject(i + 1, params.get(i));
+            }
+
+            // [유지] ResultSet을 try-with-resources 안으로 이동
+            try (ResultSet rs = pstmt.executeQuery()) { // SQL 실행 및 ResultSet 객체 받음
+                // rs.next(): 결과 행 존재 확인 (COUNT(*)는 1개 행 반환)
+                if (rs.next()) {
+                    // rs.getInt(1): 결과의 첫 번째 컬럼 값(전체 개수) 정수로 반환
+                    return rs.getInt(1);
+                } // if 끝
+            } // [유지] rs 자동 해제
         } catch (SQLException e) { // SQLException 예외 처리 블록 시작
             e.printStackTrace(); // 콘솔 에러 로그 출력
-        } // try-catch 끝 (conn, pstmt, rs 자동 해제됨)
+        } // try-catch 끝 (conn, pstmt 자동 해제됨)
         return 0; // 오류 발생 시 0 반환
-    } // countAll 메소드 끝
+    } // countAll(String, String) 메소드 끝
 
 
     /**

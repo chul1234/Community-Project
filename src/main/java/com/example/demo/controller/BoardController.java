@@ -1,16 +1,24 @@
 package com.example.demo.controller; // 패키지 선언
 
 // 필요한 클래스 import
-import com.example.demo.service.board.IBoardService; // IBoardService 인터페이스 import
-import org.springframework.beans.factory.annotation.Autowired; // @Autowired 어노테이션 import
-import org.springframework.http.ResponseEntity; // ResponseEntity 클래스 import (HTTP 응답 제어)
-import org.springframework.security.core.Authentication; // Authentication 인터페이스 import (인증 정보)
-import org.springframework.security.core.GrantedAuthority; // GrantedAuthority 인터페이스 import (권한 정보)
-import org.springframework.web.bind.annotation.*; // Spring Web 어노테이션들 import (@RestController, @GetMapping 등)
+import java.util.List; // IBoardService 인터페이스 import
+import java.util.Map; // @Autowired 어노테이션 import
+import java.util.stream.Collectors; // ResponseEntity 클래스 import (HTTP 응답 제어)
 
-import java.util.List; // List 인터페이스 import
-import java.util.Map; // Map 인터페이스 import
-import java.util.stream.Collectors; // Collectors 클래스 import (Stream API)
+import org.springframework.beans.factory.annotation.Autowired; // Authentication 인터페이스 import (인증 정보)
+import org.springframework.http.ResponseEntity; // GrantedAuthority 인터페이스 import (권한 정보)
+import org.springframework.security.core.Authentication; // Spring Web 어노테이션들 import (@RestController, @GetMapping 등)
+import org.springframework.security.core.GrantedAuthority; // List 인터페이스 import
+import org.springframework.web.bind.annotation.DeleteMapping; // Map 인터페이스 import
+import org.springframework.web.bind.annotation.GetMapping; // Collectors 클래스 import (Stream API)
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.demo.service.board.IBoardService;
 
 // json 같은 순수 데이터로 응답하는 컨트롤러 (@RestController = @Controller + @ResponseBody)
 @RestController
@@ -21,9 +29,11 @@ public class BoardController { // BoardController 클래스 정의 시작
     private IBoardService boardService; // IBoardService 객체 멤버 변수 선언
 
     /**
-     * [유지] 페이지네이션 적용된 게시글 목록 조회 API 메소드 정의 시작
+     * [수정됨] 페이지네이션 및 검색 적용된 게시글 목록 조회 API 메소드 정의 시작
      * @param page 요청 페이지 번호 (int, 기본값 1) - 파라미터 설명
      * @param size 페이지당 게시글 수 (int, 기본값 10) - 파라미터 설명
+     * @param searchType [신규] 검색 타입 (String, 필수 아님) - 파라미터 설명
+     * @param searchKeyword [신규] 검색어 (String, 필수 아님) - 파라미터 설명
      * @return Map (키: "posts", "totalPages", "totalItems", "currentPage") - 반환 타입 설명
      */
     // @GetMapping("/api/posts"): HTTP GET /api/posts 요청 처리
@@ -32,10 +42,16 @@ public class BoardController { // BoardController 클래스 정의 시작
             // @RequestParam: URL 쿼리 파라미터 (?page=...&size=...) 값 받음
             // defaultValue: 파라미터 없을 시 기본값 설정
             @RequestParam(defaultValue = "1") int page, // page 파라미터 (int)
-            @RequestParam(defaultValue = "10") int size // size 파라미터 (int)
+            @RequestParam(defaultValue = "10") int size, // size 파라미터 (int)
+            
+            // [신규] required = false: 이 파라미터가 없어도 400 Bad Request 오류를 내지 않음 (검색 안 할 경우)
+            // [신규] (defaultValue는 null을 의미함)
+            @RequestParam(required = false) String searchType,
+            @RequestParam(required = false) String searchKeyword
+            
     ) { // getAllPosts 메소드 파라미터 끝
-        // [유지] boardService.getAllPosts() 호출 시 page, size 전달
-        return boardService.getAllPosts(page, size); // 결과 Map 반환
+        // [수정됨] boardService.getAllPosts() 호출 시 page, size, searchType, searchKeyword 전달
+        return boardService.getAllPosts(page, size, searchType, searchKeyword); // 결과 Map 반환
     } // getAllPosts 메소드 끝
 
     /**

@@ -3,14 +3,24 @@ app.controller('BoardController', function ($scope, $http) { // BoardController 
     //$scope 컨트롤러 와 뷰 연결, $http 백엔드와 HTTP통신
     $scope.postList = []; // 게시글 목록 변수 (배열 초기화)
 
-    // [신규 추가됨] 페이지네이션 상태 변수
+    // [유지] 페이지네이션 상태 변수
     $scope.currentPage = 1; // 현재 페이지 번호 (int, 1부터 시작). 기본값 1
     
-    // [수정됨] pageSize의 기본값을 '10' (숫자)로 설정. board-list.html의 ng-model과 연결됨
+    // [유지] pageSize의 기본값을 '10' (숫자)로 설정. board-list.html의 ng-model과 연결됨
+    // [주의] 만약 이전에 '5개씩 보기' 버그 수정 시 $watch로 변경했다면, 해당 로직을 유지해야 합니다.
+    // [유지] (일단 원본 기준으로 수정합니다.)
     $scope.pageSize = 10; // 페이지당 보여줄 게시글 수 (int). 기본값 10
     
     $scope.totalPages = 0; // 총 페이지 수 (int). 백엔드 응답으로 업데이트됨
     $scope.totalItems = 0; // 총 게시글 수 (int). 백엔드 응답으로 업데이트됨
+
+    // ▼▼▼ [수정] 검색 관련 변수 ▼▼▼
+    // [신규] HTML의 <select ng-model="searchType">과 연결
+    // [신규] 기본 검색 기준을 'author'에서 'title'로 변경 (HTML의 첫 번째 옵션과 일치)
+    $scope.searchType = 'title'; // 기본 검색 기준 'title' (BoardDAO와 일치)
+    // [신규] HTML의 <input ng-model="searchKeyword">와 연결
+    $scope.searchKeyword = '';    // 기본 검색어 (빈 문자열)
+    // ▲▲▲ [수정] ▲▲▲
 
     /**
      * [수정됨] 특정 페이지의 게시글 목록을 서버에서 불러오는 함수
@@ -24,15 +34,18 @@ app.controller('BoardController', function ($scope, $http) { // BoardController 
         // $scope.pageSize는 HTML <select>에 의해 문자열일 수 있으므로 parseInt로 숫자로 변환
         var params = {
             page: page,
-            size: parseInt($scope.pageSize, 10) // 10진수 정수로 변환하여 전송
+            size: parseInt($scope.pageSize, 10), // 10진수 정수로 변환하여 전송
+            // [신규] 검색 관련 파라미터 2개 추가 (BoardController.java의 @RequestParam과 이름 일치)
+            searchType: $scope.searchType,
+            searchKeyword: $scope.searchKeyword
         };
 
         // [수정됨] $http.get의 params 옵션으로 params 객체를 전달
-        $http.get('/api/posts', { params: params }) // page, size 파라미터 전송
+        $http.get('/api/posts', { params: params }) // page, size, searchType, searchKeyword 파라미터 전송
             .then(function(response) { // .then(): 요청 성공 시 콜백 함수 실행. response: 응답 객체
                 // response.data: 서버 응답 본문 (BoardServiceImpl에서 반환한 Map 객체)
 
-                // [수정됨] 응답 데이터 구조에 맞춰 $scope 변수 업데이트
+                // [유지] 응답 데이터 구조에 맞춰 $scope 변수 업데이트
                 $scope.postList = response.data.posts;         // response.data.posts (게시글 목록 배열) 할당
                 $scope.totalPages = response.data.totalPages;   // response.data.totalPages (총 페이지 수) 할당
                 $scope.totalItems = response.data.totalItems;   // response.data.totalItems (총 게시글 수) 할당
@@ -40,29 +53,42 @@ app.controller('BoardController', function ($scope, $http) { // BoardController 
             }); // .then() 끝
     } // fetchPosts 함수 끝
 
-    // ▼▼▼ [신규 추가됨] 페이지 크기(pageSize) 변경 시 호출되는 함수 ▼▼▼
+    // ▼▼▼ [신규 추가] 검색 버튼 클릭 시 실행될 함수 ▼▼▼
     /**
-     * HTML의 select 태그(ng-model="pageSize") 값이 변경될 때(ng-change) 호출됨.
+     * [신규] HTML의 '검색' 버튼 (ng-click="searchPosts()") 클릭 시 호출됨.
+     */
+    $scope.searchPosts = function() { // searchPosts 함수 정의 시작
+        // [신규] 검색은 항상 1페이지부터 결과를 보여줘야 함
+        fetchPosts(1);
+    }; // searchPosts 함수 정의 끝
+    // ▲▲▲ [신규 추가] ▲▲▲
+
+    /**
+     * [수정됨] HTML의 select 태그(ng-model="pageSize") 값이 변경될 때(ng-change) 호출됨.
+     * [수정] (주의사항 3) 페이지 크기 변경 시에도 현재 검색어를 유지한 채 1페이지로 이동해야 함.
      */
     $scope.pageSizeChanged = function() { // pageSizeChanged 함수 정의 시작
         // 페이지 크기가 변경되었으므로, 1페이지부터 다시 조회
-        // 이때 $scope.pageSize는 ng-model에 의해 이미 새 값(예: "5")으로 변경된 상태
+        // [수정] $scope.pageSize는 ng-model에 의해 이미 새 값(예: "5")으로 변경된 상태
+        // [수정] (fetchPosts는 이제 $scope.searchKeyword를 자동으로 포함하여 호출됨)
         fetchPosts(1); 
     }; // pageSizeChanged 함수 정의 끝
 
     /**
-     * [신규 추가됨] 특정 페이지로 이동하는 함수. HTML의 페이지 번호/버튼 클릭 시 호출됨 (ng-click)
+     * [수정됨] 특정 페이지로 이동하는 함수. HTML의 페이지 번호/버튼 클릭 시 호출됨 (ng-click)
+     * [수정] (주의사항 3) 페이지 이동 시에도 현재 검색어를 유지해야 함.
      * @param {number} pageNumber 이동할 페이지 번호
      */
     $scope.goToPage = function(pageNumber) { // goToPage 함수 정의 시작
         // 이동 요청된 pageNumber 유효성 검사 (1 이상, totalPages 이하)
         if (pageNumber >= 1 && pageNumber <= $scope.totalPages) { // if 시작
+            // [수정] (fetchPosts는 이제 $scope.searchKeyword를 자동으로 포함하여 호출됨)
             fetchPosts(pageNumber); // fetchPosts 함수 호출하여 해당 페이지 데이터 요청
         } // if 끝
     }; // goToPage 함수 끝
 
     /**
-     * [신규 추가됨] HTML ng-repeat에서 페이지 번호 생성을 위한 헬퍼 함수
+     * [유지] HTML ng-repeat에서 페이지 번호 생성을 위한 헬퍼 함수
      * @param {number} num 생성할 배열의 길이 (totalPages 값 전달됨)
      * @returns {Array} 길이가 num인 빈 배열 ([undefined, undefined, ...])
      */
@@ -74,6 +100,7 @@ app.controller('BoardController', function ($scope, $http) { // BoardController 
     } // getNumber 함수 끝
 
     // 컨트롤러 로드 시 첫 페이지($scope.currentPage = 1) 게시글 목록을 즉시 불러옴
+    // [유지] (이때 $scope.searchKeyword는 ''(빈값)이므로 전체 목록이 조회됨)
     fetchPosts($scope.currentPage); // fetchPosts 함수 초기 호출 (1페이지 로드)
 }); // BoardController 정의 끝
 
@@ -138,7 +165,7 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
     //게시글 데이터 서버 가져옴
     // $http.get(url): 주소에 GET 요청 전송
     // 백엔드 BoardController.java의 @GetMapping("/api/posts/{postId}") 메소드 호출
-    function fetchPostDetails() { // [수정됨] 게시글 로드 함수 분리 (고정/해제 후 재호출 위함)
+    function fetchPostDetails() { // [유지] 게시글 로드 함수 분리 (고정/해제 후 재호출 위함)
         $http.get('/api/posts/' + postId).then(function (response) { // .then(): 성공 콜백
             $scope.post = response.data; //성공시 받은 데이터 $scope.post에 저장
             checkPermissions(); //게시글 데이터 도착 후, 권한 체크 함수 호출
