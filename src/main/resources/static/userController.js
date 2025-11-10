@@ -16,7 +16,7 @@ app.controller('UserListController', function ($scope, $http, $location, $rootSc
     // ▼▼▼ [페이지네이션 신규 추가] 페이지네이션 상태 변수 ▼▼▼
     $scope.currentPage = 1; // 현재 페이지 번호 (int, 1부터 시작). 기본값 1
     // boardController.js와 동일하게 '숫자' 10을 기본값으로 설정
-    $scope.pageSize = 10; // 페이지당 보여줄 사용자 수 (int). 기본값 10
+    $scope.pageSize = "10"; // 페이지당 보여줄 사용자 수 (int). 기본값 10
     $scope.totalPages = 0; // 총 페이지 수 (int). 백엔드 응답으로 업데이트됨
     $scope.totalItems = 0; // 총 사용자 수 (int). 백엔드 응답으로 업데이트됨
     // ▲▲▲ [페이지네이션 신규 추가] ▲▲▲
@@ -195,8 +195,8 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
 
     // ▼▼▼ [페이지네이션 신규 추가] 페이지네이션 상태 변수 ▼▼▼
     $scope.currentPage = 1; // 현재 페이지 번호 (int, 1부터 시작). 기본값 1
-    // boardController.js와 동일하게 '숫자' 5를 기본값으로 설정
-    $scope.pageSize = 10; // ★ 권한 관리 페이지는 10개씩 보기로 설정
+    // boardController.js와 동일하게 '숫자' 10를 기본값으로 설정
+    $scope.pageSize = "10"; // ★ 권한 관리 페이지는 10개씩 보기로 설정
     $scope.totalPages = 0; // 총 페이지 수 (int). 백엔드 응답으로 업데이트됨
     $scope.totalItems = 0; // 총 사용자 수 (int). 백엔드 응답으로 업데이트됨
     // ▲▲▲ [페이지네이션 신규 추가] ▲▲▲
