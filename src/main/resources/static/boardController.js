@@ -211,6 +211,7 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
         // angular.copy(원본): 원본 객체/배열 깊은 복사본 생성. 원본 변경 방지.
         $scope.editData = angular.copy($scope.post); // $scope.post 복사하여 $scope.editData에 저장
     }; // switchToEditMode 함수 끝
+    
     // 게시글 '수정 완료' 버튼(HTML ng-click="saveChanges()") 클릭 시 실행될 함수
     $scope.saveChanges = function() { // saveChanges 함수 정의 시작
         if (confirm("수정하시겠습니까?")) { // window.confirm() 함수
@@ -224,6 +225,7 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
             }); // .then() 끝
         } // if 끝
     }; // saveChanges 함수 끝
+    
     // 게시글 수정 '취소' 버튼(HTML ng-click="cancelEdit()") 클릭 시 실행될 함수. '보기 모드' 전환.
     $scope.cancelEdit = function() { $scope.isEditing = false; }; // cancelEdit 함수 정의 (isEditing=false 설정)
     // 게시글 '삭제' 버튼(HTML ng-click="deletePost()") 클릭 시 실행될 함수
@@ -358,8 +360,10 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
         c.editContent = c.content; // 원본 내용(c.content)을 수정용 속성(c.editContent)에 복사
     }; // switchToCommentEditMode 함수 끝
     
-    // 댓글 '저장' 버튼(HTML ng-click="saveCommentChanges(comment)") 클릭 시 실행될 함수. comment 객체(c) 인자로 받음
-    $scope.saveChanges = function(c) { // saveCommentChanges 함수 정의 시작
+    // ▼▼▼ [수정] 함수 이름 변경 (게시물 수정과의 충돌 해결) ▼▼▼
+    // 댓글 '저장' 버튼(HTML ng-click="saveCommentChanges(comment)") 클릭 시 실행될 함수.
+    // $scope.saveChanges = function(c) { // (기존, 문제의 코드)
+    $scope.saveCommentChanges = function(c) { // [수정] saveCommentChanges 함수 정의 시작
         // $http.put(url, data): HTTP PUT 데이터 전송 (수정 요청). data: 수정 내용 객체 { content: ... }
         // 백엔드 CommentController.java의 @PutMapping("/api/comments/{commentId}") 메소드 호출
         
@@ -370,6 +374,7 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
             fetchComments(); // fetchComments() 호출하여 목록 새로고침
         }); // .then() 끝
     }; // saveCommentChanges 함수 끝
+    // ▲▲▲ [수정] 완료 ▲▲▲
     
     // 댓글 수정 '취소' 버튼(HTML ng-click="cancelCommentEdit(comment)") 클릭 시 실행될 함수. comment 객체(c) 인자로 받음
     $scope.cancelCommentEdit = function(c) { c.isEditing = false; }; // isEditing 속성 false 설정 ('보기 모드' 전환)
