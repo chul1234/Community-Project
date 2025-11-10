@@ -18,7 +18,8 @@ app.controller('UserListController', function ($scope, $http, $location, $rootSc
     
     // ▼▼▼ [유지] '5개씩 보기' 버그 수정 ▼▼▼
     // [유지] HTML <option value="10">과 일치하도록 '숫자' 10 대신 '문자열' "10"으로 변경
-    $scope.pageSize = "10"; // 페이지당 보여줄 사용자 수 (String). 기본값 "10"
+    // $scope.pageSize = "10"; // 페이지당 보여줄 사용자 수 (String). 기본값 "10"
+    $scope.pagination = { pageSize: "10" }; // [변경] 원시값 대신 객체로 래핑하여 ng-if 자식 스코프 섀도잉 방지
     // ▲▲▲ [유지] ▲▲▲
 
     $scope.totalPages = 0; // 총 페이지 수 (int). 백엔드 응답으로 업데이트됨
@@ -68,8 +69,8 @@ app.controller('UserListController', function ($scope, $http, $location, $rootSc
         // ▼▼▼ [수정] params 객체가 $scope.search '객체'를 참조하도록 통일 ▼▼▼
         var params = {
             page: page,
-            // [유지] $scope.pageSize가 이제 문자열 "10"이므로, parseInt로 숫자로 변환
-            size: parseInt($scope.pageSize, 10), // size 값 전송
+            // [유지] pageSize(문자열)를 숫자로 변환
+            size: parseInt($scope.pagination.pageSize, 10), // [변경] pageSize -> pagination.pageSize
             searchType: $scope.search.type,     // $scope.search.type 사용
             searchKeyword: $scope.search.keyword  // $scope.search.keyword 사용
         };
@@ -246,7 +247,9 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
     $scope.currentPage = 1; // 현재 페이지 번호 (int, 1부터 시작). 기본값 1
     
     // [유지] HTML <option value="10">과 일치하도록 '숫자' 10 대신 '문자열' "10"으로 변경
-    $scope.pageSize = "10"; // ★ 권한 관리 페이지는 10개씩 보기로 설정
+    // $scope.pageSize = "10"; // ★ 권한 관리 페이지는 10개씩 보기로 설정
+    $scope.pagination = { pageSize: "10" }; // [변경] 원시값 대신 객체로 래핑
+    // 위와 동일한 이유(ng-if 자식 스코프 섀도잉 방지)
 
     $scope.totalPages = 0; // 총 페이지 수 (int). 백엔드 응답으로 업데이트됨
     $scope.totalItems = 0; // 총 사용자 수 (int). 백엔드 응답으로 업데이트됨
@@ -302,8 +305,8 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
             // ▼▼▼ [수정] params 객체에 검색 파라미터 추가 ▼▼▼
             var params = {
                 page: page,
-                // [유지] $scope.pageSize가 이제 문자열 "10"이므로, parseInt로 숫자로 변환
-                size: parseInt($scope.pageSize, 10),
+                // [유지] pageSize(문자열)를 숫자로 변환
+                size: parseInt($scope.pagination.pageSize, 10), // [변경] pageSize -> pagination.pageSize
                 searchType: $scope.search.type,     // [신규]
                 searchKeyword: $scope.search.keyword  // [신규]
             };
