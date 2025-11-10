@@ -6,36 +6,36 @@ app.controller('BoardController', function ($scope, $http) { // BoardController 
     // [유지] 페이지네이션 상태 변수
     $scope.currentPage = 1; // 현재 페이지 번호 (int, 1부터 시작). 기본값 1
     
-    // [유지] pageSize의 기본값을 '10' (숫자)로 설정. board-list.html의 ng-model과 연결됨
-    // [주의] 만약 이전에 '5개씩 보기' 버그 수정 시 $watch로 변경했다면, 해당 로직을 유지해야 합니다.
-    // [유지] (일단 원본 기준으로 수정합니다.)
-    $scope.pageSize = 10; // 페이지당 보여줄 게시글 수 (int). 기본값 10
+    // ▼▼▼ [수정] '5개씩 보기' 버그 수정 ▼▼▼
+    // [신규] HTML <option value="10">과 일치하도록 '숫자' 10 대신 '문자열' "10"으로 변경
+    $scope.pageSize = "10"; // 페이지당 보여줄 게시글 수 (String). 기본값 "10"
+    // ▲▲▲ [수정] ▲▲▲
     
     $scope.totalPages = 0; // 총 페이지 수 (int). 백엔드 응답으로 업데이트됨
     $scope.totalItems = 0; // 총 게시글 수 (int). 백엔드 응답으로 업데이트됨
 
-    // ▼▼▼ [수정] 검색 관련 변수 ▼▼▼
-    // [신규] HTML의 <select ng-model="searchType">과 연결
-    // [신규] 기본 검색 기준을 'author'에서 'title'로 변경 (HTML의 첫 번째 옵션과 일치)
+    // [유지] 검색 관련 변수
+    // [유지] HTML의 <select ng-model="searchType">과 연결
     $scope.searchType = 'title'; // 기본 검색 기준 'title' (BoardDAO와 일치)
-    // [신규] HTML의 <input ng-model="searchKeyword">와 연결
+    // [유지] HTML의 <input ng-model="searchKeyword">와 연결
     $scope.searchKeyword = '';    // 기본 검색어 (빈 문자열)
-    // ▲▲▲ [수정] ▲▲▲
+
+    // [유지] 검색창 표시(Toggle) 여부 변수
+    // [유지] $scope.showSearch 변수를 false로 초기화하여 검색창을 기본적으로 숨김
+    $scope.showSearch = false;
 
     /**
      * [수정됨] 특정 페이지의 게시글 목록을 서버에서 불러오는 함수
      * @param {number} page 불러올 페이지 번호
      */
     function fetchPosts(page) { // page 파라미터 받음
-        // $http.get(url, config): GET 요청 전송. config 객체 사용
-        // config.params: URL 쿼리 파라미터 설정 객체 (?page=...&size=...)
         
         // [수정됨] params 객체를 생성하여 page와 size를 담음
-        // $scope.pageSize는 HTML <select>에 의해 문자열일 수 있으므로 parseInt로 숫자로 변환
+        // [신규] $scope.pageSize가 이제 문자열 "10"이므로, parseInt로 숫자로 변환
         var params = {
             page: page,
             size: parseInt($scope.pageSize, 10), // 10진수 정수로 변환하여 전송
-            // [신규] 검색 관련 파라미터 2개 추가 (BoardController.java의 @RequestParam과 이름 일치)
+            // [유지] 검색 관련 파라미터 2개 추가
             searchType: $scope.searchType,
             searchKeyword: $scope.searchKeyword
         };
@@ -53,26 +53,35 @@ app.controller('BoardController', function ($scope, $http) { // BoardController 
             }); // .then() 끝
     } // fetchPosts 함수 끝
 
-    // ▼▼▼ [신규 추가] 검색 버튼 클릭 시 실행될 함수 ▼▼▼
-    /**
-     * [신규] HTML의 '검색' 버튼 (ng-click="searchPosts()") 클릭 시 호출됨.
-     */
-    $scope.searchPosts = function() { // searchPosts 함수 정의 시작
-        // [신규] 검색은 항상 1페이지부터 결과를 보여줘야 함
-        fetchPosts(1);
-    }; // searchPosts 함수 정의 끝
-    // ▲▲▲ [신규 추가] ▲▲▲
+    // [유지] 검색창 열기/닫기 함수
+    $scope.openSearch = function() {
+        // [유지] showSearch 변수를 true로 변경 (HTML의 ng-show="showSearch" 부분이 표시됨)
+        $scope.showSearch = true;
+    };
+    $scope.closeSearch = function() {
+        // [유지] showSearch 변수를 false로 변경 (HTML의 ng-show="!showSearch" 부분이 숨겨짐)
+        $scope.showSearch = false;
+    };
 
     /**
-     * [수정됨] HTML의 select 태그(ng-model="pageSize") 값이 변경될 때(ng-change) 호출됨.
-     * [수정] (주의사항 3) 페이지 크기 변경 시에도 현재 검색어를 유지한 채 1페이지로 이동해야 함.
+     * [유지] HTML의 '검색' 버튼 (ng-click="searchPosts()") 클릭 시 호출됨.
      */
-    $scope.pageSizeChanged = function() { // pageSizeChanged 함수 정의 시작
-        // 페이지 크기가 변경되었으므로, 1페이지부터 다시 조회
-        // [수정] $scope.pageSize는 ng-model에 의해 이미 새 값(예: "5")으로 변경된 상태
-        // [수정] (fetchPosts는 이제 $scope.searchKeyword를 자동으로 포함하여 호출됨)
+    $scope.searchPosts = function() { // searchPosts 함수 정의 시작
+        // [유지] 검색은 항상 1페이지부터 결과를 보여줘야 함
+        fetchPosts(1);
+    }; // searchPosts 함수 정의 끝
+
+    // ▼▼▼ [수정] $watch 삭제, pageSizeChanged에 로직 복원 ▼▼▼
+    /**
+     * [수정됨] HTML의 select 태그(ng-model="pageSize") 값이 변경될 때(ng-change) 호출됨.
+     */
+    $scope.pageSizeChanged = function() { 
+        // [신규] 페이지 크기가 변경되었으므로, (검색어 유지한 채) 1페이지부터 다시 조회
         fetchPosts(1); 
-    }; // pageSizeChanged 함수 정의 끝
+    }; 
+
+    // [신규] $watch('pageSize', ...) 함수 삭제
+    // ▲▲▲ [수정] ▲▲▲
 
     /**
      * [수정됨] 특정 페이지로 이동하는 함수. HTML의 페이지 번호/버튼 클릭 시 호출됨 (ng-click)
@@ -94,8 +103,6 @@ app.controller('BoardController', function ($scope, $http) { // BoardController 
      */
     $scope.getNumber = function(num) { // getNumber 함수 정의 시작
         // new Array(num): JavaScript 내장 함수. 길이가 num인 배열 생성.
-        // HTML의 ng-repeat="i in getNumber(totalPages)" 에서 사용됨.
-        // ng-repeat은 배열 길이에 맞춰 반복하며, $index 변수를 제공 (0부터 시작).
         return new Array(num); // 배열 반환
     } // getNumber 함수 끝
 
@@ -352,7 +359,7 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
     }; // switchToCommentEditMode 함수 끝
     
     // 댓글 '저장' 버튼(HTML ng-click="saveCommentChanges(comment)") 클릭 시 실행될 함수. comment 객체(c) 인자로 받음
-    $scope.saveCommentChanges = function(c) { // saveCommentChanges 함수 정의 시작
+    $scope.saveChanges = function(c) { // saveCommentChanges 함수 정의 시작
         // $http.put(url, data): HTTP PUT 데이터 전송 (수정 요청). data: 수정 내용 객체 { content: ... }
         // 백엔드 CommentController.java의 @PutMapping("/api/comments/{commentId}") 메소드 호출
         
