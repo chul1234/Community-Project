@@ -86,17 +86,24 @@ public class UserDAO {
         return Optional.empty();
     }
 
-    public List<Map<String, Object>> findAll(int limit, int offset) { // (1) 파라미터 추가
+    // [수정] findAll 메소드
+    public List<Map<String, Object>> findAll(int limit, int offset) { // (1) 파라미터 추가 (유지)
         List<Map<String, Object>> userList = new ArrayList<>();
-        String sql = SqlLoader.getSql("user.select.all"); // (2) LIMIT/OFFSET이 포함된 SQL
+        // [유지] (2) LIMIT/OFFSET이 포함된 SQL (sql.properties의 user.select.all을 사용합니다)
+        String sql = SqlLoader.getSql("user.select.all");
         
         // (3) Statement를 PreparedStatement로 변경
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) { 
 
+            // ▼▼▼ [수정] 누락되었던 파라미터 바인딩 코드 추가 ▼▼▼
             // (4) 파라미터 바인딩
-            pstmt.setInt(1, limit);  // 첫 번째 ? (LIMIT)
-            pstmt.setInt(2, offset); // 두 번째 ? (OFFSET)
+            // [신규] sql.properties의 "user.select.all" 쿼리는 LIMIT ?, OFFSET ? 순서입니다.
+            // [신규] 첫 번째 ? 에 limit 값을 설정합니다.
+            pstmt.setInt(1, limit);
+            // [신규] 두 번째 ? 에 offset 값을 설정합니다.
+            pstmt.setInt(2, offset);
+            // ▲▲▲ [수정] 코드 추가 완료 ▲▲▲
 
             try (ResultSet rs = pstmt.executeQuery()) { // (5) 쿼리 실행
                 while (rs.next()) {
@@ -115,7 +122,7 @@ public class UserDAO {
             e.printStackTrace();
         }
         return userList;
-    }
+    } // [수정] findAll 끝
 
     /**
      * users 테이블의 전체 사용자 수를 조회합니다. (페이지네이션용)
