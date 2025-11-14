@@ -4,12 +4,25 @@
         <div style="color: #6c757d; margin-bottom: 20px; border-bottom: 1px solid #dee2e6; padding-bottom: 15px;">
             <span>작성자: {{ post.author_name || '탈퇴한 사용자' }} ({{ post.user_id }})</span>
             <span style="margin-left: 15px;">조회: {{ post.view_count }}</span>
+            
+            <!-- ★ 추가됨: 게시글 좋아요 버튼 -->
+            <span style="margin-left: 15px;">
+                <button type="button"
+                        class="action-btn-sm"
+                        ng-click="togglePostLikeDetail(post)">
+                    <span ng-class="{'liked': post.likeCount > 0}">♥</span>
+                    {{ post.likeCount || 0 }}
+                </button>
+            </span>
+            <!-- ★ 추가됨 끝 -->
+
             <span style="float: right;">작성일: {{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</span>
         </div>
         <div class="post-content" ng-bind-html="trustedContent" style="min-height: 200px; margin-bottom: 40px; white-space: pre-wrap;"></div>
         
         <div class="action-bar">
-            <div ng-if="canModify"> <button type="button" 
+            <div ng-if="canModify">
+                <button type="button" 
                         ng-click="switchToEditMode()"
                         ng-if="post.user_id === currentUser.username">수정</button>
                 <button type="button" ng-click="deletePost()" class="delete-btn">삭제</button>
@@ -63,7 +76,8 @@
             </form>
         </div>
 
-        <div class="comment-list" style="margin-top: 30px;"> <div ng-if="!comments.length" class="no-comments">
+        <div class="comment-list" style="margin-top: 30px;">
+            <div ng-if="!comments.length" class="no-comments">
                 아직 댓글이 없습니다. 첫 댓글을 작성해보세요!
             </div>
             
@@ -71,11 +85,24 @@
         </div>
 
     </div>
-    </div> <script type="text/ng-template" id="comment-tree.html">
+</div>
+
+<script type="text/ng-template" id="comment-tree.html">
     <div class="comment-item" ng-if="!comment.isEditing">
         <div class="comment-header">
             <strong>{{ comment.author_name ||'탈퇴한 사용자' }}</strong> ({{ comment.user_id }})
             <span class="comment-date">{{ comment.created_at | date:'yyyy-MM-dd HH:mm' }}</span>
+            
+            <!-- ★ 추가됨: 댓글/대댓글 좋아요 버튼 -->
+            <span class="comment-like" style="margin-left: 10px;">
+                <button type="button"
+                        class="action-btn-sm"
+                        ng-click="toggleCommentLike(comment)">
+                    <span ng-class="{'liked': comment.likeCount > 0}">♥</span>
+                    {{ comment.likeCount || 0 }}
+                </button>
+            </span>
+            <!-- ★ 추가됨 끝 -->
         </div>
         <p class="comment-content">{{ comment.content }}</p>
         
@@ -83,7 +110,6 @@
             <button ng-click="comment.showReply = !comment.showReply" class="action-btn-sm">답글</button>
             
             <span ng-if="canModifyComment(comment)">
-                
                 <button ng-click="switchToCommentEditMode(comment)" class="action-btn-sm" 
                         ng-if="comment.user_id === currentUser.username">수정</button>
                 <button ng-click="deleteComment(comment.comment_id)" class="action-btn-sm delete">삭제</button>

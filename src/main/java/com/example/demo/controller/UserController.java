@@ -1,6 +1,5 @@
 package com.example.demo.controller;
 
-import com.example.demo.service.user.IUserService;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -10,7 +9,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.demo.service.user.IUserService;
 
 //JSON 같은 순수 데이터로 응답하는 컨트롤러
 @RestController 
@@ -100,6 +108,7 @@ public class UserController {
         response.put("role", primaryRole);
         // [핵심] 응답에 사용자의 실제 이름(name)을 추가합니다.
         response.put("name", userDetails != null ? userDetails.get("name") : username);
+        response.put("user_id",username);
         // 필요에 따라 추가 사용자 정보도 여기에 포함할 수 있습니다.
         return ResponseEntity.ok(response);
     }

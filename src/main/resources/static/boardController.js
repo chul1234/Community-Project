@@ -1,5 +1,5 @@
 // 'BoardController' (게시판 목록)
-app.controller('BoardController', function ($scope, $http) { // BoardController 정의 시작
+app.controller('BoardController', function ($scope, $http, $rootScope) { // BoardController 정의 시작 // ★ 수정됨: $rootScope 추가
     //$scope 컨트롤러 와 뷰 연결, $http 백엔드와 HTTP통신
     $scope.postList = []; // 게시글 목록 변수 (배열 초기화)
 
@@ -47,6 +47,12 @@ app.controller('BoardController', function ($scope, $http) { // BoardController 
 
                 // [유지] 응답 데이터 구조에 맞춰 $scope 변수 업데이트
                 $scope.postList = response.data.posts;         // response.data.posts (게시글 목록 배열) 할당
+
+                // ★ 추가됨: 게시글별 좋아요 개수 로딩
+                $scope.postList.forEach(function(post) { // ★ 추가됨
+                    $scope.loadLikeCountForPost(post);  // ★ 추가됨
+                }); // ★ 추가됨
+
                 $scope.totalPages = response.data.totalPages;   // response.data.totalPages (총 페이지 수) 할당
                 $scope.totalItems = response.data.totalItems;   // response.data.totalItems (총 게시글 수) 할당
                 $scope.currentPage = response.data.currentPage; // response.data.currentPage (현재 페이지 번호) 할당
@@ -105,6 +111,41 @@ app.controller('BoardController', function ($scope, $http) { // BoardController 
         // new Array(num): JavaScript 내장 함수. 길이가 num인 배열 생성.
         return new Array(num); // 배열 반환
     } // getNumber 함수 끝
+
+    // ★ 추가됨: 게시글 좋아요 개수 조회 함수
+    $scope.loadLikeCountForPost = function(post) { // ★ 추가됨
+        // 'POST' 타입 게시글에 대한 좋아요 개수 조회
+        $http.get('/likes/count', {
+            params: {
+                type: 'POST',        // ★ 추가됨: 게시글 타입
+                id: post.post_id     // ★ 추가됨: 게시글 PK
+            }
+        }).then(function(res) {      // ★ 추가됨
+            post.likeCount = res.data.count; // ★ 추가됨: 받아온 좋아요 수를 post 객체에 저장
+        });
+    };
+
+    // ★ 추가됨: 게시글 좋아요 토글 함수 (목록 화면용)
+    $scope.togglePostLike = function(post) { // ★ 추가됨
+        // 로그인 여부 확인 (currentUser.user_id 필요)
+        if (!$rootScope.currentUser || !$rootScope.currentUser.user_id) { // ★ 추가됨
+            alert("로그인이 필요합니다."); // ★ 추가됨
+            return; // ★ 추가됨
+        }
+
+        // /likes/toggle 호출하여 좋아요 On/Off
+        $http.post('/likes/toggle', null, { // ★ 추가됨
+            params: {
+                type: 'POST',                    // ★ 추가됨
+                id: post.post_id,                // ★ 추가됨
+                userId: $rootScope.currentUser.user_id // ★ 추가됨
+            }
+        }).then(function(res) { // ★ 추가됨
+            // 응답으로 현재 좋아요 상태와 개수 반환됨
+            post.liked = res.data.liked;   // ★ 추가됨: true/false
+            post.likeCount = res.data.count; // ★ 추가됨: 총 개수
+        });
+    };
 
     // 컨트롤러 로드 시 첫 페이지($scope.currentPage = 1) 게시글 목록을 즉시 불러옴
     // [유지] (이때 $scope.searchKeyword는 ''(빈값)이므로 전체 목록이 조회됨)
@@ -175,6 +216,10 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
     function fetchPostDetails() { // [유지] 게시글 로드 함수 분리 (고정/해제 후 재호출 위함)
         $http.get('/api/posts/' + postId).then(function (response) { // .then(): 성공 콜백
             $scope.post = response.data; //성공시 받은 데이터 $scope.post에 저장
+
+            // ★ 추가됨: 상세 페이지에서 게시글 좋아요 개수 로딩
+            $scope.loadLikeCountForPost($scope.post); // ★ 추가됨
+
             checkPermissions(); //게시글 데이터 도착 후, 권한 체크 함수 호출
         }).catch(function (error) { // .catch(): 실패 콜백
             alert('게시글을 불러오는데 실패했습니다.'); // 오류 알림
@@ -190,6 +235,9 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
         // [대댓글 수정] 이제 이 API는 계층형 JSON을 반환합니다.
         $http.get('/api/posts/' + postId + '/comments').then(function (response) { // .then(): 성공 콜백
             $scope.comments = response.data; //성공시 받은 계층형 댓글 목록 $scope.comments에 저장
+
+            // ★ 추가됨: 댓글/대댓글 전체에 대해 좋아요 개수 로딩
+            $scope.applyLikeInfoToComments($scope.comments); // ★ 추가됨
         }); // .then() 끝
     } // fetchComments 함수 끝
     fetchComments(); // 함수 즉시 호출
@@ -257,7 +305,7 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
         const order = 1; // order 변수 1 할당
 
         // $http.put(url, data): HTTP PUT 데이터 전송
-        // 백엔드 BoardController.java의 @PutMapping("/api/posts/{postId}/pin") 메소드 호출
+        // 백엔드 BoardController.java의 @PutMapping("/api/posts/{postId}") 메소드 호출
         // data: { order: order } 객체 (JSON 변환됨)
         $http.put('/api/posts/' + postId + '/pin', { order: order }).then(function() { // .then(): 성공 콜백
             alert("게시글이 고정되었습니다."); // 성공 알림
@@ -281,7 +329,7 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
     $scope.unpinPost = function() { // unpinPost 함수 정의 시작
         if (confirm("게시글 고정을 해제하시겠습니까?")) { // window.confirm() 함수
             // $http.put(url): HTTP PUT 요청 전송 (본문 없음)
-            // 백엔드 BoardController.java의 @PutMapping("/api/posts/{postId}/unpin") 메소드 호출
+            // 백엔드 BoardController.java의 @PutMapping("/api/posts/{postId}") 메소드 호출
             $http.put('/api/posts/' + postId + '/unpin').then(function() { // .then(): 성공 콜백
                 alert("게시글 고정이 해제되었습니다."); // 성공 알림
                 // fetchPostDetails() 함수 호출하여 변경된 게시글 정보(pinned_order = null) 다시 로드
@@ -298,7 +346,83 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
     }; // unpinPost 함수 끝
 
 
+    // --- [★ 추가됨] 게시글 좋아요 관련 함수들 ---
+
+    // 게시글 좋아요 개수 조회
+    $scope.loadLikeCountForPost = function(post) { // ★ 추가됨
+        $http.get('/likes/count', {
+            params: {
+                type: 'POST', // 게시글 타입
+                id: postId    // 현재 상세 화면 게시글 ID
+            }
+        }).then(function(res) {
+            post.likeCount = res.data.count; // 좋아요 개수 저장
+        });
+    };
+
+    // 게시글 좋아요 토글 (상세 화면)
+    $scope.togglePostLikeDetail = function(post) { // ★ 추가됨
+        if (!$rootScope.currentUser || !$rootScope.currentUser.user_id) {
+            alert("로그인이 필요합니다.");
+            return;
+        }
+
+        $http.post('/likes/toggle', null, {
+            params: {
+                type: 'POST',
+                id: postId,
+                userId: $rootScope.currentUser.user_id
+            }
+        }).then(function(res) {
+            post.liked = res.data.liked;      // true / false
+            post.likeCount = res.data.count;  // 총 개수
+        });
+    };
+
+
     // --- 댓글 관련 함수들 ---
+
+    // ★ 추가됨: 댓글/대댓글 트리에 좋아요 정보 적용
+    $scope.applyLikeInfoToComments = function(commentList) { // ★ 추가됨
+        if (!commentList) return; // ★ 추가됨
+        commentList.forEach(function(c) { // ★ 추가됨
+            $scope.loadLikeCountForComment(c); // ★ 추가됨
+            if (c.replies && c.replies.length > 0) { // ★ 추가됨 (대댓글 존재 시 재귀 호출)
+                $scope.applyLikeInfoToComments(c.replies); // ★ 추가됨
+            }
+        });
+    };
+
+    // ★ 추가됨: 댓글/대댓글 좋아요 개수 조회
+    $scope.loadLikeCountForComment = function(comment) { // ★ 추가됨
+        $http.get('/likes/count', {
+            params: {
+                type: 'COMMENT',          // 댓글/대댓글은 COMMENT 타입으로 통합
+                id: comment.comment_id    // 해당 댓글 PK
+            }
+        }).then(function(res) {
+            comment.likeCount = res.data.count; // 좋아요 개수 저장
+        });
+    };
+
+    // ★ 추가됨: 댓글/대댓글 좋아요 토글
+    $scope.toggleCommentLike = function(comment) { // ★ 추가됨
+        if (!$rootScope.currentUser || !$rootScope.currentUser.user_id) { // 로그인 체크
+            alert("로그인이 필요합니다.");
+            return;
+        }
+
+        $http.post('/likes/toggle', null, {
+            params: {
+                type: 'COMMENT',               // 댓글/대댓글
+                id: comment.comment_id,        // 댓글 ID
+                userId: $rootScope.currentUser.user_id
+            }
+        }).then(function(res) {
+            comment.liked = res.data.liked;       // 현재 상태
+            comment.likeCount = res.data.count;   // 총 개수
+        });
+    };
 
     // ▼▼▼ [대댓글 수정] submitComment 함수가 parentId와 commentData를 받도록 수정 ▼▼▼
     /**

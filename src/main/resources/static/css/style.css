@@ -468,3 +468,7 @@ header h1 {
          border-top: 1px solid #dee2e6; /* 위쪽 경계선 추가 (선택 사항) */
          border-bottom: 1px solid #dee2e6; /* 아래쪽 경계선 강화 (선택 사항) */
     }
+/* 좋아요 누른 상태일 때 하트 색상 */
+.liked {
+    color: red;
+}
