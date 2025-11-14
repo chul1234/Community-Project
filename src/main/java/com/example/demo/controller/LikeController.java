@@ -38,7 +38,7 @@ public class LikeController {
     public Map<String, Object> toggleLike(
             @RequestParam("type") String targetType,   // POST 또는 COMMENT
             @RequestParam("id") int targetId,          // post_id 또는 comment_id
-            @RequestParam("userId") String userId      // 현재 로그인 사용자
+            @RequestParam String userId      // 현재 로그인 사용자
     ) {
         // 좋아요 토글 실행
         boolean liked = likeService.toggleLike(targetType, targetId, userId);  // ★ 추가됨
