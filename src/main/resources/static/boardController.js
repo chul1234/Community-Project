@@ -450,7 +450,6 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
             } else {
                 // 답글 폼의 내용은 HTML에서 (취소 버튼 클릭 시) 알아서 처리하므로
                 // 여기서는 commentData.content = ''; 를 할 필요가 없음 (오히려 오류 유발 가능)
-                // 대신 답글 폼을 닫아주기 위해 해당 댓글의 showReply를 false로 만들 수 있으나,
                 // fetchComments()가 어차피 전체를 새로 그리므로 생략 가능.
             }
 
