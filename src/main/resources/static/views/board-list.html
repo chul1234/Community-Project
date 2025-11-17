@@ -6,7 +6,8 @@
                 type="button"
                 class="action-btn"
                 ng-show="!showSearch"
-                ng-click="openSearch()"
+                ng-click="openSearch()
+"
                 style="background-color: #6c757d; color: white; margin-right: 10px"
             >
                 🔍 검색
@@ -73,10 +74,12 @@
     <table class="user-table">
         <thead>
             <tr>
-                <th style="width: 10%">번호</th>
-                <th style="width: 45%">제목</th>
+                <th style="width: 8%">번호</th>
+                <th style="width: 40%">제목</th>
+                <!-- ★ 추가됨: 첨부파일/이미지 아이콘 컬럼 -->
+                <th style="width: 10%">첨부</th>
                 <th style="width: 15%">작성자</th>
-                <th style="width: 20%">작성일</th>
+                <th style="width: 17%">작성일</th>
                 <th style="width: 10%">조회수</th>
                 <!-- : 좋아요 컬럼 헤더 -->
                 <th>좋아요</th>
@@ -85,18 +88,18 @@
         </thead>
         <tbody>
             <tr ng-if="!postList.length && totalItems === 0 && !searchKeyword">
-                <!-- ★ 수정됨: 컬럼 수가 6개가 되었으므로 colspan 6 -->
+                <!-- ★ 수정됨: 컬럼 수가 7개가 되었으므로 colspan 7 -->
                 <td
-                    colspan="6"
+                    colspan="7"
                     style="text-align: center; color: #777"
                 >
                     작성된 게시글이 없습니다.
                 </td>
             </tr>
             <tr ng-if="!postList.length && totalItems === 0 && searchKeyword">
-                <!-- ★ 수정됨: 컬럼 수가 6개가 되었으므로 colspan 6 -->
+                <!-- ★ 수정됨: 컬럼 수가 7개가 되었으므로 colspan 7 -->
                 <td
-                    colspan="6"
+                    colspan="7"
                     style="text-align: center; color: #777"
                 >
                     '{{searchKeyword}}'에 대한 검색 결과가 없습니다.
@@ -122,6 +125,27 @@
                     >
                     <a href="#!/board/{{ post.post_id }}">{{ post.title }}</a>
                 </td>
+
+                <!-- ★ 추가됨: 첨부파일 / 이미지 표시 셀 -->
+                <td class="file-cell">
+                    <!-- 이미지가 있을 때: 썸네일 표시 -->
+                    <div ng-if="post.fileType === 'IMAGE'">
+                        <img
+                            ng-src="{{post.thumbUrl}}"
+                            class="file-thumb-image"
+                            alt="thumbnail"
+                        />
+                    </div>
+
+                    <!-- 이미지 없고 파일만 있을 때: 파일 아이콘 -->
+                    <div ng-if="post.fileType === 'FILE'">
+                        <span class="file-icon">📄</span>
+                    </div>
+
+                    <!-- 파일도 없을 때: 빈칸 -->
+                    <div ng-if="post.fileType === 'NONE'">-</div>
+                </td>
+
                 <td>{{ post.author_name || '탈퇴한 사용자' }} ({{ post.user_id }})</td>
                 <td>{{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</td>
                 <td>{{ post.view_count }}</td>

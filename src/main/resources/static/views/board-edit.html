@@ -1,13 +1,13 @@
 <div ng-controller="BoardEditController" class="container">
     <div class="page-header">
         <h1>게시글 수정</h1>
-        <a href="#!/board/{{ post.post_id }}" class="cancel-link">취소 (상세보기로 돌아가기)</a>
+        <a href="" ng-click="cancelEdit()" class="cancel-link">취소 (상세보기로 돌아가기)</a>
     </div>
 
     <form name="postForm" novalidate>
         <div class="form-group">
             <label for="postTitle">제목</label>
-            <input type="text" id="postTitle" ng-model="post.title" required />
+            <input type="text" id="postTitle" ng-model="post.title" required class="form-control" />
         </div>
 
         <div class="form-group">
@@ -16,23 +16,22 @@
                       ng-model="post.content"
                       required
                       rows="10"
-                      style="width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; box-sizing: border-box;"></textarea>
+                      class="form-control" 
+                      style="width: 100%;"></textarea>
         </div>
     </form>
 
     <hr style="margin: 30px 0;" />
 
-    <!-- ★ 기존 첨부파일 목록 표시 -->
-    <div class="existing-files" ng-if="existingFiles && existingFiles.length > 0">
+    <div class="existing-files" ng-if="fileList && fileList.length > 0">
         <h3>기존 첨부 파일</h3>
         <ul>
-            <li ng-repeat="file in existingFiles">
+            <li ng-repeat="file in fileList">
                 {{ file.original_name }}
                 <span style="color:#6c757d; font-size:12px">
                     ({{ file.file_size | number }} bytes)
                 </span>
 
-                <!-- ★ 삭제 체크박스 추가됨 -->
                 <label style="margin-left:10px;">
                     <input type="checkbox" ng-model="file._delete" />
                     삭제
@@ -41,14 +40,12 @@
         </ul>
     </div>
 
-    <!-- 기존 파일이 없을 때 -->
-    <div ng-if="existingFiles && existingFiles.length === 0" style="color:#6c757d; margin-bottom:20px;">
+    <div ng-if="!fileList || fileList.length === 0" style="color:#6c757d; margin-bottom:20px;">
         첨부된 파일이 없습니다.
     </div>
 
     <hr style="margin: 20px 0;" />
 
-    <!-- ★ 새 파일 추가하기 -->
     <div class="new-files">
         <h3>파일 추가</h3>
         <input type="file" multiple file-model="newFiles" />

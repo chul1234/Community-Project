@@ -472,3 +472,86 @@ header h1 {
 .liked {
     color: red;
 }
+/* --- (board-list.html) 첨부파일/이미지 아이콘 스타일 --- */
+.file-cell {
+    text-align: center; /* 아이콘/이미지 가운데 정렬 */
+    vertical-align: middle;
+}
+
+.file-thumb-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.file-thumb-image {
+    width: 40px;           /* ★ 조건: 목록에 작게 보이도록 */
+    height: 40px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+.file-icon-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.file-icon {
+    font-size: 20px;
+}
+
+/* --- (board-new.html) 새 글 작성 폼 전용 스타일 --- */
+.board-new-form .form-group {
+    margin-bottom: 15px;
+}
+
+.board-new-form label {
+    font-weight: 500;
+    margin-bottom: 5px;
+    display: inline-block;
+}
+
+.board-new-form .form-control {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+/* 업로드 파일 목록 */
+.file-upload-list {
+    margin-top: 8px;
+    padding-left: 18px;
+    font-size: 13px;
+    color: #495057;
+}
+
+.file-upload-list li {
+    margin-bottom: 2px;
+}
+
+/* 새 글 작성 버튼 그룹 - 기존 button-group 재사용 (board-edit와 동일 느낌) */
+.button-group .secondary-btn {
+    padding: 12px;
+    font-size: 16px;
+    border: 1px solid #ced4da;
+    background-color: #f8f9fa;
+    color: #495057;
+    border-radius: 4px;
+}
+.button-group .secondary-btn:hover {
+    background-color: #e9ecef;
+}
+.file-thumb-image {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.file-icon {
+    font-size: 20px;
+}

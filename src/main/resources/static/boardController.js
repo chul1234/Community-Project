@@ -127,7 +127,7 @@ app.controller('BoardController', function ($scope, $http, $rootScope) {
     /**
      * [신규] 현재 페이지 기준으로 화면에 보여줄 페이지 번호 목록 계산  // 수정됨
      * 예) currentPage=7, totalPages=52, maxPageLinks=10 → [1..10]  // 수정됨
-     *     currentPage=17 → [11..20] 식으로 동작  // 수정됨
+     * currentPage=17 → [11..20] 식으로 동작  // 수정됨
      */
     $scope.getPageRange = function () {
         // 수정됨
@@ -260,23 +260,24 @@ app.controller('BoardNewController', function ($scope, $http, $location) {
 }); // BoardNewController 정의 끝
 
 /**
- * 게시글 상세 보기, 수정, 삭제 및 댓글, **[신규] 게시글 고정/해제 + 파일 추가/삭제** 를 모두 처리하는 컨트롤러
+ * ▼▼▼ [수정됨] BoardDetailController (상세보기/댓글/삭제/고정 전용) ▼▼▼
+ * (수정 관련 로직이 BoardEditController로 이동됨)
  */
 app.controller('BoardDetailController', function ($scope, $http, $routeParams, $sce, $rootScope, $location) {
     // BoardDetailController 정의 시작
-    // $routeParams: URL 파라미터 접근, $sce: 신뢰할 수 있는 콘텐츠 처리, $rootScope: 공유되는 전역 저장 공간(사용자 정보)
-    const postId = $routeParams.postId; // URL에서 postId 파라미터 추출 ($routeParams 서비스 사용)
+    const postId = $routeParams.postId; // URL에서 postId 파라미터 추출
 
     // --- 게시글 관련 변수 ---
     $scope.post = {}; // 게시글 데이터 객체
     $scope.canModify = false; // 수정/삭제 권한 여부 (boolean)
-    $scope.isEditing = false; // 수정 모드 여부 (boolean)
-    $scope.editData = {}; // 수정 중인 게시글 데이터 (원본 복사본)
+    
+    // ▼▼▼ [수정됨] 수정 관련 $scope 변수 삭제 ▼▼▼
+    // $scope.isEditing = false; // (삭제)
+    // $scope.editData = {}; // (삭제)
+    // $scope.newFiles = []; // (삭제)
+    // $scope.deletedFileIds = []; // (삭제)
+    // ▲▲▲ [수정됨] ▲▲▲
 
-    // : 파일 관련 상태
-    $scope.existingFiles = []; // : 기존 첨부파일 목록 (백엔드에서 함께 내려주거나 별도 조회)
-    $scope.newFiles = []; // : 수정 시 새로 추가할 파일들 (file-model="newFiles")
-    $scope.deletedFileIds = []; // : 삭제 체크된 파일 ID 목록
     $scope.fileList = []; // : 상세 화면에서 표시할 첨부파일 목록 // 수정됨
 
     // --- 댓글 관련 변수 ---
@@ -284,32 +285,21 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
     $scope.newComment = { content: '' }; // 새 댓글 데이터 (객체)
 
     // [핵심] 권한 확인 함수
-    // 게시글 및 댓글 수정/삭제 권한 확인 로직
     function checkPermissions() {
         // checkPermissions 함수 정의 시작
-        // 게시글 정보($scope.post.user_id)와 사용자 정보($rootScope.currentUser.role) 로드 완료 확인
         if ($scope.post.user_id && $rootScope.currentUser.role) {
             // if 시작
-            // 데이터 로딩 순서 문제(타이밍 문제)를 해결하기 위해 두 정보가 모두 있을 때만 권한 체크
-            // $rootScope.currentUser.role: 현재 로그인 사용자 역할 ('ADMIN' 등)
-            // $scope.post.user_id: 현재 게시글 작성자 ID
-            // $rootScope.currentUser.username: 현재 로그인 사용자 ID
             if ($rootScope.currentUser.role === 'ADMIN' || $scope.post.user_id === $rootScope.currentUser.username) {
                 // if 시작 (관리자 또는 작성자)
-                // 현재 로그인이 관리자 이거나 게시글 작성자 ID가 현재 사용자 같다면
                 $scope.canModify = true; // 수정/삭제 권한 부여 (true 설정)
             } else {
                 // else 시작
-                // 권한이 없으면 false로 설정
                 $scope.canModify = false; // 권한 없음 (false 설정)
             } // if-else 끝
         } // if 끝
     } // checkPermissions 함수 끝
 
     // --- 데이터 로드 ---
-    //게시글 데이터 서버 가져옴
-    // $http.get(url): 주소에 GET 요청 전송
-    // 백엔드 BoardController.java의 @GetMapping("/api/posts/{postId}") 메소드 호출
     function fetchPostDetails() {
         // [유지] 게시글 로드 함수 분리 (고정/해제 후 재호출 위함)
         $http
@@ -357,9 +347,6 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
     // 댓글 목록 가져오는 함수
     function fetchComments() {
         // fetchComments 함수 정의 시작
-        // $http.get(url): 주소에 GET 요청 전송
-        // 백엔드 CommentController.java의 @GetMapping("/api/posts/{postId}/comments") 메소드 호출
-        // [대댓글 수정] 이제 이 API는 계층형 JSON을 반환합니다.
         $http.get('/api/posts/' + postId + '/comments').then(function (response) {
             // .then(): 성공 콜백
             $scope.comments = response.data; //성공시 받은 계층형 댓글 목록 $scope.comments에 저장
@@ -371,11 +358,8 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
     fetchComments(); // 함수 즉시 호출
 
     //[핵심] $rootScope.currentUser.role 값이 바뀔 때마다 자동으로 함수를 실행 (AngularJS $watch 기능)
-    // $watch(감시 대상, 리스너 함수): 감시 대상 값이 변경될 때 리스너 함수 실행
     $rootScope.$watch('currentUser.role', function (newRole) {
         // newRole: 변경된 새 값
-        // 사용자 정보($rootScope)가 게시글 정보($scope)보다 늦게 도착하는 '타이밍' 문제를 해결 위함
-        // newRole 사용자 정보 도착 확인 (null이나 undefined가 아니면)
         if (newRole) {
             // if 시작
             checkPermissions(); //권한 다시 확인 함수 호출
@@ -383,126 +367,24 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
     }); // $watch 끝
 
     // --- 게시글 관련 함수들 ---
-    // 게시글 '수정' 버튼(HTML ng-click="switchToEditMode()") 클릭 시 실행될 함수
-    $scope.switchToEditMode = function () {
-        // switchToEditMode 함수 정의 시작
-        $scope.isEditing = true; // $scope.isEditing 상태 true 변경 (HTML에서 ng-if="isEditing" 부분이 보이게 됨)
-        // angular.copy(원본): 원본 객체/배열 깊은 복사본 생성. 원본 변경 방지.
-        $scope.editData = angular.copy($scope.post); // $scope.post 복사하여 $scope.editData에 저장
 
-        // : 수정 모드 진입 시 새 파일/삭제 체크 상태 초기화
-        $scope.newFiles = []; //
-        $scope.deletedFileIds = []; //
-        if ($scope.existingFiles) {
-            //
-            $scope.existingFiles.forEach(function (f) {
-                f._delete = false; // : 체크박스 초기화
-            });
-        }
-    }; // switchToEditMode 함수 끝
-
-    // 게시글 '수정 완료' 버튼(HTML ng-click="saveChanges()") 클릭 시 실행될 함수
-    $scope.saveChanges = function () {
-        // saveChanges 함수 정의 시작
-        if (confirm('수정하시겠습니까?')) {
-            // window.confirm() 함수
-
-            // ★★★ 핵심: FormData로 텍스트 + 파일 + 삭제할 파일 ID 함께 전송 ★★★
-            var formData = new FormData(); //
-
-            // 1) 수정된 제목, 내용 추가
-            formData.append('title', $scope.editData.title || ''); //
-            formData.append('content', $scope.editData.content || ''); //
-
-            // 2) 삭제 체크된 기존 파일 ID 수집
-            $scope.deletedFileIds = []; //  (매번 초기화)
-            if ($scope.existingFiles && $scope.existingFiles.length > 0) {
-                //
-                angular.forEach($scope.existingFiles, function (f) {
-                    //
-                    if (f._delete) {
-                        //
-                        $scope.deletedFileIds.push(f.file_id); //
-                    }
-                });
-            }
-
-            // 2-1) 삭제할 파일 ID들을 FormData에 추가
-            angular.forEach($scope.deletedFileIds, function (id) {
-                //
-                formData.append('deleteFileIds', id); //  (키 이름은 백엔드 파라미터 이름과 맞춰야 함)
-            });
-
-            // 3) 새로 추가한 파일들 FormData에 추가
-            if ($scope.newFiles && $scope.newFiles.length > 0) {
-                //
-                for (var i = 0; i < $scope.newFiles.length; i++) {
-                    //
-                    formData.append('files', $scope.newFiles[i]); //
-                }
-            }
-
-            // $http.put(url, data): HTTP PUT 데이터 전송 (수정 요청)
-            // 백엔드 BoardController.java의 @PutMapping("/api/posts/{postId}") 메소드가
-            // Multipart 요청(텍스트 + 파일)을 처리한다고 가정
-            $http
-                .put('/api/posts/' + postId, formData, {
-                    // ★ 수정됨
-                    transformRequest: angular.identity, //
-                    headers: { 'Content-Type': undefined }, //
-                })
-                .then(function () {
-                    // ★ 수정됨
-                    // 성공 시, 최신 게시글/파일 정보를 다시 불러오기 위해 fetchPostDetails() 호출
-                    $scope.isEditing = false; // 수정 모드 해제
-                    $scope.newFiles = []; // 새 파일 목록 초기화
-                    $scope.deletedFileIds = []; // 삭제 목록 초기화
-                    fetchPostDetails(); // 게시글 + 첨부파일 + 좋아요 정보 재로딩
-                    fetchFiles(); // 수정 후 첨부파일 목록 재로딩 // 수정됨
-                })
-                .catch(function (error) {
-                    //
-                    alert('게시글 수정 중 오류가 발생했습니다.'); //
-                    console.error('Post update failed:', error); //
-                });
-        } // if 끝
-    }; // saveChanges 함수 끝
-
-    // 게시글 수정 '취소' 버튼(HTML ng-click="exitEditMode()") 클릭 시 실행될 함수. '보기 모드' 전환.
-    $scope.exitEditMode = function () {
-        // ★ 수정됨: cancelEdit 대신 HTML과 이름 맞춤
-        $scope.isEditing = false; // 보기 모드 전환
-        $scope.editData = angular.copy($scope.post); // 원본으로 다시 되돌림
-        $scope.newFiles = []; // 새 파일 선택 초기화
-        // 기존 파일 삭제 체크 해제
-        if ($scope.existingFiles) {
-            $scope.existingFiles.forEach(function (f) {
-                f._delete = false;
-            });
-        }
-    }; // exitEditMode 함수 끝
+    // ▼▼▼ [수정됨] 수정 관련 함수(switchToEditMode, saveChanges, exitEditMode) 모두 삭제 ▼▼▼
+    // (BoardEditController로 이동)
+    // ▲▲▲ [수정됨] ▲▲▲
 
     // 게시글 '삭제' 버튼(HTML ng-click="deletePost()") 클릭 시 실행될 함수
     $scope.deletePost = function () {
         // deletePost 함수 정의 시작
         if (confirm('게시글을 삭제하시겠습니까?')) {
             // window.confirm() 함수
-            // $http.delete(url): HTTP DELETE 요청 전송
-            // 백엔드 BoardController.java의 @DeleteMapping("/api/posts/{postId}") 메소드 호출
             $http.delete('/api/posts/' + postId).then(function () {
                 // 화살표 함수 대신 일반 함수로 유지해도 무방
-                // 성공 시, $location.path() 사용하여 목록 페이지('/board')로 이동
                 $location.path('/board'); // 경로 변경
             }); // .then() 끝
         } // if 끝
     }; // deletePost 함수 끝
 
     // 게시글 내용($scope.post.content)이 변경될 때마다 감시($watch)하여 실행되는 함수
-    // $watch(감시 대상, 리스너 함수)
-    // HTML 렌더링 위해 줄바꿈 문자(\n)를 HTML 태그(<br/>)로 변환 (String.prototype.replace() 사용)
-    // $sce.trustAsHtml(html문자열): AngularJS에게 이 HTML 문자열이 안전함을 알림 (XSS 방지 해제)
-    // 결과를 $scope.trustedContent 변수에 저장
-    // 사용처: board-detail.html의 ng-bind-html="trustedContent" 부분에서 사용
     $scope.$watch('post.content', function (v) {
         if (v) {
             $scope.trustedContent = $sce.trustAsHtml(v.replace(/\n/g, '<br/>'));
@@ -518,21 +400,15 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
         // [신규] 고정 순서(order) 값을 1로 고정 (prompt 제거)
         const order = 1; // order 변수 1 할당
 
-        // $http.put(url, data): HTTP PUT 데이터 전송
-        // 백엔드 BoardController.java의 @PutMapping("/api/posts/{postId}") 메소드 호출
-        // data: { order: order } 객체 (JSON 변환됨)
         $http
             .put('/api/posts/' + postId + '/pin', { order: order })
             .then(function () {
                 // .then(): 성공 콜백
                 alert('게시글이 고정되었습니다.'); // 성공 알림
-                // fetchPostDetails() 함수 호출하여 변경된 게시글 정보(pinned_order) 다시 로드
                 fetchPostDetails();
             })
             .catch(function (error) {
                 // .catch(): 실패 콜백
-                // error.status: HTTP 상태 코드 (백엔드에서 400 또는 403 반환 예상)
-                // [수정됨] 400 상태 코드일 때 제한 초과 메시지 표시 (BoardServiceImpl 반환값 boolean 기준)
                 if (error.status === 403) {
                     // 403 Forbidden (권한 문제 또는 개수 제한 문제 - 백엔드에서 구분 어려움 현재)
                     alert('게시글 고정 실패: 권한이 없거나 최대 3개까지만 고정할 수 있습니다.'); // 통합 메시지
@@ -551,14 +427,11 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
         // unpinPost 함수 정의 시작
         if (confirm('게시글 고정을 해제하시겠습니까?')) {
             // window.confirm() 함수
-            // $http.put(url): HTTP PUT 요청 전송 (본문 없음)
-            // 백엔드 BoardController.java의 @PutMapping("/api/posts/{postId}") 메소드 호출
             $http
                 .put('/api/posts/' + postId + '/unpin')
                 .then(function () {
                     // .then(): 성공 콜백
                     alert('게시글 고정이 해제되었습니다.'); // 성공 알림
-                    // fetchPostDetails() 함수 호출하여 변경된 게시글 정보(pinned_order = null) 다시 로드
                     fetchPostDetails();
                 })
                 .catch(function (error) {
@@ -684,8 +557,6 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
         };
 
         // $http.post(url, data): HTTP POST 데이터 전송
-        // 백엔드 CommentController.java의 @PostMapping("/api/posts/{postId}/comments") 메소드 호출
-        // [대댓글 수정] 전송하는 데이터가 $scope.newComment에서 commentToSend로 변경됨
         $http
             .post('/api/posts/' + postId + '/comments', commentToSend)
             .then(function () {
@@ -698,7 +569,6 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
                 }
 
                 // 3. fetchComments() 함수 호출하여 댓글 목록 다시 불러와 화면 갱신
-                // (Service에서 계층형으로 조립된 새 목록을 받아옴)
                 fetchComments();
             })
             .catch(function () {
@@ -710,7 +580,6 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
     // (HTML에서 ng-if="canModifyComment(comment)"로 사용) 댓글 수정/삭제 권한 확인 함수. comment 객체(c) 인자로 받음
     $scope.canModifyComment = function (c) {
         // canModifyComment 함수 정의 시작
-        // 현재 사용자 역할($rootScope.currentUser.role)이 관리자(ADMIN) 이거나(||) 댓글 작성자 ID(c.user_id)가 현재 사용자 ID($rootScope.currentUser.username)와 같으면 true 반환
         return $rootScope.currentUser.role === 'ADMIN' || c.user_id === $rootScope.currentUser.username; // boolean 반환
     }; // canModifyComment 함수 끝
 
@@ -719,8 +588,6 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
         // deleteComment 함수 정의 시작
         if (confirm('댓글을 삭제하시겠습니까?')) {
             // window.confirm() 함수
-            // $http.delete(url): HTTP DELETE 요청 전송
-            // 백엔드 CommentController.java의 @DeleteMapping("/api/comments/{commentId}") 메소드 호출
             $http.delete('/api/comments/' + cId).then(function () {
                 fetchComments(); // 성공 시 fetchComments() 호출하여 목록 새로고침
             });
@@ -736,11 +603,8 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
 
     // ▼▼▼ [수정] 함수 이름 변경 (게시물 수정과의 충돌 해결) ▼▼▼
     // 댓글 '저장' 버튼(HTML ng-click="saveCommentChanges(comment)") 클릭 시 실행될 함수.
-    // $scope.saveChanges = function(c) { // (기존, 문제의 코드)
     $scope.saveCommentChanges = function (c) {
         // [수정] saveCommentChanges 함수 정의 시작
-        // $http.put(url, data): HTTP PUT 데이터 전송 (수정 요청). data: 수정 내용 객체 { content: ... }
-        // 백엔드 CommentController.java의 @PutMapping("/api/comments/{commentId}") 메소드 호출
         $http.put('/api/comments/' + c.comment_id, { content: c.editContent }).then(function () {
             // c.comment_id 사용, 성공 콜백
             c.isEditing = false; // 성공 시 isEditing 속성 false 설정 ('보기 모드' 전환)
@@ -754,6 +618,89 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
         c.isEditing = false; // isEditing 속성 false 설정 ('보기 모드' 전환)
     }; // cancelCommentEdit 함수 끝
 }); // BoardDetailController 정의 끝
+
+// ▼▼▼ [신규 추가] BoardEditController (수정 전용) ▼▼▼
+app.controller('BoardEditController', function ($scope, $http, $routeParams, $location) {
+    const postId = $routeParams.postId;
+
+    // 1. $scope 변수 초기화
+    $scope.post = {};       // 게시글(제목, 내용) 데이터
+    $scope.fileList = [];   // 기존 첨부 파일 목록
+    $scope.newFiles = [];   // 새로 추가할 파일 목록
+    $scope.deletedFileIds = []; // 삭제할 파일 ID 목록
+
+    // 2. (로딩) 게시글 상세 정보 가져오기 (제목, 내용 채우기)
+    $http.get('/api/posts/' + postId)
+        .then(function (response) {
+            $scope.post = response.data;
+        })
+        .catch(function () {
+            alert('게시글 정보를 불러오는데 실패했습니다.');
+            $location.path('/board');
+        });
+
+    // 3. (로딩) 기존 첨부파일 목록 가져오기
+    $http.get('/api/posts/' + postId + '/files')
+        .then(function (response) {
+            $scope.fileList = response.data || [];
+            // 체크박스 초기화
+            $scope.fileList.forEach(function (f) {
+                f._delete = false;
+            });
+        });
+
+    // 4. (액션) 수정 완료 버튼 클릭
+    $scope.saveChanges = function () {
+        if (confirm('수정하시겠습니까?')) {
+            var formData = new FormData();
+
+            // 1) 수정된 제목, 내용
+            formData.append('title', $scope.post.title || '');
+            formData.append('content', $scope.post.content || '');
+
+            // 2) 삭제 체크된 기존 파일 ID 수집
+            $scope.deletedFileIds = []; 
+            angular.forEach($scope.fileList, function (f) {
+                if (f._delete) {
+                    $scope.deletedFileIds.push(f.file_id);
+                }
+            });
+            angular.forEach($scope.deletedFileIds, function (id) {
+                formData.append('deleteFileIds', id);
+            });
+
+            // 3) 새로 추가한 파일들
+            if ($scope.newFiles && $scope.newFiles.length > 0) {
+                for (var i = 0; i < $scope.newFiles.length; i++) {
+                    formData.append('files', $scope.newFiles[i]);
+                }
+            }
+
+            // 4) PUT 전송
+            $http.put('/api/posts/' + postId, formData, {
+                transformRequest: angular.identity,
+                headers: { 'Content-Type': undefined },
+            })
+            .then(function () {
+                alert('게시글이 수정되었습니다.');
+                // 성공 시 상세보기 페이지로 이동
+                $location.path('/board/' + postId);
+            })
+            .catch(function (error) {
+                alert('게시글 수정 중 오류가 발생했습니다.');
+                console.error('Post update failed:', error);
+            });
+        }
+    }; // saveChanges 끝
+
+    // 5. (액션) 취소 버튼 클릭
+    $scope.cancelEdit = function () {
+        // 상세보기 페이지로 이동
+        $location.path('/board/' + postId);
+    };
+
+}); // BoardEditController 정의 끝
+// ▲▲▲ [신규 추가] ▲▲▲
 
 // ★★★ [공통] file-model 디렉티브 추가 (board-new.html / board-detail.html에서 사용) ★★★
 app.directive('fileModel', [
@@ -776,5 +723,3 @@ app.directive('fileModel', [
         };
     },
 ]); // fileModel 디렉티브 끝 //
-
-

@@ -1,57 +1,82 @@
-<div ng-controller="BoardNewController">
-    <h2>게시글 작성</h2>
+<div class="container" ng-controller="BoardNewController">
+    <!-- ★ 수정됨: 공통 페이지 헤더 스타일 사용 -->
+    <div class="page-header">
+        <h1>게시글 작성</h1>
+        <a href="#!/board" class="cancel-link">← 목록으로</a>
+    </div>
 
-    <form
-        ng-submit="submitPost()"
-        enctype="multipart/form-data"
-    >
-        <!-- 제목 -->
-        <div style="margin-top: 10px">
-            <label>제목</label><br />
-            <input
-                type="text"
-                ng-model="post.title"
-                required
-                style="width: 100%"
-            />
+    <!-- ★ 수정됨: user-entry-card 레이아웃 재사용 -->
+    <div class="user-entry-card">
+        <div class="card-header">
+            <h4>게시글 정보</h4>
         </div>
+        <div class="card-body">
+            <form
+                ng-submit="submitPost()"
+                enctype="multipart/form-data"
+                class="board-new-form"
+            >
+                <!-- 제목 -->
+                <div class="form-group">
+                    <label for="title">제목</label>
+                    <input
+                        id="title"
+                        type="text"
+                        class="form-control"
+                        ng-model="post.title"
+                        required
+                    />
+                </div>
 
-        <!-- 내용 -->
-        <div style="margin-top: 10px">
-            <label>내용</label><br />
-            <textarea
-                ng-model="post.content"
-                rows="10"
-                style="width: 100%"
-            ></textarea>
+                <!-- 내용 -->
+                <div class="form-group">
+                    <label for="content">내용</label>
+                    <textarea
+                        id="content"
+                        class="form-control"
+                        ng-model="post.content"
+                        rows="10"
+                    ></textarea>
+                </div>
+
+                <!-- : 파일 업로드 -->
+                <div class="form-group">
+                    <label for="fileInput">첨부 파일</label>
+                    <input
+                        type="file"
+                        id="fileInput"
+                        multiple
+                        file-model="uploadFiles"
+                    />
+
+                    <!-- ★ 수정됨: 파일 목록도 약간 정리 -->
+                    <ul
+                        class="file-upload-list"
+                        ng-if="uploadFiles && uploadFiles.length > 0"
+                    >
+                        <li ng-repeat="file in uploadFiles">
+                            {{file.name}} ({{file.size}} bytes)
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 버튼 영역 -->
+                <div class="button-group">
+                    <button
+                        type="submit"
+                        class="submit-btn-full"
+                    >
+                        등록
+                    </button>
+                    <button
+                        type="button"
+                        class="secondary-btn"
+                        ng-click="cancel()"
+                    >
+                        취소
+                    </button>
+                </div>
+            </form>
         </div>
-
-        <!-- : 파일 업로드 -->
-        <div style="margin-top: 10px">
-            <label>첨부 파일</label><br />
-            <input
-                type="file"
-                id="fileInput"
-                multiple
-                file-model="uploadFiles"
-            />
-
-            <ul ng-if="uploadFiles && uploadFiles.length > 0">
-                <li ng-repeat="file in uploadFiles">{{file.name}} ({{file.size}} bytes)</li>
-            </ul>
-        </div>
-
-        <button
-            type="submit"
-            style="margin-top: 20px"
-        >
-            등록
-        </button>
-        <button
-            type="button"
-            ng-click="cancel()"
-        >
-            취소
-        </button>
-    </form>
+    </div>
 </div>

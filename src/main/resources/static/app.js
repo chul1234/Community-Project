@@ -25,10 +25,12 @@ app.config(function ($routeProvider) {
             controller: 'BoardDetailController',
         })
 
-        // .when('/board/edit/:postId', {
-        //     templateUrl: 'views/board-edit.html',
-        //     controller: 'BoardEditController'
-        // })
+        // ▼▼▼ [수정됨] 이 부분의 주석(//)을 제거하여 경로를 활성화합니다. ▼▼▼
+        .when('/board/edit/:postId', {
+            templateUrl: 'views/board-edit.html',
+            controller: 'BoardEditController'
+        })
+        // ▲▲▲ [수정됨] ▲▲▲
 
         .when('/users', {
             templateUrl: 'views/user-list.html',

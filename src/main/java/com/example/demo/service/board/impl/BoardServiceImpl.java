@@ -1,6 +1,5 @@
 package com.example.demo.service.board.impl; // 패키지 선언
 
-
 // 필요한 클래스 import
 import java.util.HashMap; // BoardDAO 클래스 import
 import java.util.List; // IBoardService 인터페이스 import
@@ -34,12 +33,53 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
     @Override // IBoardService 인터페이스 메소드 구현 명시
     // [신규] searchType, searchKeyword 파라미터 2개 추가
     public Map<String, Object> getAllPosts(int page, int size, String searchType, String searchKeyword) {
+
         // 1. offset 계산 (DB 건너뛸 개수). page는 1부터 시작
         int offset = (page - 1) * size; // offset 변수 계산 및 할당
 
         // 2. DAO findAll 호출하여 해당 페이지 게시글 목록 조회. limit(size), offset 전달
         // [신규] searchType, searchKeyword 파라미터를 DAO로 전달
         List<Map<String, Object>> posts = boardDAO.findAll(size, offset, searchType, searchKeyword); // posts 변수 초기화
+
+        // --------------------------------------------------------------------
+        // ★ 추가됨: 게시글 목록에 파일/이미지 정보를 포함시킴
+        // --------------------------------------------------------------------
+        for (Map<String, Object> post : posts) { // ★ 수정됨
+
+            int postId = (int) post.get("post_id"); // ★ 기존 유지
+
+            // 첨부파일 목록 조회
+            List<Map<String, Object>> files = fileService.getFilesByPostId(postId); // ★ 기존 유지
+
+            if (files == null || files.isEmpty()) {
+                // 첨부파일 없음
+                post.put("fileType", "NONE");  // ★ 기존 유지
+                post.put("thumbUrl", null);    // ★ 기존 유지
+                continue;
+            }
+
+            // 첫 번째 첨부파일 기준
+            Map<String, Object> file = files.get(0); // ★ 기존 유지
+
+            String contentType = (String) file.get("content_type"); // ★ 기존 유지
+
+            // ★ 추가됨: file_id 추출 (정수로 변환)
+            Object fileIdObj = file.get("file_id");                 // ★ 추가됨
+            int fileId = (fileIdObj instanceof Number)              // ★ 추가됨
+                    ? ((Number) fileIdObj).intValue()               // ★ 추가됨
+                    : Integer.parseInt(fileIdObj.toString());       // ★ 추가됨
+
+            // 이미지 여부 판단
+            if (contentType != null && contentType.startsWith("image")) {
+                post.put("fileType", "IMAGE"); // ★ 기존 유지
+                // ★ 수정됨: 저장 파일명을 직접 쓰지 않고, 파일 뷰 API 경로로 변경
+                post.put("thumbUrl", "/api/files/" + fileId + "/view"); // ★ 수정됨
+            } else {
+                post.put("fileType", "FILE"); // ★ 기존 유지
+                post.put("thumbUrl", null);   // ★ 기존 유지
+            }
+        }
+        // --------------------------------------------------------------------
 
         // 3. DAO countAll 호출하여 전체 게시글 수 조회
         // [신규] searchType, searchKeyword 파라미터를 DAO로 전달 (검색 조건에 맞는 전체 개수)
@@ -61,7 +101,7 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         return result;
     } // getAllPosts 메소드 끝
 
-        /**
+    /**
      * 게시글 생성 + 첨부파일 저장 메소드
      * @param post   제목/내용 등이 들어 있는 Map
      * @param files  업로드된 첨부파일 목록
@@ -96,7 +136,6 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         return getPost(postId); // ★ 수정됨: post 대신 getPost(postId) 결과 반환
     }
 
-
     /**
      * 특정 게시글 조회 메소드 정의 시작
      * @param postId 조회할 게시글 ID (int) - 파라미터 설명
@@ -109,7 +148,7 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         return boardDAO.findById(postId).orElse(null);
     } // getPost 메소드 끝
 
-        /**
+    /**
      * 게시글 수정 + 첨부파일 추가/삭제 메소드
      * @param postId        수정할 게시글 ID
      * @param postDetails   수정할 제목/내용 등이 들어있는 Map
@@ -159,7 +198,6 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         return getPost(postId); // ★ 수정됨: post 대신 getPost(postId) 반환
     }
 
-
     /**
      * 게시글 삭제 메소드 정의 시작 (관리자 또는 작성자)
      * @param postId 삭제할 게시글 ID (int) - 파라미터 설명
@@ -168,27 +206,26 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
      * @return 삭제 성공 여부 (boolean) - 반환 타입 설명
      */
     @Override // IBoardService 인터페이스 메소드 구현 명시
-public boolean deletePost(int postId, String currentUserId, List<String> roles) { // deletePost 메소드 정의 시작
-    // boardDAO.findById() 호출하여 삭제할 게시글 조회
-    Map<String, Object> post = boardDAO.findById(postId).orElse(null); // post 변수 초기화
+    public boolean deletePost(int postId, String currentUserId, List<String> roles) { // deletePost 메소드 정의 시작
+        // boardDAO.findById() 호출하여 삭제할 게시글 조회
+        Map<String, Object> post = boardDAO.findById(postId).orElse(null); // post 변수 초기화
 
-    // 권한 확인 로직 시작 (게시글 존재 여부 및 관리자 또는 작성자 일치 확인)
-    if (post != null && (roles.contains("ADMIN") || post.get("user_id").equals(currentUserId))) { // if 시작
+        // 권한 확인 로직 시작 (게시글 존재 여부 및 관리자 또는 작성자 일치 확인)
+        if (post != null && (roles.contains("ADMIN") || post.get("user_id").equals(currentUserId))) { // if 시작
 
-        // ★ 수정됨: 게시글 삭제 전에 첨부 파일 전체 삭제
-        // 1) post_files 테이블에서 해당 post_id의 파일 메타데이터 전체 조회
-        // 2) 실제 uploads 디렉토리에서 파일 삭제
-        // 3) post_files 테이블 메타데이터 삭제
-        fileService.deleteFilesByPostId(postId); // ★ 수정됨: 첨부파일 정리
+            // ★ 수정됨: 게시글 삭제 전에 첨부 파일 전체 삭제
+            // 1) post_files 테이블에서 해당 post_id의 파일 메타데이터 전체 조회
+            // 2) 실제 uploads 디렉토리에서 파일 삭제
+            // 3) post_files 테이블 메타데이터 삭제
+            fileService.deleteFilesByPostId(postId); // ★ 수정됨: 첨부파일 정리
 
-        // 기존 로직: 게시글 자체 삭제
-        return boardDAO.delete(postId) > 0;
-    } // if 끝
+            // 기존 로직: 게시글 자체 삭제
+            return boardDAO.delete(postId) > 0;
+        } // if 끝
 
-    // 게시글 없거나 권한 없으면 false 반환
-    return false;
-} // deletePost 메소드 끝
-
+        // 게시글 없거나 권한 없으면 false 반환
+        return false;
+    } // deletePost 메소드 끝
 
     /**
      * [유지] 특정 게시글 조회수 증가 메소드 정의 시작

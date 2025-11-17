@@ -1,11 +1,10 @@
 <div class="container">
-    <div ng-if="!isEditing">
+    <div>
         <h1>{{ post.title }}</h1>
         <div style="color: #6c757d; margin-bottom: 20px; border-bottom: 1px solid #dee2e6; padding-bottom: 15px;">
             <span>작성자: {{ post.author_name || '탈퇴한 사용자' }} ({{ post.user_id }})</span>
             <span style="margin-left: 15px;">조회: {{ post.view_count }}</span>
             
-            <!-- ★ 추가됨: 게시글 좋아요 버튼 -->
             <span style="margin-left: 15px;">
                 <button type="button"
                         class="action-btn-sm"
@@ -14,8 +13,6 @@
                     {{ post.likeCount || 0 }}
                 </button>
             </span>
-            <!-- ★ 추가됨 끝 -->
-
             <span style="float: right;">작성일: {{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</span>
         </div>
 
@@ -23,14 +20,12 @@
              ng-bind-html="trustedContent"
              style="min-height: 200px; margin-bottom: 20px; white-space: pre-wrap;"></div>
 
-        <!-- ★ 첨부 파일 영역 시작: detail에서 업로드한 파일 표시 -->
         <div class="attachments"
              ng-if="fileList && fileList.length > 0"
              style="margin-bottom: 20px;">
             <h3 style="font-size: 16px; margin-bottom: 8px;">첨부 파일</h3>
             <ul>
                 <li ng-repeat="file in fileList">
-                    <!-- 파일 다운로드 링크: 실제 다운로드 URL에 맞게 수정 가능 -->
                     <a ng-href="/api/files/{{file.file_id}}/download">
                         {{ file.original_name }}
                     </a>
@@ -45,13 +40,12 @@
              style="margin-bottom: 20px; color: #6c757d; font-size: 14px;">
             첨부된 파일이 없습니다.
         </div>
-        <!-- ★ 첨부 파일 영역 끝 -->
-
         <div class="action-bar">
             <div ng-if="canModify">
-                <button type="button" 
-                        ng-click="switchToEditMode()"
-                        ng-if="post.user_id === currentUser.username">수정</button>
+                <a href="#!/board/edit/{{post.post_id}}" 
+                   class="action-btn"
+                   style="background-color: #007bff; color: white;"
+                   ng-if="post.user_id === currentUser.username">수정</a>
                 <button type="button" ng-click="deletePost()" class="delete-btn">삭제</button>
 
                 <button type="button" 
@@ -68,32 +62,6 @@
                 </button>
             </div>
             <a href="#!/board" class="action-btn">목록으로</a>
-        </div>
-    </div>
-
-    <div ng-if="isEditing">
-        <h1>게시글 수정</h1>
-        <form name="editForm" novalidate>
-            <div class="form-group">
-                <label>제목</label>
-                <input type="text" ng-model="editData.title" required class="form-control" />
-            </div>
-            <div class="form-group">
-                <label>내용</label>
-                <textarea ng-model="editData.content" required rows="10" class="form-control" style="width: 100%;"></textarea>
-            </div>
-        </form>
-        <div class="action-bar">
-            <div class="button-group">
-                <button type="button"
-                        ng-click="saveChanges()"
-                        ng-disabled="editForm.$invalid"
-                        class="submit-btn-full">수정 완료</button>
-                <!-- ★ 수정됨: cancelEdit() → exitEditMode() (컨트롤러 함수명과 맞춤) -->
-                <button type="button"
-                        ng-click="exitEditMode()"
-                        class="secondary-btn">취소</button>
-            </div>
         </div>
     </div>
 
@@ -131,7 +99,6 @@
             <strong>{{ comment.author_name ||'탈퇴한 사용자' }}</strong> ({{ comment.user_id }})
             <span class="comment-date">{{ comment.created_at | date:'yyyy-MM-dd HH:mm' }}</span>
             
-            <!-- ★ 추가됨: 댓글/대댓글 좋아요 버튼 -->
             <span class="comment-like" style="margin-left: 10px;">
                 <button type="button"
                         class="action-btn-sm"
@@ -140,8 +107,7 @@
                     {{ comment.likeCount || 0 }}
                 </button>
             </span>
-            <!-- ★ 추가됨 끝 -->
-        </div>
+            </div>
         <p class="comment-content">{{ comment.content }}</p>
         
         <div class="comment-actions">
