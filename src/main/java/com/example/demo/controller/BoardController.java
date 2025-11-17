@@ -1,24 +1,29 @@
 package com.example.demo.controller; // 패키지 선언
 
 // 필요한 클래스 import
-import java.util.List; // IBoardService 인터페이스 import
-import java.util.Map; // @Autowired 어노테이션 import
-import java.util.stream.Collectors; // ResponseEntity 클래스 import (HTTP 응답 제어)
+import java.util.HashMap; // List 인터페이스 import
+import java.util.List; // Map 인터페이스 import
+import java.util.Map; // ★ 추가됨: HashMap import
+import java.util.stream.Collectors; // Collectors 클래스 import (Stream API)
 
-import org.springframework.beans.factory.annotation.Autowired; // Authentication 인터페이스 import (인증 정보)
-import org.springframework.http.ResponseEntity; // GrantedAuthority 인터페이스 import (권한 정보)
-import org.springframework.security.core.Authentication; // Spring Web 어노테이션들 import (@RestController, @GetMapping 등)
-import org.springframework.security.core.GrantedAuthority; // List 인터페이스 import
-import org.springframework.web.bind.annotation.DeleteMapping; // Map 인터페이스 import
-import org.springframework.web.bind.annotation.GetMapping; // Collectors 클래스 import (Stream API)
+import org.springframework.beans.factory.annotation.Autowired; // @Autowired 어노테이션 import
+import org.springframework.http.ResponseEntity; // ResponseEntity 클래스 import (HTTP 응답 제어)
+import org.springframework.security.core.Authentication; // Authentication 인터페이스 import (인증 정보)
+import org.springframework.security.core.GrantedAuthority; // GrantedAuthority 인터페이스 import (권한 정보)
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping; 
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestBody;   // ★ 수정됨: pinPost에서 JSON 본문 수신용
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile; // ★ 추가됨: MultipartFile import
 
 import com.example.demo.service.board.IBoardService;
+import com.example.demo.service.file.IFileService;
+
+
 
 // json 같은 순수 데이터로 응답하는 컨트롤러 (@RestController = @Controller + @ResponseBody)
 @RestController
@@ -27,6 +32,9 @@ public class BoardController { // BoardController 클래스 정의 시작
     // @Autowired: Spring이 IBoardService 타입 Bean 자동 주입
     @Autowired
     private IBoardService boardService; // IBoardService 객체 멤버 변수 선언
+
+    @Autowired
+    private IFileService fileService; // ★ 추가됨: 첨부파일 서비스 주입
 
     /**
      * [수정됨] 페이지네이션 및 검색 적용된 게시글 목록 조회 API 메소드 정의 시작
@@ -45,7 +53,6 @@ public class BoardController { // BoardController 클래스 정의 시작
             @RequestParam(defaultValue = "10") int size, // size 파라미터 (int)
             
             // [신규] required = false: 이 파라미터가 없어도 400 Bad Request 오류를 내지 않음 (검색 안 할 경우)
-            // [신규] (defaultValue는 null을 의미함)
             @RequestParam(required = false) String searchType,
             @RequestParam(required = false) String searchKeyword
             
@@ -55,21 +62,32 @@ public class BoardController { // BoardController 클래스 정의 시작
     } // getAllPosts 메소드 끝
 
     /**
-     * 게시글 생성 API 메소드 정의 시작
-     * @param post 요청 본문 JSON 데이터 (Map) - 파라미터 설명
-     * @param authentication 현재 인증 정보 (Authentication) - 파라미터 설명
-     * @return ResponseEntity<Map<String, Object>> - 생성된 게시글 정보 또는 에러 상태 응답 - 반환 타입 설명
+     * [★ 수정됨] 게시글 생성 API (Multipart 폼 + 첨부파일)
+     *
+     * @param title   폼 필드 title (String)
+     * @param content 폼 필드 content (String)
+     * @param files   업로드 파일 목록 (MultipartFile 리스트, null 가능)
+     * @param authentication 현재 인증 정보 (Authentication)
+     * @return ResponseEntity<Map<String, Object>> - 생성된 게시글 정보 또는 에러 상태 응답
      */
     // @PostMapping("/api/posts"): HTTP POST /api/posts 요청 처리
     @PostMapping("/api/posts")
-    public ResponseEntity<Map<String, Object>> createPost(@RequestBody Map<String, Object> post, Authentication authentication) { // createPost 메소드 정의 시작
-        // @RequestBody: 요청 본문(body) JSON 데이터를 Map<String, Object> 타입으로 자동 변환하여 post 파라미터에 주입
-        // Authentication: Spring Security가 자동으로 현재 사용자 인증 정보 주입
+    public ResponseEntity<Map<String, Object>> createPost(
+            @RequestParam("title") String title, // ★ 수정됨: @RequestParam으로 제목 수신
+            @RequestParam("content") String content, // ★ 수정됨: @RequestParam으로 내용 수신
+            @RequestParam(value = "files", required = false) List<MultipartFile> files, // ★ 추가됨: 첨부파일 목록
+            Authentication authentication) { // createPost 메소드 정의 시작
 
         // authentication.getName() 메소드: 현재 로그인 사용자 ID(username) 반환
         String userId = authentication.getName(); // userId 변수 초기화
-        // boardService.createPost() 메소드 호출하여 게시글 생성 로직 수행
-        Map<String, Object> createdPost = boardService.createPost(post, userId); // createdPost 변수 초기화
+
+        // ★ 추가됨: Service에 넘겨줄 Map 구성 (기존 JSON 구조 대체)
+        Map<String, Object> postData = new HashMap<>(); // ★ 추가됨
+        postData.put("title", title);   // ★ 추가됨
+        postData.put("content", content); // ★ 추가됨
+
+        // ★ 수정됨: boardService.createPost() 메소드 (텍스트 + 파일 동시 처리)
+        Map<String, Object> createdPost = boardService.createPost(postData, files, userId); // ★ 수정됨
 
         // createdPost null 여부 확인 (null이면 생성 실패)
         if (createdPost != null) { // if 시작 (생성 성공)
@@ -107,21 +125,44 @@ public class BoardController { // BoardController 클래스 정의 시작
         } // if-else 끝
     } // getPostById 메소드 끝
 
+    @GetMapping("/api/posts/{postId}/files") // ★ 추가됨
+    public ResponseEntity<List<Map<String, Object>>> getFilesByPost(@PathVariable int postId) { // ★ 추가됨
+        List<Map<String, Object>> files = fileService.getFilesByPostId(postId); // ★ 추가됨
+        return ResponseEntity.ok(files); // ★ 추가됨
+    } // ★ 추가됨
+
     /**
-     * 게시글 수정 API 메소드 정의 시작
-     * @param postId URL 경로에서 추출한 게시글 ID (int) - 파라미터 설명
-     * @param postDetails 요청 본문 JSON 데이터 (수정 내용 Map) - 파라미터 설명
-     * @param authentication 현재 인증 정보 (Authentication) - 파라미터 설명
-     * @return ResponseEntity<Map<String, Object>> - 수정된 게시글 정보 또는 403 Forbidden 응답 - 반환 타입 설명
+     * [★ 수정됨] 게시글 수정 API (Multipart 폼 + 첨부파일 추가/삭제)
+     *
+     * @param postId URL 경로에서 추출한 게시글 ID (int)
+     * @param title  수정된 제목 (폼 필드)
+     * @param content 수정된 내용 (폼 필드)
+     * @param files  새로 추가할 파일 목록 (MultipartFile 리스트, null 가능)
+     * @param deleteFileIds 삭제할 기존 파일 ID 목록 (예: deleteFileIds=1&deleteFileIds=2 ...)
+     * @param authentication 현재 인증 정보
+     * @return ResponseEntity<Map<String, Object>> - 수정된 게시글 정보 또는 403 Forbidden 응답
      */
     // @PutMapping("/api/posts/{postId}"): HTTP PUT /api/posts/{postId} 요청 처리
     @PutMapping("/api/posts/{postId}")
-    public ResponseEntity<Map<String, Object>> updatePost(@PathVariable int postId, @RequestBody Map<String, Object> postDetails, Authentication authentication) { // updatePost 메소드 정의 시작
+    public ResponseEntity<Map<String, Object>> updatePost(
+            @PathVariable int postId,
+            @RequestParam("title") String title, // ★ 수정됨: @RequestParam으로 제목 수신
+            @RequestParam("content") String content, // ★ 수정됨: @RequestParam으로 내용 수신
+            @RequestParam(value = "files", required = false) List<MultipartFile> files, // ★ 추가됨: 새 첨부파일
+            @RequestParam(value = "deleteFileIds", required = false) List<Integer> deleteFileIds, // ★ 추가됨: 삭제할 파일 ID 목록
+            Authentication authentication) { // updatePost 메소드 정의 시작
+
         // authentication.getName() 메소드: 현재 사용자 ID 획득
         String currentUserId = authentication.getName(); // currentUserId 변수 초기화
 
-        // boardService.updatePost() 호출하여 게시글 수정 로직 수행
-        Map<String, Object> updatedPost = boardService.updatePost(postId, postDetails, currentUserId); // updatedPost 변수 초기화
+        // ★ 추가됨: Service로 넘길 수정 데이터 Map 구성
+        Map<String, Object> postDetails = new HashMap<>(); // ★ 추가됨
+        postDetails.put("title", title);     // ★ 추가됨
+        postDetails.put("content", content); // ★ 추가됨
+
+        // boardService.updatePost() 호출하여 게시글 수정 로직 수행 (텍스트 + 파일 + 삭제 목록)
+        Map<String, Object> updatedPost =
+                boardService.updatePost(postId, postDetails, files, deleteFileIds, currentUserId); // ★ 수정됨
 
         // updatedPost null 여부 확인 (null이면 수정 실패 또는 권한 없음)
         if (updatedPost != null) { // if 시작 (수정 성공)
@@ -178,7 +219,11 @@ public class BoardController { // BoardController 클래스 정의 시작
     // @PreAuthorize("hasRole('ADMIN')"): 이 메소드는 ADMIN 역할 사용자만 호출 가능 (Spring Security Method Security 필요)
     // @PreAuthorize("hasRole('ADMIN')") // <- 주석 해제하여 활성화 
     @PutMapping("/api/posts/{postId}/pin")
-    public ResponseEntity<Void> pinPost(@PathVariable int postId, @RequestBody Map<String, Integer> requestBody, Authentication authentication) { // pinPost 메소드 정의 시작
+    public ResponseEntity<Void> pinPost(
+            @PathVariable int postId,
+            @RequestBody Map<String, Integer> requestBody, // ★ 수정됨: JSON body(@RequestBody)로 order 수신
+            Authentication authentication) { // pinPost 메소드 정의 시작
+
         // authentication.getName() 메소드: 현재 사용자 ID 획득
         String currentUserId = authentication.getName(); // currentUserId 변수 초기화
         // authentication.getAuthorities() ~ .collect(Collectors.toList()): 현재 사용자 역할 목록(List<String>) 추출

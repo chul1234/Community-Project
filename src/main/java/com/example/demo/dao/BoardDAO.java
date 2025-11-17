@@ -5,11 +5,12 @@ import java.sql.Connection; // @Autowired 어노테이션 import
 import java.sql.PreparedStatement; // @Repository 어노테이션 import
 import java.sql.ResultSet; // DataSource 인터페이스 import (DB 커넥션 풀)
 import java.sql.SQLException; // JDBC API 클래스들 import (Connection, PreparedStatement, ResultSet, SQLException)
-import java.sql.Types; // ArrayList 클래스 import (List 구현체)
-import java.util.ArrayList; // HashMap 클래스 import (Map 구현체)
-import java.util.HashMap; // List 인터페이스 import
-import java.util.List; // Map 인터페이스 import
-import java.util.Map; // Optional 클래스 import (null 처리용)
+import java.sql.Statement; // ArrayList 클래스 import (List 구현체)
+import java.sql.Types; // HashMap 클래스 import (Map 구현체)
+import java.util.ArrayList; // List 인터페이스 import
+import java.util.HashMap; // Map 인터페이스 import
+import java.util.List; // Optional 클래스 import (null 처리용)
+import java.util.Map;
 import java.util.Optional;
 
 import javax.sql.DataSource;
@@ -269,27 +270,39 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
      * @return 영향을 받은 행의 수 (성공 시 1, 실패 시 0) - 반환 타입 설명
      */
     public int save(Map<String, Object> post) { // save 메소드 정의 시작
-        // SqlLoader.getSql() 호출하여 "post.insert" SQL 문자열 로드
-        String sql = SqlLoader.getSql("post.insert");
-        // try-with-resources: conn, pstmt 자동 자원 해제 시작
-        try (Connection conn = getConnection(); // Connection 객체 생성
-             PreparedStatement pstmt = conn.prepareStatement(sql)) { // PreparedStatement 객체 생성
 
-            // SQL의 ? 파라미터 값 설정 시작 (pstmt.setXXX() 메소드 사용)
-            // post 맵에서 .get() 메소드로 값 추출 및 형변환
-            pstmt.setString(1, (String) post.get("title")); // 첫 번째 ? : title (String)
-            pstmt.setString(2, (String) post.get("content")); // 두 번째 ? : content (String)
-            pstmt.setString(3, (String) post.get("user_id")); // 세 번째 ? : user_id (String)
-            // SQL의 ? 파라미터 값 설정 끝
+    // SqlLoader.getSql() 호출하여 "post.insert" SQL 문자열 로드
+    String sql = SqlLoader.getSql("post.insert");
 
-            // pstmt.executeUpdate(): INSERT SQL 실행 후 영향받은 행 수 반환
-            return pstmt.executeUpdate();
-        } catch (SQLException e) { // SQLException 예외 처리 블록 시작
-            e.printStackTrace(); // 콘솔 에러 로그 출력
-            return 0; // 실패 시 0 반환
-        } // try-catch 끝 (conn, pstmt 자동 해제됨)
-    } // save 메소드 끝
+    // try-with-resources: conn, pstmt 자동 자원 해제
+    try (Connection conn = getConnection();
 
+         // ★ 수정됨: 자동 생성된 post_id 를 얻기 위해 RETURN_GENERATED_KEYS 사용
+         PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+        // SQL ? 파라미터 설정
+        pstmt.setString(1, (String) post.get("title"));
+        pstmt.setString(2, (String) post.get("content"));
+        pstmt.setString(3, (String) post.get("user_id"));
+
+        // INSERT 실행
+        int rows = pstmt.executeUpdate();  // 영향받은 행 수
+
+        // ★ 수정됨: 자동 생성된 post_id 읽어오기
+        try (ResultSet rs = pstmt.getGeneratedKeys()) {
+            if (rs.next()) {
+                int generatedId = rs.getInt(1);
+                post.put("post_id", generatedId); // ★ 수정됨: post Map에 post_id 저장
+            }
+        }
+
+        return rows;
+
+    } catch (SQLException e) {
+        e.printStackTrace();
+        return 0;
+    }
+}
     /**
      * post_id로 특정 게시글 하나 조회 메소드 정의 시작
      * @param postId 조회할 게시글 ID (int) - 파라미터 설명

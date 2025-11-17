@@ -1,5 +1,6 @@
 package com.example.demo.service.board.impl; // 패키지 선언
 
+
 // 필요한 클래스 import
 import java.util.HashMap; // BoardDAO 클래스 import
 import java.util.List; // IBoardService 인터페이스 import
@@ -7,15 +8,20 @@ import java.util.Map; // @Autowired 어노테이션 import
 
 import org.springframework.beans.factory.annotation.Autowired; // @Service 어노테이션 import
 import org.springframework.stereotype.Service; // HashMap 클래스 import
+import org.springframework.web.multipart.MultipartFile; // Map 인터페이스 import
 
-import com.example.demo.dao.BoardDAO; // Map 인터페이스 import
-import com.example.demo.service.board.IBoardService; // List 인터페이스 import
+import com.example.demo.dao.BoardDAO; // List 인터페이스 import
+import com.example.demo.service.board.IBoardService;
+import com.example.demo.service.file.IFileService; // ★ 추가됨: 파일 업로드 처리용
 
 @Service // @Service: 서비스 계층 컴포넌트 선언
 public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클래스 정의 시작, IBoardService 구현
 
     @Autowired // @Autowired: Spring이 BoardDAO Bean 자동 주입
     private BoardDAO boardDAO; // BoardDAO 객체 멤버 변수 선언
+
+    @Autowired
+    private IFileService fileService; // ★ 신규 추가: 첨부파일 관련 작업 담당
 
     /**
      * [수정됨] 특정 페이지의 게시글 목록과 전체 페이지 정보를 조회 메소드 정의 시작
@@ -55,29 +61,41 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         return result;
     } // getAllPosts 메소드 끝
 
-    /**
-     * 게시글 생성 메소드 정의 시작
-     * @param post 생성할 게시글 정보 (Map) - 파라미터 설명
-     * @param userId 작성자 ID (String) - 파라미터 설명
-     * @return 생성된 게시글 정보 (Map) 또는 null - 반환 타입 설명
+        /**
+     * 게시글 생성 + 첨부파일 저장 메소드
+     * @param post   제목/내용 등이 들어 있는 Map
+     * @param files  업로드된 첨부파일 목록
+     * @param userId 작성자 ID
+     * @return 생성된 게시글 정보(Map). 실패 시 null.
      */
-    @Override // IBoardService 인터페이스 메소드 구현 명시
-    public Map<String, Object> createPost(Map<String, Object> post, String userId) { // createPost 메소드 정의 시작
-        // 1. post 맵에 .put() 메소드로 'user_id' 키와 userId 값 추가
-        post.put("user_id", userId); // user_id 설정
+    @Override // IBoardService 인터페이스 메소드 구현 명시 // ★ 수정됨
+    public Map<String, Object> createPost(Map<String, Object> post, List<MultipartFile> files, String userId) { // ★ 수정됨: files 파라미터 추가
+        // 1. 작성자 ID 설정
+        post.put("user_id", userId); // 게시글 작성자 ID 설정
 
-        // 2. boardDAO.save() 메소드 호출하여 DB 저장 요청
-        int affectedRows = boardDAO.save(post); // affectedRows 변수 초기화 (영향받은 행 수)
+        // 2. DB에 게시글 INSERT
+        int affectedRows = boardDAO.save(post); // boardDAO.save() 호출하여 DB에 저장 (post_id 생성)
 
-        // 3. affectedRows 값 확인 (0보다 크면 성공)
-        if (affectedRows > 0) { // if 시작
-            // 원본 게시글 데이터(post 맵) 컨트롤러 반환
-            return post;
-        } else { // else 시작
-            // null 반환하여 컨트롤러에게 실패 알림
+        if (affectedRows <= 0) { // INSERT 실패
             return null;
-        } // if-else 끝
-    } // createPost 메소드 끝
+        }
+
+        // 3. 방금 INSERT된 게시글 ID 가져오기
+        Object postIdObj = post.get("post_id"); // boardDAO.save()에서 생성된 PK가 넣어져 있다고 가정
+        if (!(postIdObj instanceof Number)) {
+            return null; // 안전 장치 (예외 상황)
+        }
+        int postId = ((Number) postIdObj).intValue();
+
+        // 4. 첨부파일이 있다면 저장
+        if (files != null && !files.isEmpty()) { // ★ 추가됨: 파일 저장 로직
+            fileService.saveFilesForPost(postId, files); // 게시글 ID 기준으로 파일들 저장
+        }
+
+        // 5. 최종적으로 생성된 게시글 전체 정보(첨부파일 포함)를 다시 조회해서 반환
+        return getPost(postId); // ★ 수정됨: post 대신 getPost(postId) 결과 반환
+    }
+
 
     /**
      * 특정 게시글 조회 메소드 정의 시작
@@ -91,36 +109,56 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         return boardDAO.findById(postId).orElse(null);
     } // getPost 메소드 끝
 
-    /**
-     * 게시글 수정 메소드 정의 시작
-     * @param postId 수정할 게시글 ID (int) - 파라미터 설명
-     * @param postDetails 수정할 내용 (Map) - 파라미터 설명
-     * @param currentUserId 현재 사용자 ID (String) - 파라미터 설명
-     * @return 수정된 게시글 정보 (Map) 또는 null (권한 없음 등) - 반환 타입 설명
+        /**
+     * 게시글 수정 + 첨부파일 추가/삭제 메소드
+     * @param postId        수정할 게시글 ID
+     * @param postDetails   수정할 제목/내용 등이 들어있는 Map
+     * @param newFiles      새로 추가할 파일 목록
+     * @param deleteFileIds 삭제할 파일 ID 목록
+     * @param currentUserId 현재 로그인 사용자 ID
+     * @return 수정된 게시글 정보(Map). 권한 없음/실패 시 null.
      */
-    @Override // IBoardService 인터페이스 메소드 구현 명시
-    public Map<String, Object> updatePost(int postId, Map<String, Object> postDetails, String currentUserId) { // updatePost 메소드 정의 시작
-        // 1. boardDAO.findById() 호출하여 수정할 게시글 조회
+    @Override // IBoardService 인터페이스 메소드 구현 명시 // ★ 수정됨
+    public Map<String, Object> updatePost(
+            int postId,
+            Map<String, Object> postDetails,
+            List<MultipartFile> newFiles,      // ★ 추가됨
+            List<Integer> deleteFileIds,       // ★ 추가됨
+            String currentUserId) {            // ★ 수정됨: 시그니처 변경
+
+        // 1. 수정 대상 게시글 조회
         Map<String, Object> post = boardDAO.findById(postId).orElse(null); // post 변수 초기화
 
-        // 2. 권한 확인 로직 시작 (게시글 존재 여부 및 작성자 일치 확인)
-        // post != null: 게시글 존재 확인
-        // post.get("user_id"): 게시글의 user_id 값 가져오기
-        // .equals(currentUserId): 현재 사용자와 작성자 ID 비교
-        if (post != null && post.get("user_id").equals(currentUserId)) { // if 시작
-            // 3. 작성자 맞으면, post 맵 데이터 업데이트 시작 (.put() 메소드 사용)
-            post.put("title", postDetails.get("title")); // "title" 키 값 업데이트
-            post.put("content", postDetails.get("content")); // "content" 키 값 업데이트
-            // 3. 작성자 맞으면, post 맵 데이터 업데이트 끝
+        // 2. 권한 확인 (게시글 존재 + 작성자 일치)
+        if (post == null || !post.get("user_id").equals(currentUserId)) { // 게시글 없거나 작성자 아니면
+            return null; // 권한 없음 또는 게시글 없음
+        }
 
-            // 4. boardDAO.update() 메소드 호출하여 DB 업데이트 요청
-            int affectedRows = boardDAO.update(post); // affectedRows 변수 초기화
-            // 삼항 연산자: affectedRows > 0 이 true면 post 반환, false면 null 반환
-            return affectedRows > 0 ? post : null;
-        } // if 끝
-        // 게시글 없거나 작성자 아니면 null 반환
-        return null;
-    } // updatePost 메소드 끝
+        // 3. 제목/내용 수정
+        post.put("title", postDetails.get("title"));     // "title" 키 값 업데이트
+        post.put("content", postDetails.get("content")); // "content" 키 값 업데이트
+
+        // 4. DB에 게시글 UPDATE
+        int affectedRows = boardDAO.update(post); // boardDAO.update() 메소드 호출
+
+        if (affectedRows <= 0) {
+            return null; // UPDATE 실패
+        }
+
+        // 5. 첨부파일 삭제 처리 (체크된 파일들)
+        if (deleteFileIds != null && !deleteFileIds.isEmpty()) { // ★ 추가됨
+            fileService.deleteFilesByIds(deleteFileIds); // 선택된 파일 ID들 삭제 // ★ 추가됨
+        }
+
+        // 6. 새로 추가된 첨부파일 저장
+        if (newFiles != null && !newFiles.isEmpty()) { // ★ 추가됨
+            fileService.saveFilesForPost(postId, newFiles); // 게시글 ID 기준으로 파일들 추가 저장 // ★ 추가됨
+        }
+
+        // 7. 수정 후 최신 게시글 정보(첨부파일 포함)를 다시 조회해서 반환
+        return getPost(postId); // ★ 수정됨: post 대신 getPost(postId) 반환
+    }
+
 
     /**
      * 게시글 삭제 메소드 정의 시작 (관리자 또는 작성자)
@@ -130,22 +168,27 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
      * @return 삭제 성공 여부 (boolean) - 반환 타입 설명
      */
     @Override // IBoardService 인터페이스 메소드 구현 명시
-    public boolean deletePost(int postId, String currentUserId, List<String> roles) { // deletePost 메소드 정의 시작
-        // boardDAO.findById() 호출하여 삭제할 게시글 조회
-        Map<String, Object> post = boardDAO.findById(postId).orElse(null); // post 변수 초기화
+public boolean deletePost(int postId, String currentUserId, List<String> roles) { // deletePost 메소드 정의 시작
+    // boardDAO.findById() 호출하여 삭제할 게시글 조회
+    Map<String, Object> post = boardDAO.findById(postId).orElse(null); // post 변수 초기화
 
-        // 권한 확인 로직 시작 (게시글 존재 여부 및 관리자 또는 작성자 일치 확인)
-        // post != null: 게시글 존재 확인
-        // roles.contains("ADMIN"): 사용자 역할 목록에 "ADMIN" 포함 확인
-        // post.get("user_id").equals(currentUserId): 작성자와 현재 사용자 ID 비교
-        if (post != null && (roles.contains("ADMIN") || post.get("user_id").equals(currentUserId))) { // if 시작
-            // 권한 있으면, boardDAO.delete() 메소드 호출하여 DB 삭제 요청
-            // 결과(영향받은 행 수)가 0보다 큰지 비교하여 boolean 값(true/false) 반환
-            return boardDAO.delete(postId) > 0;
-        } // if 끝
-        // 게시글 없거나 권한 없으면 false 반환
-        return false;
-    } // deletePost 메소드 끝
+    // 권한 확인 로직 시작 (게시글 존재 여부 및 관리자 또는 작성자 일치 확인)
+    if (post != null && (roles.contains("ADMIN") || post.get("user_id").equals(currentUserId))) { // if 시작
+
+        // ★ 수정됨: 게시글 삭제 전에 첨부 파일 전체 삭제
+        // 1) post_files 테이블에서 해당 post_id의 파일 메타데이터 전체 조회
+        // 2) 실제 uploads 디렉토리에서 파일 삭제
+        // 3) post_files 테이블 메타데이터 삭제
+        fileService.deleteFilesByPostId(postId); // ★ 수정됨: 첨부파일 정리
+
+        // 기존 로직: 게시글 자체 삭제
+        return boardDAO.delete(postId) > 0;
+    } // if 끝
+
+    // 게시글 없거나 권한 없으면 false 반환
+    return false;
+} // deletePost 메소드 끝
+
 
     /**
      * [유지] 특정 게시글 조회수 증가 메소드 정의 시작

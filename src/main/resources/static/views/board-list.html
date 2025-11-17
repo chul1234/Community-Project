@@ -1,126 +1,184 @@
 <div class="container">
     <div class="action-bar">
-        <h1>게시판</h1> 
-        <div style="margin-left: auto; display: flex; align-items: center;">
-        
-        <button type="button" 
-                class="action-btn" 
-                ng-show="!showSearch" 
+        <h1>게시판</h1>
+        <div style="margin-left: auto; display: flex; align-items: center">
+            <button
+                type="button"
+                class="action-btn"
+                ng-show="!showSearch"
                 ng-click="openSearch()"
-                style="background-color: #6c757d; color: white; margin-right: 10px;">
-            🔍 검색
-        </button>
-        <div class="search-bar" style="display: flex; align-items: center; margin-right: 10px;" ng-show="showSearch">
-            <select ng-model="searchType" style="height: 35px; border-radius: 4px; border: 1px solid #ccc; margin-right: 5px;">
-                <option value="title">제목</option>
-                <option value="content">내용</option>
-                <option value="title_content">제목+내용</option>
-                <option value="author">작성자</option>
-                <option value="author_content">작성자+내용</option>
-                <option value="time">작성된 시간(0-23시)</option>
-            </select>
-            <input type="text" ng-model="searchKeyword" placeholder="검색어 (시간은 0~23 입력)" style="height: 33px; border: 1px solid #ccc; border-radius: 4px; padding: 0 8px; margin-right: 5px;" />
-            <button type="button" ng-click="searchPosts()" class="action-btn" style="background-color: #5a6268; color: white;">검색</button>
-
-            <button type="button" 
-                    ng-click="closeSearch()" 
-                    class="action-btn" 
-                    style="background-color: #dc3545; color: white; margin-left: 5px; padding: 6px 10px;">
-                X
+                style="background-color: #6c757d; color: white; margin-right: 10px"
+            >
+                🔍 검색
             </button>
+            <div
+                class="search-bar"
+                style="display: flex; align-items: center; margin-right: 10px"
+                ng-show="showSearch"
+            >
+                <select
+                    ng-model="searchType"
+                    style="height: 35px; border-radius: 4px; border: 1px solid #ccc; margin-right: 5px"
+                >
+                    <option value="title">제목</option>
+                    <option value="content">내용</option>
+                    <option value="title_content">제목+내용</option>
+                    <option value="author">작성자</option>
+                    <option value="author_content">작성자+내용</option>
+                    <option value="time">작성된 시간(0-23시)</option>
+                </select>
+                <input
+                    type="text"
+                    ng-model="searchKeyword"
+                    placeholder="검색어 (시간은 0~23 입력)"
+                    style="height: 33px; border: 1px solid #ccc; border-radius: 4px; padding: 0 8px; margin-right: 5px"
+                />
+                <button
+                    type="button"
+                    ng-click="searchPosts()"
+                    class="action-btn"
+                    style="background-color: #5a6268; color: white"
+                >
+                    검색
+                </button>
+
+                <button
+                    type="button"
+                    ng-click="closeSearch()"
+                    class="action-btn"
+                    style="background-color: #dc3545; color: white; margin-left: 5px; padding: 6px 10px"
+                >
+                    X
+                </button>
+            </div>
+            <select
+                ng-model="pageSize"
+                ng-change="pageSizeChanged()"
+                style="height: 35px; border-radius: 4px; border: 1px solid #ccc; margin-right: 10px"
+            >
+                <option value="5">5개씩 보기</option>
+                <option value="10">10개씩 보기</option>
+                <option value="15">15개씩 보기</option>
+                <option value="20">20개씩 보기</option>
+            </select>
+
+            <a
+                href="#!/board/new"
+                class="action-btn create-btn"
+                >글쓰기</a
+            >
         </div>
-        <select ng-model="pageSize" 
-                ng-change="pageSizeChanged()" 
-                style="height: 35px; border-radius: 4px; border: 1px solid #ccc; margin-right: 10px;">
-            <option value="5">5개씩 보기</option>
-            <option value="10">10개씩 보기</option>
-            <option value="15">15개씩 보기</option>
-            <option value="20">20개씩 보기</option>
-        </select>
-    
-        <a href="#!/board/new" class="action-btn create-btn">글쓰기</a>
-    </div>
     </div>
 
     <table class="user-table">
         <thead>
             <tr>
-                <th style="width: 10%;">번호</th>
-                <th style="width: 45%;">제목</th>
-                <th style="width: 15%;">작성자</th>
-                <th style="width: 20%;">작성일</th>
-                <th style="width: 10%;">조회수</th>
-                <!-- ★ 추가됨: 좋아요 컬럼 헤더 -->
+                <th style="width: 10%">번호</th>
+                <th style="width: 45%">제목</th>
+                <th style="width: 15%">작성자</th>
+                <th style="width: 20%">작성일</th>
+                <th style="width: 10%">조회수</th>
+                <!-- : 좋아요 컬럼 헤더 -->
                 <th>좋아요</th>
-                <!-- ★ 추가됨 끝 -->
+                <!--  끝 -->
             </tr>
         </thead>
         <tbody>
             <tr ng-if="!postList.length && totalItems === 0 && !searchKeyword">
                 <!-- ★ 수정됨: 컬럼 수가 6개가 되었으므로 colspan 6 -->
-                <td colspan="6" style="text-align: center; color: #777;">
+                <td
+                    colspan="6"
+                    style="text-align: center; color: #777"
+                >
                     작성된 게시글이 없습니다.
                 </td>
             </tr>
             <tr ng-if="!postList.length && totalItems === 0 && searchKeyword">
                 <!-- ★ 수정됨: 컬럼 수가 6개가 되었으므로 colspan 6 -->
-                <td colspan="6" style="text-align: center; color: #777;">
+                <td
+                    colspan="6"
+                    style="text-align: center; color: #777"
+                >
                     '{{searchKeyword}}'에 대한 검색 결과가 없습니다.
                 </td>
             </tr>
-            <tr ng-repeat="post in postList" ng-class="{'pinned-post': post.pinned_order !== null}">
+            <tr
+                ng-repeat="post in postList"
+                ng-class="{'pinned-post': post.pinned_order !== null}"
+            >
                 <td>
-                    <span ng-if="post.pinned_order !== null" style="font-weight: bold; color: #007bff;">공지</span>
+                    <span
+                        ng-if="post.pinned_order !== null"
+                        style="font-weight: bold; color: #007bff"
+                        >공지</span
+                    >
                     <span ng-if="post.pinned_order === null">{{ totalItems - (currentPage - 1) * pageSize - $index }}</span>
                 </td>
                 <td>
-                    <span ng-if="post.pinned_order !== null" style="margin-right: 5px;">🏷️</span>
+                    <span
+                        ng-if="post.pinned_order !== null"
+                        style="margin-right: 5px"
+                        >🏷️</span
+                    >
                     <a href="#!/board/{{ post.post_id }}">{{ post.title }}</a>
                 </td>
                 <td>{{ post.author_name || '탈퇴한 사용자' }} ({{ post.user_id }})</td>
                 <td>{{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</td>
                 <td>{{ post.view_count }}</td>
 
-                <!-- ★ 추가됨: 목록에서 게시글 좋아요 버튼/카운트 -->
+                <!-- : 목록에서 게시글 좋아요 버튼/카운트 -->
                 <td>
-                    <button type="button"
-                            class="action-btn-sm"
-                            ng-click="togglePostLike(post)">
+                    <button
+                        type="button"
+                        class="action-btn-sm"
+                        ng-click="togglePostLike(post)"
+                    >
                         <span ng-class="{'liked': post.likeCount > 0}">♥</span>
                         {{ post.likeCount || 0 }}
                     </button>
                 </td>
-                <!-- ★ 추가됨 끝 -->
+                <!--  끝 -->
             </tr>
         </tbody>
     </table>
 
-        <div class="pagination-container" ng-if="totalPages > 1" style="text-align: center; margin-top: 20px;">
-        <button ng-click="goToPage(currentPage - 1)" 
-                ng-disabled="currentPage === 1" 
-                style="margin-right: 5px;">
+    <div
+        class="pagination-container"
+        ng-if="totalPages > 1"
+        style="text-align: center; margin-top: 20px"
+    >
+        <button
+            ng-click="goToPage(currentPage - 1)"
+            ng-disabled="currentPage === 1"
+            style="margin-right: 5px"
+        >
             &lt; 이전
         </button>
 
-        <!-- ▼▼▼ [수정] 한 번에 10개만 보이도록 변경 ▼▼▼ -->  
-        <span ng-repeat="page in getPageRange() track by $index" style="margin: 0 2px;"> 
-            <a href=""
-               ng-click="goToPage(page)"                                       
-               ng-style="{
+        <!-- ▼▼▼ [수정] 한 번에 10개만 보이도록 변경 ▼▼▼ -->
+        <span
+            ng-repeat="page in getPageRange() track by $index"
+            style="margin: 0 2px"
+        >
+            <a
+                href=""
+                ng-click="goToPage(page)"
+                ng-style="{
                     'font-weight': (currentPage === page) ? 'bold' : 'normal', 
                     'text-decoration': (currentPage === page) ? 'none' : 'underline' 
-               }">
+               }"
+            >
                 {{ page }}
             </a>
         </span>
-        <!-- ▲▲▲ [수정 끝] ▲▲▲ -->  
+        <!-- ▲▲▲ [수정 끝] ▲▲▲ -->
 
-        <button ng-click="goToPage(currentPage + 1)" 
-                ng-disabled="currentPage === totalPages" 
-                style="margin-left: 5px;">
+        <button
+            ng-click="goToPage(currentPage + 1)"
+            ng-disabled="currentPage === totalPages"
+            style="margin-left: 5px"
+        >
             다음 &gt;
         </button>
     </div>
-
-
 </div>

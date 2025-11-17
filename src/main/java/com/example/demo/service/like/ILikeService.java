@@ -16,7 +16,7 @@ public interface ILikeService {
      * @param userId      현재 사용자 ID
      * @return true: 좋아요 ON 상태, false: 좋아요 OFF 상태
      */
-    boolean toggleLike(String targetType, int targetId, String userId); // ★ 추가됨
+    boolean toggleLike(String targetType, int targetId, String userId); // 
 
     /**
      * ★ 좋아요 개수 조회 기능 (추가됨)
@@ -26,5 +26,5 @@ public interface ILikeService {
      * @param targetId   대상 ID
      * @return 좋아요 개수(int)
      */
-    int getLikeCount(String targetType, int targetId); // ★ 추가됨
+    int getLikeCount(String targetType, int targetId); // 
 }

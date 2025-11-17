@@ -1,6 +1,6 @@
 package com.example.demo.controller;
 
-import java.util.HashMap;   // ★ 추가됨
+import java.util.HashMap;   // 
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,11 +17,11 @@ import com.example.demo.service.like.ILikeService;
  * - /likes/toggle : 좋아요 On/Off 기능
  * - /likes/count  : 좋아요 개수 조회
  */
-@RestController   // ★ 추가됨
+@RestController   // 
 public class LikeController {
 
     @Autowired
-    private ILikeService likeService;    // ★ 추가됨
+    private ILikeService likeService;    // 
 
     /**
      * ★ 좋아요 토글 API
@@ -34,17 +34,17 @@ public class LikeController {
      *   "count": 숫자
      * }
      */
-    @PostMapping("/likes/toggle")   // ★ 추가됨
+    @PostMapping("/likes/toggle")   // 
     public Map<String, Object> toggleLike(
             @RequestParam("type") String targetType,   // POST 또는 COMMENT
             @RequestParam("id") int targetId,          // post_id 또는 comment_id
             @RequestParam String userId      // 현재 로그인 사용자
     ) {
         // 좋아요 토글 실행
-        boolean liked = likeService.toggleLike(targetType, targetId, userId);  // ★ 추가됨
+        boolean liked = likeService.toggleLike(targetType, targetId, userId);  // 
 
         // 변경 후 좋아요 개수 조회
-        int count = likeService.getLikeCount(targetType, targetId);            // ★ 추가됨
+        int count = likeService.getLikeCount(targetType, targetId);            // 
 
         // 응답 JSON 생성
         Map<String, Object> result = new HashMap<>();
@@ -62,12 +62,12 @@ public class LikeController {
      * 요청:
      * /likes/count?type=POST&id=3
      */
-    @GetMapping("/likes/count")     // ★ 추가됨
+    @GetMapping("/likes/count")     // 
     public Map<String, Object> getLikeCount(
             @RequestParam("type") String targetType,
             @RequestParam("id") int targetId
     ) {
-        int count = likeService.getLikeCount(targetType, targetId);  // ★ 추가됨
+        int count = likeService.getLikeCount(targetType, targetId);  // 
 
         Map<String, Object> result = new HashMap<>();
         result.put("count", count);

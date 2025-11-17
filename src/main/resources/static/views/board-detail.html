@@ -18,8 +18,35 @@
 
             <span style="float: right;">작성일: {{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</span>
         </div>
-        <div class="post-content" ng-bind-html="trustedContent" style="min-height: 200px; margin-bottom: 40px; white-space: pre-wrap;"></div>
-        
+
+        <div class="post-content"
+             ng-bind-html="trustedContent"
+             style="min-height: 200px; margin-bottom: 20px; white-space: pre-wrap;"></div>
+
+        <!-- ★ 첨부 파일 영역 시작: detail에서 업로드한 파일 표시 -->
+        <div class="attachments"
+             ng-if="fileList && fileList.length > 0"
+             style="margin-bottom: 20px;">
+            <h3 style="font-size: 16px; margin-bottom: 8px;">첨부 파일</h3>
+            <ul>
+                <li ng-repeat="file in fileList">
+                    <!-- 파일 다운로드 링크: 실제 다운로드 URL에 맞게 수정 가능 -->
+                    <a ng-href="/api/files/{{file.file_id}}/download">
+                        {{ file.original_name }}
+                    </a>
+                    <span style="color: #6c757d; font-size: 12px;">
+                        ({{ file.file_size | number }} bytes)
+                    </span>
+                </li>
+            </ul>
+        </div>
+        <div class="attachments"
+             ng-if="fileList && fileList.length === 0"
+             style="margin-bottom: 20px; color: #6c757d; font-size: 14px;">
+            첨부된 파일이 없습니다.
+        </div>
+        <!-- ★ 첨부 파일 영역 끝 -->
+
         <div class="action-bar">
             <div ng-if="canModify">
                 <button type="button" 
@@ -58,8 +85,14 @@
         </form>
         <div class="action-bar">
             <div class="button-group">
-                <button type="button" ng-click="saveChanges()" ng-disabled="editForm.$invalid" class="submit-btn-full">수정 완료</button>
-                <button type="button" ng-click="cancelEdit()" class="secondary-btn">취소</button>
+                <button type="button"
+                        ng-click="saveChanges()"
+                        ng-disabled="editForm.$invalid"
+                        class="submit-btn-full">수정 완료</button>
+                <!-- ★ 수정됨: cancelEdit() → exitEditMode() (컨트롤러 함수명과 맞춤) -->
+                <button type="button"
+                        ng-click="exitEditMode()"
+                        class="secondary-btn">취소</button>
             </div>
         </div>
     </div>
@@ -72,7 +105,12 @@
         <div class="comment-form">
             <form name="commentForm">
                 <textarea ng-model="newComment.content" required placeholder="댓글을 입력하세요" class="form-control" rows="4"></textarea>
-                <button ng-click="submitComment(null, newComment)" ng-disabled="commentForm.$invalid" class="submit-btn" style="width: 100%; margin-top: 10px;">댓글 등록</button>
+                <button ng-click="submitComment(null, newComment)"
+                        ng-disabled="commentForm.$invalid"
+                        class="submit-btn"
+                        style="width: 100%; margin-top: 10px;">
+                    댓글 등록
+                </button>
             </form>
         </div>
 
@@ -118,23 +156,38 @@
     </div>
 
     <div class="comment-item" ng-if="comment.isEditing">
-        <textarea ng-model="comment.editContent" class="form-control" rows="3" style="width: 100%; box-sizing: border-box;"></textarea>
+        <textarea ng-model="comment.editContent"
+                  class="form-control"
+                  rows="3"
+                  style="width: 100%; box-sizing: border-box;"></textarea>
         <div class="comment-actions" style="margin-top: 5px;">
             <button ng-click="saveCommentChanges(comment)" class="action-btn-sm save">저장</button>
             <button ng-click="cancelCommentEdit(comment)" class="action-btn-sm">취소</button>
         </div>
     </div>
 
-    <div class="comment-form" ng-if="comment.showReply" style="margin-left: 30px; margin-top: 10px; margin-bottom: 10px;">
+    <div class="comment-form"
+         ng-if="comment.showReply"
+         style="margin-left: 30px; margin-top: 10px; margin-bottom: 10px;">
         <form name="replyForm_{{comment.comment_id}}">
-            <textarea ng-model="comment.replyContent" required placeholder="{{comment.author_name}}님에게 답글 남기기" class="form-control" rows="3"></textarea>
+            <textarea ng-model="comment.replyContent"
+                      required
+                      placeholder="{{comment.author_name}}님에게 답글 남기기"
+                      class="form-control"
+                      rows="3"></textarea>
             
             <button ng-click="submitComment(comment.comment_id, { content: comment.replyContent })" 
                     ng-disabled="!comment.replyContent" 
-                    class="submit-btn" style="width: auto; margin-top: 10px; padding: 6px 12px;">답글 등록</button>
+                    class="submit-btn"
+                    style="width: auto; margin-top: 10px; padding: 6px 12px;">
+                답글 등록
+            </button>
             
             <button ng-click="comment.showReply = false; comment.replyContent = '';" 
-                    class="secondary-btn" style="width: auto; margin-top: 10px; background-color: #6c757d; padding: 6px 12px;">취소</button>
+                    class="secondary-btn"
+                    style="width: auto; margin-top: 10px; background-color: #6c757d; padding: 6px 12px;">
+                취소
+            </button>
         </form>
     </div>
 
