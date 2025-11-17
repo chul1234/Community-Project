@@ -13,6 +13,7 @@
                     {{ post.likeCount || 0 }}
                 </button>
             </span>
+
             <span style="float: right;">작성일: {{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</span>
         </div>
 
@@ -26,15 +27,24 @@
             <h3 style="font-size: 16px; margin-bottom: 8px;">첨부 파일</h3>
             <ul>
                 <li ng-repeat="file in fileList">
+                    
+                    <span ng-if="file.file_path && file.file_path.length > 0" style="margin-right: 6px;">📁</span>
+                    <span ng-if="!file.file_path || file.file_path.length === 0" style="margin-right: 6px;">📄</span>
+                    
                     <a ng-href="/api/files/{{file.file_id}}/download">
+                        <span ng-if="file.file_path && file.file_path.length > 0">
+                            {{ file.file_path }} / 
+                        </span>
                         {{ file.original_name }}
                     </a>
+                    
                     <span style="color: #6c757d; font-size: 12px;">
                         ({{ file.file_size | number }} bytes)
                     </span>
                 </li>
             </ul>
         </div>
+        
         <div class="attachments"
              ng-if="fileList && fileList.length === 0"
              style="margin-bottom: 20px; color: #6c757d; font-size: 14px;">
@@ -43,10 +53,10 @@
         <div class="action-bar">
             <div ng-if="canModify">
                 <a href="#!/board/edit/{{post.post_id}}" 
-                   class="action-btn"
-                   style="background-color: #007bff; color: white;"
+                   class="action-btn" 
                    ng-if="post.user_id === currentUser.username">수정</a>
-                <button type="button" ng-click="deletePost()" class="delete-btn">삭제</button>
+                
+                <button type="button" ng-click="deletePost()">삭제</button>
 
                 <button type="button" 
                         ng-if="currentUser.role === 'ADMIN' && post.pinned_order === null"
@@ -56,14 +66,13 @@
                 
                 <button type="button" 
                         ng-if="currentUser.role === 'ADMIN' && post.pinned_order !== null"
-                        ng-click="unpinPost()" 
-                        class="delete-btn">
+                        ng-click="unpinPost()">
                     🏷️ 고정 해제
                 </button>
             </div>
             <a href="#!/board" class="action-btn">목록으로</a>
         </div>
-    </div>
+        </div>
 
     <hr> 
     

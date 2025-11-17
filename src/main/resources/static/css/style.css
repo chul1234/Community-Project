@@ -263,19 +263,13 @@ header h1 {
     opacity: 0.9;
 }
 
+/* [수정됨] 글쓰기 버튼도 회색으로 보이도록 이 규칙을 제거하거나 주석 처리합니다.
 .create-btn {
     background-color: #007bff;
     color: white;
 }
-
-/* * [신규 추가] '목록으로' 버튼 오른쪽 정렬용
- * .action-bar 내부의 .action-btn 중에서
- * .create-btn 클래스가 없는(:not) 버튼 (즉, board-detail의 '목록으로' 버튼)에
- * margin-left: auto; 를 적용하여 오른쪽 끝으로 밀어냅니다.
- *
- * (참고: board-list의 '글쓰기' 버튼은 .create-btn 클래스가 있어서
- * 이 규칙이 적용되지 않고, .action-bar의 justify-content: space-between 규칙을 따릅니다.)
 */
+
 .action-bar .action-btn:not(.create-btn) {
     margin-left: auto;
 }
@@ -332,8 +326,8 @@ header h1 {
     padding: 4px 8px;
     font-size: 12px;
     margin-right: 5px;
-    background-color: #f1f3f5;  /* [오류 수정] f1f3ff5 -> f1f3f5 */
-    color: #495057;             /* [오류 수정] 'C' 문자 제거 */
+    background-color: #f1f3f5;
+    color: #495057;
     border: 1px solid #dee2e6;
 }
 .comment-actions .action-btn-sm.delete {
@@ -350,131 +344,54 @@ header h1 {
 }
 
 /* --- 드롭다운 메뉴 스타일 --- */
-
-/* 1. 탭 링크(대메뉴)의 기본 스타일 */
-/* Angular_http.html의 <div class="tab-link dropdown"...>에 적용됩니다. */
 .tab-link.dropdown {
-    /* * position: relative;
-     * 'relative'는 '상대적인'이라는 뜻입니다.
-     * 이 요소 자체는 원래 위치에 그대로 있지만,
-     * 나중에 나올 'position: absolute' (절대 위치)를 가진
-     * 자식 요소(.dropdown-content)의 기준점이 됩니다.
-     * 즉, 소메뉴는 이 대메뉴(.tab-link.dropdown)를 기준으로 위치를 잡습니다.
-    */
     position: relative;
-    
-    /* * display: inline-block;
-     * 'inline' (a태그처럼 글자 취급)과 'block' (div처럼 영역 취급)의 중간입니다.
-     * 'inline'처럼 "게시판", "관리" 메뉴를 한 줄에 나란히 배치하면서,
-     * 'block'처럼 너비와 높이를 가질 수 있게 합니다.
-    */
     display: inline-block;
-    
-    /* * cursor: default;
-     * 대메뉴 자체는 클릭할 링크가 아니기 때문에(소메뉴를 보여주는 컨테이너 역할),
-     * 마우스 커서를 링크 모양(손가락)이 아닌 기본 화살표 모양으로 설정합니다.
-    */
     cursor: default;
 }
 
-/* 2. 소메뉴를 감싸는 영역 (평소에는 숨김) */
-/* Angular_http.html의 <div class="dropdown-content"...>에 적용됩니다. */
 .dropdown-content {
-    /* * display: none;
-     * 'none'은 '보이지 않음'입니다. 평소에는 이 소메뉴 영역을
-     * 화면에서 완전히 숨기고, 공간도 차지하지 않게 만듭니다.
-    */
     display: none;
-    
-    /*
-     * position: absolute;
-     * 'absolute'는 '절대적인'이라는 뜻입니다.
-     * 일반적인 흐름(위에서 아래로)을 무시하고,
-     * 가장 가까운 'position: relative' 부모(즉, .tab-link.dropdown)를 기준으로
-     * 겹쳐서(떠다니도록) 배치됩니다.
-    */
     position: absolute;
-    
-    /* * top: 100%;
-     * 기준점인 부모(.tab-link.dropdown)의 
-     * 맨 위(top: 0%)부터 100% 만큼(즉, 부모의 높이만큼) 아래로 내려온 위치에
-     * 소메뉴를 배치합니다. (결과: 대메뉴 바로 아래에 붙음)
-    */
     top: 100%;
-    
-    /*
-     * left: 0;
-     * 기준점인 부모의 왼쪽(left: 0)에 정확히 맞춰서 배치합니다.
-    */
     left: 0;
-    
-    /* z-index: 100;
-     * 'z-index'는 쌓임 순서(높이)입니다. 숫자가 클수록 위로 올라옵니다.
-     * 혹시라도 이 메뉴가 다른 내용(예: 게시글 본문)에 가려지지 않도록
-     * z-index를 100 같은 높은 값으로 설정하여 항상 맨 위에 보이게 합니다.
-    */
     z-index: 100;
-    
-    /* 배경색, 최소 너비, 그림자 등 꾸미기 스타일 */
     background-color: #f9f9f9;
-    min-width: 160px; /* 소메뉴가 너무 좁아지지 않게 최소 너비 설정 */
-    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); /* 입체감을 위한 그림자 */
+    min-width: 160px; 
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); 
 }
 
-/* 3. 소메뉴 내부의 실제 링크(a 태그) 스타일 */
-/* Angular_http.html의 <a ng-repeat="subMenu in ...">에 적용됩니다. */
 .dropdown-content a {
     color: black;
     padding: 12px 16px;
     text-decoration: none;
-    
-    /*
-     * display: block;
-     * 'block'은 '영역'입니다. <a> 태그(원래는 'inline')를 'block'으로 만들면,
-     * '일반 게시판'이라는 글자뿐만 아니라, 그 링크를 감싸는
-     * 사각형 영역 전체가 클릭 가능한 링크가 됩니다. (사용자 편의성 증가)
-    */
     display: block;
-    
-    text-align: left; /* 글자를 왼쪽 정렬 */
-    white-space: nowrap; /* '대구 버스 노선 정보'처럼 긴 메뉴가 두 줄로 줄바꿈되는 것을 방지 */
+    text-align: left; 
+    white-space: nowrap; 
 }
 
-/* 4. 소메뉴 링크에 마우스 올렸을 때 배경색 변경 */
-/* 사용자가 어떤 메뉴를 선택하려는지 시각적으로 보여줍니다. */
 .dropdown-content a:hover {
     background-color: #f1f1f1;
 }
 
-/* 5. [핵심] 대메뉴(.dropdown)에 마우스를 올리면(.hover) 숨겨뒀던 소메뉴(.dropdown-content)를 보여줌 */
-/*
- * .dropdown:hover .dropdown-content
- * CSS의 자손 선택자입니다.
- * "만약 사용자가 .dropdown 클래스에 마우스를 올리면(:hover),
- * 그 안에 숨어있는 자식 요소 .dropdown-content를 찾아서
- * display: block; (보이도록) 속성을 적용해라."
- *
- * 이것이 마우스 호버(Hover) 기능의 핵심 원리입니다.
-*/
 .dropdown:hover .dropdown-content {
     display: block;
 }
 
 .pinned-post {
-        background-color: #f8f9fa; /* 약간 다른 배경색 */
-        font-weight: 500; /* 조금 굵게 (선택 사항) */
+        background-color: #f8f9fa; 
+        font-weight: 500; 
     }
     .pinned-post td {
-         border-top: 1px solid #dee2e6; /* 위쪽 경계선 추가 (선택 사항) */
-         border-bottom: 1px solid #dee2e6; /* 아래쪽 경계선 강화 (선택 사항) */
+         border-top: 1px solid #dee2e6; 
+         border-bottom: 1px solid #dee2e6; 
     }
-/* 좋아요 누른 상태일 때 하트 색상 */
 .liked {
     color: red;
 }
 /* --- (board-list.html) 첨부파일/이미지 아이콘 스타일 --- */
 .file-cell {
-    text-align: center; /* 아이콘/이미지 가운데 정렬 */
+    text-align: center; 
     vertical-align: middle;
 }
 
@@ -485,7 +402,7 @@ header h1 {
 }
 
 .file-thumb-image {
-    width: 40px;           /* ★ 조건: 목록에 작게 보이도록 */
+    width: 40px;           
     height: 40px;
     object-fit: cover;
     border-radius: 4px;
@@ -521,7 +438,6 @@ header h1 {
     font-size: 14px;
 }
 
-/* 업로드 파일 목록 */
 .file-upload-list {
     margin-top: 8px;
     padding-left: 18px;
@@ -533,7 +449,6 @@ header h1 {
     margin-bottom: 2px;
 }
 
-/* 새 글 작성 버튼 그룹 - 기존 button-group 재사용 (board-edit와 동일 느낌) */
 .button-group .secondary-btn {
     padding: 12px;
     font-size: 16px;
@@ -555,3 +470,57 @@ header h1 {
 .file-icon {
     font-size: 20px;
 }
+
+/* ▼▼▼ [수정됨] action-bar 버튼 스타일 (회색 통일 + 높이 고정) ▼▼▼ */
+
+/* 1. action-bar 내부의 기본 버튼/링크 (회색) */
+.action-bar .action-btn,
+.action-bar button {
+    display: inline-block;
+    padding: 8px 15px;
+    border-radius: 4px;
+    font-weight: 500;
+    text-align: center;
+    transition: background-color 0.2s;
+    text-decoration: none; /* a 태그 밑줄 제거 */
+    
+    /* [수정] 모든 버튼을 회색으로 통일 */
+    background-color: #f1f3f5;
+    color: #495057;
+    border: 1px solid #dee2e6;
+    
+    cursor: pointer;
+    margin-right: 5px; /* 버튼 사이 간격 */
+
+    /* ▼▼▼ [신규 추가] 높이 및 정렬 고정 ▼▼▼ */
+    font-size: 14px;       /* 폰트 크기 고정 */
+    line-height: 1.2;      /* 줄 높이 고정 (이모지 영향 최소화) */
+    vertical-align: middle;/* 수직 정렬 통일 */
+    /* ▲▲▲ [신규 추가] ▲▲▲ */
+}
+
+/* [수정] 호버 스타일도 회색 계열로 통일 */
+.action-bar .action-btn:hover,
+.action-bar button:hover {
+    background-color: #e9ecef;
+    color: #495057;
+    opacity: 1.0; /* hover 기본 투명도 제거 */
+}
+
+/* 2. [수정됨] 파란색 버튼 정의 제거 */
+/*
+.action-bar .create-btn { ... }
+.action-bar .create-btn:hover { ... }
+*/
+
+/* 3. [수정됨] 빨간색 버튼 정의 제거 */
+/*
+.action-bar .delete-btn { ... }
+.action-bar .delete-btn:hover { ... }
+*/
+
+/* [유지] 목록으로 버튼 오른쪽 정렬 */
+.action-bar .action-btn:not(.create-btn) {
+    margin-left: auto;
+}
+/* ▲▲▲ [수정됨] ▲▲▲ */
