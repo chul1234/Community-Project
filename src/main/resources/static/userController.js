@@ -26,6 +26,9 @@ app.controller('UserListController', function ($scope, $http, $location, $rootSc
     $scope.totalItems = 0; // 총 사용자 수 (int). 백엔드 응답으로 업데이트됨
     // ▲▲▲ [페이지네이션 유지] ▲▲▲
 
+    //페이지 네이션 블록 크기 
+    $scope.maxPageLinks = 10;
+
     // ▼▼▼ [수정] 검색 변수를 '객체(Object)'로 선언 (ng-if 스코프 문제 해결) ▼▼▼
     // $scope.searchType = 'user_id';  (이전)
     // $scope.searchKeyword = ''; (이전)
@@ -139,9 +142,29 @@ app.controller('UserListController', function ($scope, $http, $location, $rootSc
      * @param {number} num 생성할 배열의 길이 (totalPages 값 전달됨)
      * @returns {Array} 길이가 num인 빈 배열
      */
-    $scope.getNumber = function (num) {
-        return new Array(num); // 배열 반환
+        // (기존) getNumber는 그대로 두거나, 더 이상 안 쓰면 나중에 삭제해도 됨
+    $scope.getNumber = function(num) {
+        return new Array(num);
     };
+
+    // ▼▼▼ [신규] 현재 페이지 기준으로 화면에 보여줄 페이지 번호 목록 계산 ▼▼▼  // 수정됨
+    $scope.getPageRange = function () {  // 수정됨
+        if (!$scope.totalPages || $scope.totalPages < 1) return [];  // 수정됨
+
+        var current   = $scope.currentPage || 1;     // 현재 페이지  // 수정됨
+        var blockSize = $scope.maxPageLinks || 10;   // 블록 크기   // 수정됨
+
+        // 1~10, 11~20, 21~30 ... 시작/끝 계산  // 수정됨
+        var start = Math.floor((current - 1) / blockSize) * blockSize + 1;  // 수정됨
+        var end   = Math.min(start + blockSize - 1, $scope.totalPages);    // 수정됨
+
+        var pages = [];                             // 실제 페이지 번호 배열  // 수정됨
+        for (var i = start; i <= end; i++) {        // 수정됨
+            pages.push(i);                          // 수정됨
+        }
+        return pages;                               // 수정됨
+    }; // getPageRange 끝  // 수정됨
+
     // ▲▲▲ [페이지네이션 유지] 함수 3개 완료 ▲▲▲
 
     // [유지] deleteUser 함수: 특정 사용자 삭제 기능. HTML 삭제 버튼(ng-click)에서 호출됨.
@@ -254,6 +277,9 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
     $scope.totalPages = 0; // 총 페이지 수 (int). 백엔드 응답으로 업데이트됨
     $scope.totalItems = 0; // 총 사용자 수 (int). 백엔드 응답으로 업데이트됨
     // ▲▲▲ [페이지네이션 유지] ▲▲▲
+
+    //페이지 네이션 블록 크기 
+    $scope.maxPageLinks = 10;
 
     // ▼▼▼ [신규 추가] RoleManagementController용 검색 객체 선언 (ng-if 스코프 문제 해결) ▼▼▼
     $scope.search = {
@@ -372,9 +398,29 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
     /**
      * [유지] HTML ng-repeat에서 페이지 번호 생성을 위한 헬퍼 함수
      */
-    $scope.getNumber = function (num) {
-        return new Array(num); // 배열 반환
+        // (기존) getNumber는 그대로 두거나, 더 이상 안 쓰면 나중에 삭제해도 됨
+    $scope.getNumber = function(num) {
+        return new Array(num);
     };
+
+    // ▼▼▼ [신규] 현재 페이지 기준으로 화면에 보여줄 페이지 번호 목록 계산 ▼▼▼  // 수정됨
+    $scope.getPageRange = function () {  // 수정됨
+        if (!$scope.totalPages || $scope.totalPages < 1) return [];  // 수정됨
+
+        var current   = $scope.currentPage || 1;     // 현재 페이지  // 수정됨
+        var blockSize = $scope.maxPageLinks || 10;   // 블록 크기   // 수정됨
+
+        // 1~10, 11~20, 21~30 ... 시작/끝 계산  // 수정됨
+        var start = Math.floor((current - 1) / blockSize) * blockSize + 1;  // 수정됨
+        var end   = Math.min(start + blockSize - 1, $scope.totalPages);    // 수정됨
+
+        var pages = [];                             // 실제 페이지 번호 배열  // 수정됨
+        for (var i = start; i <= end; i++) {        // 수정됨
+            pages.push(i);                          // 수정됨
+        }
+        return pages;                               // 수정됨
+    }; // getPageRange 끝  // 수정됨
+
     // ▲▲▲ [페이지네이션 유지] 함수 3개 완료 ▲▲▲
 
     // [유지] isRoleAssigned 함수: 특정 사용자에게 특정 역할이 할당되었는지(체크 상태인지) 확인.

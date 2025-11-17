@@ -87,18 +87,33 @@
         </table>
 
         <div class="pagination-container" ng-if="totalPages > 1" style="text-align: center; margin-top: 20px;">
-            <button ng-click="goToPage(currentPage - 1)" ng-disabled="currentPage === 1" style="margin-right: 5px;">
-                &lt; 이전 </button>
-    
-            <span ng-repeat="i in getNumber(totalPages) track by $index" style="margin: 0 2px;">
-                <a href="" ng-click="goToPage($index + 1)" ng-style="{ 'font-weight': (currentPage === $index + 1) ? 'bold' : 'normal', 'text-decoration': (currentPage === $index + 1) ? 'none' : 'underline' }">
-                    {{ $index + 1 }} </a>
-            </span>
-    
-            <button ng-click="goToPage(currentPage + 1)" ng-disabled="currentPage === totalPages" style="margin-left: 5px;">
-                다음 &gt; </button>
-        </div>
-        </div>
+    <button ng-click="goToPage(currentPage - 1)"
+            ng-disabled="currentPage === 1"
+            style="margin-right: 5px;">
+        &lt; 이전
+    </button>
+
+    <!-- ▼▼▼ 수정: 한 번에 10개만 보이도록 변경 ▼▼▼ -->  
+    <span ng-repeat="page in getPageRange() track by $index" style="margin: 0 2px;"> 
+        <a href=""
+           ng-click="goToPage(page)"                                                    
+           ng-style="{
+                'font-weight': (currentPage === page) ? 'bold' : 'normal',             
+                'text-decoration': (currentPage === page) ? 'none' : 'underline'      
+           }">
+            {{ page }}                                                                 
+        </a>
+    </span>
+    <!-- ▲▲▲ 수정 끝 ▲▲▲ -->  
+
+    <button ng-click="goToPage(currentPage + 1)"
+            ng-disabled="currentPage === totalPages"
+            style="margin-left: 5px;">
+        다음 &gt;
+    </button>
+</div>
+
+    </div>
 
     <div ng-if="!isAdmin">
         <p style="text-align: center; font-size: 1.2em; color: #777; margin-top: 50px;">
