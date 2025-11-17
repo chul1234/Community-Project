@@ -33,4 +33,7 @@ public interface IFileService {
      */
     List<Map<String, Object>> getFilesByPostId(int postId); // ★ 추가됨: 게시글별 첨부파일 목록 조회
 
+    // com.example.demo.service.file.IFileService
+    Map<String, Object> getFileById(int fileId);
+
 }

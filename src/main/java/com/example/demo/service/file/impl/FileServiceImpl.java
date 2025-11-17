@@ -158,4 +158,11 @@ public class FileServiceImpl implements IFileService {
         return postFileDAO.findByPostId(postId); // ★ 추가됨
     } // ★ 추가됨
 
+        @Override
+    public Map<String, Object> getFileById(int fileId) {        // ★ 수정됨
+        // PostFileDAO 의 findById(Optional) 를 사용해서 한 건 조회
+        return postFileDAO.findById(fileId).orElse(null);       // ★ 수정됨
+    }                                                           // ★ 수정됨
+
+
 }
