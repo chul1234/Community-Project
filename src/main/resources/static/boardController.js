@@ -110,7 +110,7 @@ app.controller('BoardController', function ($scope, $http, $rootScope) { // Boar
      * @param {number} num 생성할 배열의 길이 (totalPages 값 전달됨)
      * @returns {Array} 길이가 num인 빈 배열 ([undefined, undefined, ...])
      */
-        $scope.getNumber = function(num) { // getNumber 함수 정의 시작
+    $scope.getNumber = function(num) { // getNumber 함수 정의 시작
         // new Array(num): JavaScript 내장 함수. 길이가 num인 배열 생성.
         return new Array(num); // 배열 반환
     } // getNumber 함수 끝
