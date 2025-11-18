@@ -1,5 +1,5 @@
 spring:
-    # MVC 설정을 통해 모든 정적 리소스 경로를 루트('/')에서 찾도록 합니다.
+    # MVC 설정: 정적 리소스 경로
     mvc:
         static-path-pattern: /**
 
@@ -13,5 +13,11 @@ spring:
     # JPA 설정
     jpa:
         hibernate:
-            ddl-auto: update # 앱 시작 시 테이블을 새로 만들어서 DB 충돌을 방지합니다.
+            ddl-auto: update
         show-sql: true
+
+    # ★ 여기부터 추가: 파일 업로드 용량 설정
+    servlet:
+        multipart:
+            max-file-size: 50MB       # 파일 하나당 최대 크기
+            max-request-size: 100MB   # 요청 전체(여러 파일 합) 최대 크기

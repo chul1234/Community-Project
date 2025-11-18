@@ -6,7 +6,8 @@
                 type="button"
                 class="action-btn"
                 ng-show="!showSearch"
-                ng-click="openSearch()"
+                ng-click="openSearch()
+                "
                 style="background-color: #6c757d; color: white; margin-right: 10px"
             >
                 🔍 검색
@@ -74,9 +75,9 @@
         <thead>
             <tr>
                 <th style="width: 8%">번호</th>
+                <!-- ★ 수정됨: 첨부 컬럼을 제목 앞이 아니라 ‘번호 바로 옆’으로 이동 -->
+                <th style="width: 10%">첨부</th> <!-- ★ 수정됨 -->
                 <th style="width: 40%">제목</th>
-                <!-- ★ 추가됨: 첨부파일/이미지 아이콘 컬럼 -->
-                <th style="width: 10%">첨부</th>
                 <th style="width: 15%">작성자</th>
                 <th style="width: 17%">작성일</th>
                 <th style="width: 10%">조회수</th>
@@ -108,25 +109,20 @@
                 ng-repeat="post in postList"
                 ng-class="{'pinned-post': post.pinned_order !== null}"
             >
+                <!-- 번호 -->
                 <td>
                     <span
                         ng-if="post.pinned_order !== null"
                         style="font-weight: bold; color: #007bff"
                         >공지</span
                     >
-                    <span ng-if="post.pinned_order === null">{{ totalItems - (currentPage - 1) * pageSize - $index }}</span>
-                </td>
-                <td>
-                    <span
-                        ng-if="post.pinned_order !== null"
-                        style="margin-right: 5px"
-                        >🏷️</span
-                    >
-                    <a href="#!/board/{{ post.post_id }}">{{ post.title }}</a>
+                    <span ng-if="post.pinned_order === null">
+                        {{ totalItems - (currentPage - 1) * pageSize - $index }}
+                    </span>
                 </td>
 
-                <!-- ★ 첨부파일 / 이미지 / 폴더 표시 셀 -->
-                <td class="file-cell">
+                <!-- ★ 수정됨: 첨부파일 / 이미지 / 폴더 표시 셀을 번호 바로 뒤로 이동 -->
+                <td class="file-cell"> <!-- ★ 수정됨 -->
                     <!-- 이미지가 있을 때: 썸네일 표시 -->
                     <div ng-if="post.fileType === 'IMAGE'">
                         <img
@@ -141,16 +137,25 @@
                         <span class="file-icon">📄</span>
                     </div>
 
-                    <!-- ★ 폴더로 업로드된 경우: 폴더 아이콘 + 폴더 이름 + 파일 개수 표시 -->
+                    <!-- ★ 폴더로 업로드된 경우: 폴더 아이콘 표시 -->
                     <div ng-if="post.fileType === 'FOLDER'">
                         <span class="file-icon">📁</span>
-                        </span>
                     </div>
 
                     <!-- 파일도 없을 때: 빈칸 -->
                     <div ng-if="post.fileType === 'NONE' || !post.fileType">
                         -
                     </div>
+                </td>
+
+                <!-- 제목 -->
+                <td> <!-- ★ 수정됨: 제목 셀을 첨부 뒤로 이동 -->
+                    <span
+                        ng-if="post.pinned_order !== null"
+                        style="margin-right: 5px"
+                        >🏷️</span
+                    >
+                    <a href="#!/board/{{ post.post_id }}">{{ post.title }}</a>
                 </td>
 
                 <td>{{ post.author_name || '탈퇴한 사용자' }} ({{ post.user_id }})</td>
