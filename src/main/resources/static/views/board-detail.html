@@ -1,113 +1,172 @@
 <div class="container">
     <div>
         <h1>{{ post.title }}</h1>
-        <div style="color: #6c757d; margin-bottom: 20px; border-bottom: 1px solid #dee2e6; padding-bottom: 15px;">
+        <div style="color: #6c757d; margin-bottom: 20px; border-bottom: 1px solid #dee2e6; padding-bottom: 15px">
             <span>작성자: {{ post.author_name || '탈퇴한 사용자' }} ({{ post.user_id }})</span>
-            <span style="margin-left: 15px;">조회: {{ post.view_count }}</span>
-            
-            <span style="margin-left: 15px;">
-                <button type="button"
-                        class="action-btn-sm"
-                        ng-click="togglePostLikeDetail(post)">
+            <span style="margin-left: 15px">조회: {{ post.view_count }}</span>
+
+            <span style="margin-left: 15px">
+                <button
+                    type="button"
+                    class="action-btn-sm"
+                    ng-click="togglePostLikeDetail(post)"
+                >
                     <span ng-class="{'liked': post.likeCount > 0}">♥</span>
                     {{ post.likeCount || 0 }}
                 </button>
             </span>
 
-            <span style="float: right;">작성일: {{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</span>
+            <span style="float: right">작성일: {{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</span>
         </div>
 
-        <div class="post-content"
-             ng-bind-html="trustedContent"
-             style="min-height: 200px; margin-bottom: 20px; white-space: pre-wrap;"></div>
+        <div
+            class="post-content"
+            ng-bind-html="trustedContent"
+            style="min-height: 200px; margin-bottom: 20px; white-space: pre-wrap"
+        ></div>
 
-        <div class="attachments"
-             ng-if="fileList && fileList.length > 0"
-             style="margin-bottom: 20px;">
-            <h3 style="font-size: 16px; margin-bottom: 8px;">첨부 파일</h3>
+        <div
+            class="attachments"
+            ng-if="fileList && fileList.length > 0"
+            style="margin-bottom: 20px"
+        >
+            <h3 style="font-size: 16px; margin-bottom: 8px">첨부 파일</h3>
             <ul>
                 <li ng-repeat="file in fileList">
-                    
-                    <span ng-if="file.file_path && file.file_path.length > 0" style="margin-right: 6px;">📁</span>
-                    <span ng-if="!file.file_path || file.file_path.length === 0" style="margin-right: 6px;">📄</span>
-                    
+                    <!-- 1) 폴더 업로드된 파일인 경우: 폴더 아이콘 -->
+                    <span
+                        ng-if="file.file_path && file.file_path.length > 0"
+                        style="margin-right: 6px"
+                        >📁</span
+                    >
+
+                    <!-- 2) 폴더가 아니고, 이미지인 경우: 이미지 아이콘 -->
+                    <span
+                        ng-if="(!file.file_path || file.file_path.length === 0)
+                       && file.content_type && file.content_type.indexOf('image') === 0"
+                        style="margin-right: 6px"
+                        >🖼️</span
+                    >
+
+                    <!-- 3) 폴더도 아니고, 이미지도 아닌 경우: 일반 파일 아이콘 -->
+                    <span
+                        ng-if="(!file.file_path || file.file_path.length === 0)
+                       && (!file.content_type || file.content_type.indexOf('image') !== 0)"
+                        style="margin-right: 6px"
+                        >📄</span
+                    >
+
+                    <!-- 다운로드뷰로 이동 -->
                     <a ng-href="#!/files/{{file.file_id}}">
-                    <span ng-if="file.file_path && file.file_path.length > 0">
-                        {{ file.file_path }} / 
-                    </span>
+                        <span ng-if="file.file_path && file.file_path.length > 0"> {{ file.file_path }} / </span>
                         {{ file.original_name }}
                     </a>
-                    
-                    <span style="color: #6c757d; font-size: 12px;">
-                        ({{ file.file_size | number }} bytes)
-                    </span>
+
+                    <span style="color: #6c757d; font-size: 12px"> ({{ file.file_size | number }} bytes) </span>
                 </li>
             </ul>
         </div>
-        
-        <div class="attachments"
-             ng-if="fileList && fileList.length === 0"
-             style="margin-bottom: 20px; color: #6c757d; font-size: 14px;">
+
+        <div
+            class="attachments"
+            ng-if="fileList && fileList.length === 0"
+            style="margin-bottom: 20px; color: #6c757d; font-size: 14px"
+        >
             첨부된 파일이 없습니다.
         </div>
         <div class="action-bar">
             <div ng-if="canModify">
-                <a href="#!/board/edit/{{post.post_id}}" 
-                   class="action-btn" 
-                   ng-if="post.user_id === currentUser.username">수정</a>
-                
-                <button type="button" ng-click="deletePost()">삭제</button>
+                <a
+                    href="#!/board/edit/{{post.post_id}}"
+                    class="action-btn"
+                    ng-if="post.user_id === currentUser.username"
+                    >수정</a
+                >
 
-                <button type="button" 
-                        ng-if="currentUser.role === 'ADMIN' && post.pinned_order === null"
-                        ng-click="pinPost()">
+                <button
+                    type="button"
+                    ng-click="deletePost()"
+                >
+                    삭제
+                </button>
+
+                <button
+                    type="button"
+                    ng-if="currentUser.role === 'ADMIN' && post.pinned_order === null"
+                    ng-click="pinPost()"
+                >
                     🏷️ 고정하기
                 </button>
-                
-                <button type="button" 
-                        ng-if="currentUser.role === 'ADMIN' && post.pinned_order !== null"
-                        ng-click="unpinPost()">
+
+                <button
+                    type="button"
+                    ng-if="currentUser.role === 'ADMIN' && post.pinned_order !== null"
+                    ng-click="unpinPost()"
+                >
                     🏷️ 고정 해제
                 </button>
             </div>
-            <a href="#!/board" class="action-btn">목록으로</a>
+            <a
+                href="#!/board"
+                class="action-btn"
+                >목록으로</a
+            >
         </div>
-        </div>
+    </div>
 
-    <hr> 
-    
+    <hr />
+
     <div class="comments-section">
         <h2>댓글</h2>
 
         <div class="comment-form">
             <form name="commentForm">
-                <textarea ng-model="newComment.content" required placeholder="댓글을 입력하세요" class="form-control" rows="4"></textarea>
-                <button ng-click="submitComment(null, newComment)"
-                        ng-disabled="commentForm.$invalid"
-                        class="submit-btn"
-                        style="width: 100%; margin-top: 10px;">
+                <textarea
+                    ng-model="newComment.content"
+                    required
+                    placeholder="댓글을 입력하세요"
+                    class="form-control"
+                    rows="4"
+                ></textarea>
+                <button
+                    ng-click="submitComment(null, newComment)"
+                    ng-disabled="commentForm.$invalid"
+                    class="submit-btn"
+                    style="width: 100%; margin-top: 10px"
+                >
                     댓글 등록
                 </button>
             </form>
         </div>
 
-        <div class="comment-list" style="margin-top: 30px;">
-            <div ng-if="!comments.length" class="no-comments">
+        <div
+            class="comment-list"
+            style="margin-top: 30px"
+        >
+            <div
+                ng-if="!comments.length"
+                class="no-comments"
+            >
                 아직 댓글이 없습니다. 첫 댓글을 작성해보세요!
             </div>
-            
-            <div ng-repeat="comment in comments" ng-include="'comment-tree.html'"></div>
-        </div>
 
+            <div
+                ng-repeat="comment in comments"
+                ng-include="'comment-tree.html'"
+            ></div>
+        </div>
     </div>
 </div>
 
-<script type="text/ng-template" id="comment-tree.html">
+<script
+    type="text/ng-template"
+    id="comment-tree.html"
+>
     <div class="comment-item" ng-if="!comment.isEditing">
         <div class="comment-header">
             <strong>{{ comment.author_name ||'탈퇴한 사용자' }}</strong> ({{ comment.user_id }})
             <span class="comment-date">{{ comment.created_at | date:'yyyy-MM-dd HH:mm' }}</span>
-            
+
             <span class="comment-like" style="margin-left: 10px;">
                 <button type="button"
                         class="action-btn-sm"
@@ -118,12 +177,12 @@
             </span>
             </div>
         <p class="comment-content">{{ comment.content }}</p>
-        
+
         <div class="comment-actions">
             <button ng-click="comment.showReply = !comment.showReply" class="action-btn-sm">답글</button>
-            
+
             <span ng-if="canModifyComment(comment)">
-                <button ng-click="switchToCommentEditMode(comment)" class="action-btn-sm" 
+                <button ng-click="switchToCommentEditMode(comment)" class="action-btn-sm"
                         ng-if="comment.user_id === currentUser.username">수정</button>
                 <button ng-click="deleteComment(comment.comment_id)" class="action-btn-sm delete">삭제</button>
             </span>
@@ -150,15 +209,15 @@
                       placeholder="{{comment.author_name}}님에게 답글 남기기"
                       class="form-control"
                       rows="3"></textarea>
-            
-            <button ng-click="submitComment(comment.comment_id, { content: comment.replyContent })" 
-                    ng-disabled="!comment.replyContent" 
+
+            <button ng-click="submitComment(comment.comment_id, { content: comment.replyContent })"
+                    ng-disabled="!comment.replyContent"
                     class="submit-btn"
                     style="width: auto; margin-top: 10px; padding: 6px 12px;">
                 답글 등록
             </button>
-            
-            <button ng-click="comment.showReply = false; comment.replyContent = '';" 
+
+            <button ng-click="comment.showReply = false; comment.replyContent = '';"
                     class="secondary-btn"
                     style="width: auto; margin-top: 10px; background-color: #6c757d; padding: 6px 12px;">
                 취소
@@ -166,9 +225,9 @@
         </form>
     </div>
 
-    <div class="replies" style="margin-left: 30px; border-left: 2px solid #eee; padding-left: 10px;" 
+    <div class="replies" style="margin-left: 30px; border-left: 2px solid #eee; padding-left: 10px;"
          ng-if="comment.replies && comment.replies.length > 0">
-        
+
         <div ng-repeat="comment in comment.replies" ng-include="'comment-tree.html'"></div>
     </div>
 </script>
