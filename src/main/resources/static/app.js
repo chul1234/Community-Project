@@ -53,6 +53,13 @@ app.config(function ($routeProvider) {
             templateUrl: 'views/bus-info.html',
             controller: 'BusController',
         })
+
+        .when('/files/:fileId', {
+            templateUrl: 'views/file-view.html',
+            controller: 'FileViewController'
+        })
+
+        
         .otherwise({
             redirectTo: '/users',
         });

@@ -31,10 +31,10 @@
                     <span ng-if="file.file_path && file.file_path.length > 0" style="margin-right: 6px;">📁</span>
                     <span ng-if="!file.file_path || file.file_path.length === 0" style="margin-right: 6px;">📄</span>
                     
-                    <a ng-href="/api/files/{{file.file_id}}/download">
-                        <span ng-if="file.file_path && file.file_path.length > 0">
-                            {{ file.file_path }} / 
-                        </span>
+                    <a ng-href="#!/files/{{file.file_id}}">
+                    <span ng-if="file.file_path && file.file_path.length > 0">
+                        {{ file.file_path }} / 
+                    </span>
                         {{ file.original_name }}
                     </a>
                     

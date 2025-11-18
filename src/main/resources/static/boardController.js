@@ -762,3 +762,36 @@ app.directive('fileModel', [
         };
     },
 ]); // fileModel 디렉티브 끝 //
+
+// 파일 다운로드뷰 컨트롤러 // ★ 추가됨
+app.controller('FileViewController', function ($scope, $routeParams, $http, $window) {
+
+    $scope.file = null; // 파일 메타데이터 // ★ 추가됨
+    $scope.isImage = false; // 이미지 여부 // ★ 추가됨
+    $scope.viewUrl = '';    // /api/files/{id}/view // ★ 추가됨
+    $scope.downloadUrl = ''; // /api/files/{id}/download // ★ 추가됨
+
+    var fileId = $routeParams.fileId; // URL에서 파일 ID 추출 // ★ 추가됨
+
+    // 파일 메타데이터 조회 // ★ 추가됨
+    $http.get('/api/files/' + fileId + '/meta')
+        .then(function (response) {
+            $scope.file = response.data;
+
+            var contentType = $scope.file.content_type || '';
+            $scope.isImage = contentType.indexOf('image') === 0;
+
+            $scope.viewUrl = '/api/files/' + fileId + '/view';
+            $scope.downloadUrl = '/api.files/' + fileId + '/download'.replace('/api.files', '/api/files'); // 혹시 오타 대비 // ★ 수정 가능
+            $scope.downloadUrl = '/api/files/' + fileId + '/download'; // ★ 깔끔하게 이 줄로 쓰면 됨
+        })
+        .catch(function (error) {
+            console.error('파일 정보를 불러오는 중 오류:', error);
+            alert('파일 정보를 불러오는 중 오류가 발생했습니다.');
+        });
+
+    // 뒤로가기 // ★ 추가됨
+    $scope.goBack = function () {
+        $window.history.back();
+    };
+});

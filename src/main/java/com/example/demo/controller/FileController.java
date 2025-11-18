@@ -48,17 +48,17 @@ public class FileController {
         String originalName = (String) fileMeta.get("original_name");  // 사용자가 올린 원래 파일명
 
         // ★ 수정됨: DB에 저장된 file_path(폴더 경로)까지 포함해서 실제 파일 경로 구성
-        String filePathFromDb = (String) fileMeta.get("file_path");    // 예: "test8/폴더1/" 또는 null  // 수정됨
-        if (filePathFromDb == null) {                                  // 수정됨
-            filePathFromDb = "";                                       // 수정됨
-        }                                                               // 수정됨
-        filePathFromDb = filePathFromDb.replace("\\", "/");            // 윈도우 경로 대비 // 수정됨
+        String filePathFromDb = (String) fileMeta.get("file_path");    // 예: "test8/폴더1/" 또는 null  
+        if (filePathFromDb == null) {                                  
+            filePathFromDb = "";                                       
+        }                                                               
+        filePathFromDb = filePathFromDb.replace("\\", "/");            // 윈도우 경로 대비 
 
         // 2) 실제 파일 경로 만들기
-        Path basePath = Paths.get(uploadDir);                           // 수정됨
-        Path filePath = basePath.resolve(filePathFromDb)                // 수정됨
-                                 .resolve(savedName)                    // 수정됨
-                                 .normalize();                          // 수정됨
+        Path basePath = Paths.get(uploadDir);                           
+        Path filePath = basePath.resolve(filePathFromDb)                
+                                 .resolve(savedName)                    
+                                 .normalize();                          
 
         if (!Files.exists(filePath)) {
             return ResponseEntity.notFound().build();
@@ -127,5 +127,20 @@ public class FileController {
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "inline; filename*=UTF-8''" + encodedName)
                 .body(resource);
+    }
+    /**
+     * 파일 메타데이터 조회 (다운로드뷰에서 사용)
+     * 예: GET /api/files/3/meta
+     */
+    @GetMapping("/api/files/{fileId}/meta")   // ★ 추가됨
+    public ResponseEntity<Map<String, Object>> getFileMeta(@PathVariable int fileId) {  // ★ 추가됨
+
+        Map<String, Object> fileMeta = fileService.getFileById(fileId);  // ★ 추가됨
+
+        if (fileMeta == null) {                                          // ★ 추가됨
+            return ResponseEntity.notFound().build();                    // ★ 추가됨
+        }
+
+        return ResponseEntity.ok(fileMeta);                              // ★ 추가됨
     }
 }
