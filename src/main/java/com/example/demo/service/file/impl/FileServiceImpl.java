@@ -55,42 +55,61 @@ public class FileServiceImpl implements IFileService {
      */
     @Override
     public Map<String, Object> saveFile(MultipartFile file) {
-        Map<String, Object> fileInfo = new HashMap<>();
+    Map<String, Object> fileInfo = new HashMap<>();
 
-        if (file == null || file.isEmpty()) {
-            return fileInfo;
-        }
-
-        try {
-            // 1) 업로드 폴더 생성
-            Path uploadPath = Paths.get(uploadDir);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
-
-            // 2) 파일명 생성 (UUID_원본명)
-            String originalName = file.getOriginalFilename();
-            if (originalName == null) originalName = "unknown";
-
-            String uuid = UUID.randomUUID().toString();
-            String savedName = uuid + "_" + originalName;
-
-            // 3) 파일 저장
-            Path savePath = uploadPath.resolve(savedName);
-            Files.copy(file.getInputStream(), savePath, StandardCopyOption.REPLACE_EXISTING);
-
-            // 4) 파일 정보 반환 (DB에 저장할 부분)
-            fileInfo.put("original_name", originalName);
-            fileInfo.put("saved_name", savedName);
-            fileInfo.put("content_type", file.getContentType());
-            fileInfo.put("file_size", file.getSize());
-
-            return fileInfo;
-
-        } catch (IOException e) {
-            throw new RuntimeException("파일 저장 중 오류가 발생했습니다: " + file.getOriginalFilename(), e);
-        }
+    if (file == null || file.isEmpty()) {
+        return fileInfo;
     }
+
+    try {
+        // ------------- 1) webkitRelativePath에서 폴더 경로/파일명 분리 -------------
+        String originalFullPath = file.getOriginalFilename();
+        if (originalFullPath == null) originalFullPath = "unknown";
+
+        originalFullPath = originalFullPath.replace("\\", "/");
+
+        String filePath = "";      // DB에 넣을 폴더 경로
+        String originalName = "";  // DB에 넣을 파일명
+
+        int idx = originalFullPath.lastIndexOf("/");
+        if (idx != -1) {
+            filePath = originalFullPath.substring(0, idx + 1);   // "test8/폴더1/폴더2/"
+            originalName = originalFullPath.substring(idx + 1);  // "파일명.txt"
+        } else {
+            filePath = "";
+            originalName = originalFullPath;
+        }
+
+        // ------------- 2) 저장 파일명 생성 (UUID_원본명) -------------
+        String uuid = UUID.randomUUID().toString();
+        String savedName = uuid + "_" + originalName;
+
+        // ------------- 3) 실제 저장 경로 만들기 -------------
+        Path basePath = Paths.get(uploadDir);
+
+        // 폴더가 있을 경우 서버 내 폴더까지 생성
+        Path folderPath = basePath.resolve(filePath);
+        Files.createDirectories(folderPath);   // ★ 폴더 존재 안 하면 자동 생성
+
+        // 실제 파일 저장 위치
+        Path savePath = folderPath.resolve(savedName);
+
+        Files.copy(file.getInputStream(), savePath, StandardCopyOption.REPLACE_EXISTING);
+
+        // ------------- 4) DB 저장용 정보 세팅 -------------
+        fileInfo.put("original_name", originalName);
+        fileInfo.put("saved_name", savedName);
+        fileInfo.put("file_path", filePath);   // ★ 새로 추가한 컬럼
+        fileInfo.put("content_type", file.getContentType());
+        fileInfo.put("file_size", file.getSize());
+
+        return fileInfo;
+
+    } catch (IOException e) {
+        throw new RuntimeException("파일 저장 중 오류 발생: " + file.getOriginalFilename(), e);
+    }
+}
+
 
     /**
      * (3) 특정 게시글에 연결된 모든 파일 삭제

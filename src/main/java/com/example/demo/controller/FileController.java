@@ -47,8 +47,19 @@ public class FileController {
         String savedName    = (String) fileMeta.get("saved_name");     // 서버에 저장된 파일명
         String originalName = (String) fileMeta.get("original_name");  // 사용자가 올린 원래 파일명
 
+        // ★ 수정됨: DB에 저장된 file_path(폴더 경로)까지 포함해서 실제 파일 경로 구성
+        String filePathFromDb = (String) fileMeta.get("file_path");    // 예: "test8/폴더1/" 또는 null  // 수정됨
+        if (filePathFromDb == null) {                                  // 수정됨
+            filePathFromDb = "";                                       // 수정됨
+        }                                                               // 수정됨
+        filePathFromDb = filePathFromDb.replace("\\", "/");            // 윈도우 경로 대비 // 수정됨
+
         // 2) 실제 파일 경로 만들기
-        Path filePath = Paths.get(uploadDir).resolve(savedName).normalize();
+        Path basePath = Paths.get(uploadDir);                           // 수정됨
+        Path filePath = basePath.resolve(filePathFromDb)                // 수정됨
+                                 .resolve(savedName)                    // 수정됨
+                                 .normalize();                          // 수정됨
+
         if (!Files.exists(filePath)) {
             return ResponseEntity.notFound().build();
         }
@@ -71,7 +82,7 @@ public class FileController {
      * (선택) 이미지/파일을 브라우저에서 바로 보이게 하고 싶을 때
      * 예: GET /api/files/3/view
      */
-    @GetMapping("/api/files/{fileId}/view")
+    @GetMapping("/api/files/{fileId}/view")  // ← 기존 경로가 /api/files/... 이었다면 그대로 두면 됨
     public ResponseEntity<Resource> viewFile(@PathVariable int fileId) throws IOException {
 
         Map<String, Object> fileMeta = fileService.getFileById(fileId);   // ★ 동일
@@ -83,7 +94,18 @@ public class FileController {
         String savedName    = (String) fileMeta.get("saved_name");
         String originalName = (String) fileMeta.get("original_name");
 
-        Path filePath = Paths.get(uploadDir).resolve(savedName).normalize();
+        // ★ 수정됨: 다운로드와 동일하게 file_path 포함
+        String filePathFromDb = (String) fileMeta.get("file_path");       // 수정됨
+        if (filePathFromDb == null) {                                     // 수정됨
+            filePathFromDb = "";                                          // 수정됨
+        }                                                                  // 수정됨
+        filePathFromDb = filePathFromDb.replace("\\", "/");               // 수정됨
+
+        Path basePath = Paths.get(uploadDir);                              // 수정됨
+        Path filePath = basePath.resolve(filePathFromDb)                   // 수정됨
+                                 .resolve(savedName)                       // 수정됨
+                                 .normalize();                             // 수정됨
+
         if (!Files.exists(filePath)) {
             return ResponseEntity.notFound().build();
         }

@@ -263,12 +263,11 @@ header h1 {
     opacity: 0.9;
 }
 
-/* [수정됨] 글쓰기 버튼도 회색으로 보이도록 이 규칙을 제거하거나 주석 처리합니다.
+/* [수정됨] .create-btn은 파란색으로 유지 */
 .create-btn {
     background-color: #007bff;
     color: white;
 }
-*/
 
 .action-bar .action-btn:not(.create-btn) {
     margin-left: auto;
@@ -471,7 +470,7 @@ header h1 {
     font-size: 20px;
 }
 
-/* ▼▼▼ [수정됨] action-bar 버튼 스타일 (회색 통일 + 높이 고정) ▼▼▼ */
+/* ▼▼▼ [수정됨] action-bar 버튼 스타일 (회색 기본, 파란색/빨간색 예외) ▼▼▼ */
 
 /* 1. action-bar 내부의 기본 버튼/링크 (회색) */
 .action-bar .action-btn,
@@ -484,7 +483,7 @@ header h1 {
     transition: background-color 0.2s;
     text-decoration: none; /* a 태그 밑줄 제거 */
     
-    /* [수정] 모든 버튼을 회색으로 통일 */
+    /* [수정] 기본 스타일을 회색으로 정의 */
     background-color: #f1f3f5;
     color: #495057;
     border: 1px solid #dee2e6;
@@ -492,11 +491,10 @@ header h1 {
     cursor: pointer;
     margin-right: 5px; /* 버튼 사이 간격 */
 
-    /* ▼▼▼ [신규 추가] 높이 및 정렬 고정 ▼▼▼ */
-    font-size: 14px;       /* 폰트 크기 고정 */
-    line-height: 1.2;      /* 줄 높이 고정 (이모지 영향 최소화) */
-    vertical-align: middle;/* 수직 정렬 통일 */
-    /* ▲▲▲ [신규 추가] ▲▲▲ */
+    /* [신규] 높이 및 정렬 고정 */
+    font-size: 14px;
+    line-height: 1.2;
+    vertical-align: middle;
 }
 
 /* [수정] 호버 스타일도 회색 계열로 통일 */
@@ -507,20 +505,28 @@ header h1 {
     opacity: 1.0; /* hover 기본 투명도 제거 */
 }
 
-/* 2. [수정됨] 파란색 버튼 정의 제거 */
-/*
-.action-bar .create-btn { ... }
-.action-bar .create-btn:hover { ... }
-*/
+/* 2. [수정됨] 파란색 버튼 (create-btn)이 회색을 덮어쓰도록 정의 */
+.action-bar .create-btn {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+.action-bar .create-btn:hover {
+    background-color: #0069d9;
+}
 
-/* 3. [수정됨] 빨간색 버튼 정의 제거 */
-/*
-.action-bar .delete-btn { ... }
-.action-bar .delete-btn:hover { ... }
-*/
+/* 3. [수정됨] 빨간색 버튼 (delete-btn)이 회색을 덮어쓰도록 정의 */
+.action-bar .delete-btn {
+    background-color: #dc3545;
+    color: white;
+    border-color: #dc3545;
+}
+.action-bar .delete-btn:hover {
+    background-color: #c82333;
+}
 
 /* [유지] 목록으로 버튼 오른쪽 정렬 */
 .action-bar .action-btn:not(.create-btn) {
     margin-left: auto;
 }
-/* ▲▲▲ [수정됨] ▲▲▲ */
+/* ▲▲▲ [수정됨] 수정 완료 ▲▲▲ */

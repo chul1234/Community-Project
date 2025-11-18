@@ -206,6 +206,44 @@ app.controller('BoardNewController', function ($scope, $http, $location) {
     // post 객체는 title(제목)과 content(내용) 속성을 가짐
 
     $scope.uploadFiles = []; // : 첨부 파일 목록 (file-model 디렉티브가 채워줌)
+    $scope.uploadFolderFiles = []; // : 업로드 폴더 내 파일 목록 (미리보기용)
+
+    $scope.getAllUploadFiles = function () {
+        var list = [];
+
+        if ($scope.uploadFiles && $scope.uploadFiles.length > 0) {
+            for (var i = 0; i < $scope.uploadFiles.length; i++) {
+                list.push($scope.uploadFiles[i]);
+            }
+        }
+
+        if ($scope.uploadFolderFiles && $scope.uploadFolderFiles.length > 0) {
+            for (var j = 0; j < $scope.uploadFolderFiles.length; j++) {
+                list.push($scope.uploadFolderFiles[j]);
+            }
+        }
+
+        return list;
+    };
+
+    // (2) 폴더에서 온 파일인지 여부 (3번: 폴더 아이콘용)
+    $scope.isFolderFile = function (file) {
+        // 폴더 선택으로 들어온 파일이면 webkitRelativePath에 "폴더/파일명" 형식이 들어 있음
+        return !!(file.webkitRelativePath && file.webkitRelativePath.indexOf('/') !== -1);
+    };
+
+    // (3) 이미지 파일인지 여부 (이미지 아이콘 표시용)
+    $scope.isImageFile = function (file) {
+        return !!(file.type && file.type.indexOf('image') === 0);
+    };
+
+    // (4) 화면에 보여줄 이름: 폴더 선택이면 경로, 아니면 파일명만
+    $scope.getDisplayName = function (file) {
+        if (file.webkitRelativePath && file.webkitRelativePath.length > 0) {
+            return file.webkitRelativePath; // 예: "사진폴더/여행/제주도1.jpg"
+        }
+        return file.name;
+    };
 
     // 게시글 등록 함수
     $scope.submitPost = function () {
@@ -222,13 +260,14 @@ app.controller('BoardNewController', function ($scope, $http, $location) {
             formData.append('content', $scope.post.content || ''); //
 
             // 파일들 추가 (백엔드에서 MultipartFile[] files 등으로 받는다고 가정)
-            if ($scope.uploadFiles && $scope.uploadFiles.length > 0) {
-                //
-                for (var i = 0; i < $scope.uploadFiles.length; i++) {
-                    //
-                    formData.append('files', $scope.uploadFiles[i]); //  (키 이름 'files'는 백엔드와 맞춰야 함)
+                        // 파일들 추가 (백엔드에서 MultipartFile[] files 등으로 받는다고 가정) // 수정됨
+            var allFiles = $scope.getAllUploadFiles(); // 파일 + 폴더 파일 모두 합침 // 수정됨
+            if (allFiles && allFiles.length > 0) { // 수정됨
+                for (var i = 0; i < allFiles.length; i++) { // 수정됨
+                    formData.append('files', allFiles[i]); //  (키 이름 'files'는 백엔드와 맞춰야 함)
                 }
             }
+
 
             //$http.post(url, data): HTTP POST 데이터 전송
             //$scope.post: 기존에는 JSON이었으나, 이제는 formData 전송

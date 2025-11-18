@@ -39,6 +39,7 @@ public class PostFileDAO {
             pstmt.setString(3, (String) fileInfo.get("saved_name"));
             pstmt.setString(4, (String) fileInfo.get("content_type"));
             pstmt.setLong(5, (Long) fileInfo.get("file_size"));
+            pstmt.setString(6, (String) fileInfo.get("file_path"));
 
             return pstmt.executeUpdate();
         } catch (SQLException e) {
@@ -68,6 +69,7 @@ public class PostFileDAO {
                     file.put("saved_name", rs.getString("saved_name"));
                     file.put("content_type", rs.getString("content_type"));
                     file.put("file_size", rs.getLong("file_size"));
+                    file.put("file_path", rs.getString("file_path"));
                     list.add(file);
                 }
             }
@@ -99,6 +101,7 @@ public class PostFileDAO {
                     file.put("saved_name", rs.getString("saved_name"));
                     file.put("content_type", rs.getString("content_type"));
                     file.put("file_size", rs.getLong("file_size"));
+                    file.put("file_path", rs.getString("file_path"));
                     return Optional.of(file);
                 }
             }
@@ -145,6 +148,6 @@ public class PostFileDAO {
             return 0;
         }
     }
-
+    
     
 }
