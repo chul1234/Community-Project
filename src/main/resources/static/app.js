@@ -59,6 +59,10 @@ app.config(function ($routeProvider) {
             controller: 'FileViewController'
         })
 
+        .when('/big-posts', { // URL 경로
+            templateUrl: 'views/big-post-list.html', // 뷰 파일
+            controller: 'BigPostController' // 컨트롤러
+        })
         
         .otherwise({
             redirectTo: '/users',
