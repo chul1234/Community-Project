@@ -1,6 +1,6 @@
 package com.example.demo.service.file.impl;
 
-import java.io.IOException; // ★ 수정됨: 파일 메타데이터 DAO
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -21,31 +21,39 @@ import com.example.demo.service.file.IFileService;
 @Service
 public class FileServiceImpl implements IFileService {
 
-    // 업로드 폴더 경로 (프로젝트 루트 기준)
-    private final String uploadDir = "C:/upload";  // ★ 유지: properties 없이 직접 지정
+    // 업로드 폴더 경로 (C: 또는 D: 등 원하는 경로로 설정)
+    private final String uploadDir = "C:/upload";
 
     @Autowired
-    private PostFileDAO postFileDAO; // ★ 수정됨: DB 연동용 DAO 주입
+    private PostFileDAO postFileDAO; // DB 연동용 DAO 주입
 
     /**
      * (1) 특정 게시글에 대한 여러 개 파일 저장
      * - 디스크에 저장 + post_files INSERT
      */
     @Override
+    // [수정됨] 이 코드는 폴더 업로드를 지원하지 않는 *이전* 버전입니다.
+    // 폴더 업로드를 위해서는 List<String> filePaths 파라미터가 필요합니다.
+    // 일단 사용자가 제공한 시그니처(saveFilesForPost(int, List<MultipartFile>))를 기반으로 수정합니다.
     public List<Map<String, Object>> saveFilesForPost(int postId, List<MultipartFile> files) {
         List<Map<String, Object>> savedFiles = new ArrayList<>();
 
-        if (files == null || files.isEmpty()) {
+        if (files == null) {
             return savedFiles;
-        } //파일 아예 없으면 빈 리스트 반환
+        }
 
-        for (MultipartFile file : files) { // 각 파일마다 saveFile 호출 -> 실제 파일 저장 + 정보 Map 생성
-            if (file != null && !file.isEmpty()) { 
+        for (MultipartFile file : files) {
+            if (file != null) { 
                 Map<String, Object> info = saveFile(file);   // 디스크에 저장
-                postFileDAO.insertFile(postId, info);        // DB에 메타데이터 저장
+
+            // ★ 보완: saveFile이 "업로드 스킵"으로 빈 Map을 반환했을 때는 DB에 넣지 않기
+            if (info != null && !info.isEmpty()) {
+                postFileDAO.insertFile(postId, info);        
                 savedFiles.add(info); 
             }
         }
+    }
+
 
         return savedFiles; //저장된 정보들을 리스트에 모아서 반환
     }
@@ -55,86 +63,88 @@ public class FileServiceImpl implements IFileService {
      */
     @Override
     public Map<String, Object> saveFile(MultipartFile file) { 
-    Map<String, Object> fileInfo = new HashMap<>();
+        Map<String, Object> fileInfo = new HashMap<>();
 
-    if (file == null || file.isEmpty()) {
-        return fileInfo;
-    }
-
-    try {
-        // ------------- 1) webkitRelativePath에서 폴더 경로/파일명 분리 -------------
-        String originalFullPath = file.getOriginalFilename(); // 정체 경로/ 이름 획득
-        if (originalFullPath == null) originalFullPath = "unknown";
-
-        originalFullPath = originalFullPath.replace("\\", "/"); //윈도우 경로를 슬래시로 통일
-
-        String filePath = "";      // DB에 넣을 폴더 경로
-        String originalName = "";  // DB에 넣을 파일명
-
-        int idx = originalFullPath.lastIndexOf("/"); // 폴더 경로와 파일명 분리
-        if (idx != -1) {
-            filePath = originalFullPath.substring(0, idx + 1);   // "test8/폴더1/폴더2/"
-            originalName = originalFullPath.substring(idx + 1);  // "파일명.txt"
-        } else {
-            filePath = "";
-            originalName = originalFullPath;
+        // ▼▼▼ [오류 수정 2] 0바이트 파일 저장을 위해 file.isEmpty() 체크 제거 ▼▼▼
+        if (file == null) {
+        // ▲▲▲ [오류 수정 2] ▲▲▲
+            return fileInfo;
         }
 
-        // ------------- 2) 저장 파일명 생성 (UUID_원본명) -------------
-        String uuid = UUID.randomUUID().toString(); //UUID로 서버 저장용 파일 생성
-        String savedName = uuid + "_" + originalName;
+        try {
+            // ------------- 1) webkitRelativePath에서 폴더 경로/파일명 분리 -------------
+            // [참고] 이 로직은 file.getOriginalFilename()에 "MyFolder/image.jpg" 같은
+            // 경로가 포함되어 온다는 가정 하에 동작합니다.
+            String originalFullPath = file.getOriginalFilename(); 
+            if (originalFullPath == null || originalFullPath.isBlank()) {
+            return fileInfo; // 빈 Map 반환 -> 나중에 DB insert 전에 체크해서 거를 수 있음
+        }
+            originalFullPath = originalFullPath.replace("\\", "/"); 
 
-        // ------------- 3) 실제 저장 경로 만들기 -------------
-        Path basePath = Paths.get(uploadDir);
+            String filePath = "";       // DB에 넣을 폴더 경로
+            String originalName = "";   // DB에 넣을 파일명
 
-        // 폴더가 있을 경우 서버 내 폴더까지 생성
-        Path folderPath = basePath.resolve(filePath);
-        Files.createDirectories(folderPath);   // ★ 폴더 존재 안 하면 자동 생성
+            int idx = originalFullPath.lastIndexOf("/"); 
+            if (idx != -1) {
+                filePath = originalFullPath.substring(0, idx + 1);   // "test8/폴더1/폴더2/"
+                originalName = originalFullPath.substring(idx + 1);  // "파일명.txt"
+            } else {
+                filePath = "";
+                originalName = originalFullPath;
+            }
 
-        // 실제 파일 저장 위치
-        Path savePath = folderPath.resolve(savedName);
+            // ------------- 2) 저장 파일명 생성 (UUID_원본명) -------------
+            String uuid = UUID.randomUUID().toString(); 
+            String savedName = uuid + "_" + originalName;
 
-        Files.copy(file.getInputStream(), savePath, StandardCopyOption.REPLACE_EXISTING);
+            // ------------- 3) 실제 저장 경로 만들기 -------------
+            Path basePath = Paths.get(uploadDir);
 
-        // ------------- 4) DB 저장용 정보 세팅 -------------
-        fileInfo.put("original_name", originalName);
-        fileInfo.put("saved_name", savedName);
-        fileInfo.put("file_path", filePath);   // ★ 새로 추가한 컬럼
-        fileInfo.put("content_type", file.getContentType());
-        fileInfo.put("file_size", file.getSize());
+            // 폴더가 있을 경우 서버 내 폴더까지 생성
+            Path folderPath = basePath.resolve(filePath);
+            Files.createDirectories(folderPath);   // ★ 폴더 존재 안 하면 자동 생성
 
-        return fileInfo;
+            // 실제 파일 저장 위치
+            Path savePath = folderPath.resolve(savedName);
 
-    } catch (IOException e) {
-        throw new RuntimeException("파일 저장 중 오류 발생: " + file.getOriginalFilename(), e);
+            Files.copy(file.getInputStream(), savePath, StandardCopyOption.REPLACE_EXISTING);
+
+            // ------------- 4) DB 저장용 정보 세팅 -------------
+            fileInfo.put("original_name", originalName);
+            fileInfo.put("saved_name", savedName);
+            fileInfo.put("file_path", filePath);   // ★ 새로 추가한 컬럼
+            fileInfo.put("content_type", file.getContentType());
+            fileInfo.put("file_size", file.getSize());
+
+            return fileInfo;
+
+        } catch (IOException e) {
+            throw new RuntimeException("파일 저장 중 오류 발생: " + file.getOriginalFilename(), e);
+        }
     }
-}
 
 
     /**
      * (3) 특정 게시글에 연결된 모든 파일 삭제
-     * - DB에서 파일 목록 조회 → 디스크 파일 삭제 → post_files 삭제
      */
     @Override
     public void deleteFilesByPostId(int postId) {
-        // 1) 현재 게시글의 파일 목록 조회
         List<Map<String, Object>> files = postFileDAO.findByPostId(postId);
 
-        // 2) 디스크 파일 삭제
+        // ▼▼▼ [오류 수정 1] 삭제 시 file_path 사용 ▼▼▼
         for (Map<String, Object> file : files) {
-            Object savedNameObj = file.get("saved_name");
-            if (savedNameObj instanceof String) {
-                deletePhysicalFile((String) savedNameObj);
-            }
+            String savedName = (String) file.get("saved_name");
+            String subDir = (String) file.get("file_path"); // // 수정됨: file_path 읽기
+            
+            deletePhysicalFile(savedName, subDir); // // 수정됨
         }
+        // ▲▲▲ [오류 수정 1] ▲▲▲
 
-        // 3) DB 메타데이터 삭제
         postFileDAO.deleteByPostId(postId);
     }
 
     /**
      * (4) 파일 id 목록으로 선택 삭제
-     * - 수정 화면에서 특정 첨부만 삭제할 때 사용
      */
     @Override
     public void deleteFilesByIds(List<Integer> fileIds) {
@@ -145,43 +155,47 @@ public class FileServiceImpl implements IFileService {
         for (Integer fileId : fileIds) {
             if (fileId == null) continue;
 
-            // 1) 파일 메타데이터 조회
+            // ▼▼▼ [오류 수정 1] 삭제 시 file_path 사용 ▼▼▼
             postFileDAO.findById(fileId).ifPresent(file -> {
-                Object savedNameObj = file.get("saved_name");
-                if (savedNameObj instanceof String) {
-                    deletePhysicalFile((String) savedNameObj);   // 디스크 삭제
-                }
-                postFileDAO.deleteById(fileId);                  // DB 삭제
+                String savedName = (String) file.get("saved_name");
+                String subDir = (String) file.get("file_path"); // // 수정됨: file_path 읽기
+                
+                deletePhysicalFile(savedName, subDir);   // // 수정됨: 디스크 삭제
+                postFileDAO.deleteById(fileId);          // DB 삭제
             });
+            // ▲▲▲ [오류 수정 1] ▲▲▲
         }
     }
 
     /**
      * 실제 디스크에서 파일 삭제하는 내부 헬퍼 메소드
      */
-    private void deletePhysicalFile(String savedName) {
+    // ▼▼▼ [오류 수정 1] subDir 파라미터 추가 ▼▼▼
+    private void deletePhysicalFile(String savedName, String subDir) {
         try {
-            Path uploadPath = Paths.get(uploadDir);
-            Path target = uploadPath.resolve(savedName);
+            if (savedName == null) return;
+            if (subDir == null) subDir = ""; // file_path가 NULL인 경우 (기존 파일)
+            
+            // [수정됨] "C:/upload" + "MyFolder" -> "C:/upload/MyFolder"
+            Path folderPath = Paths.get(uploadDir).resolve(subDir); // // 수정됨
+            Path target = folderPath.resolve(savedName); // // 수정됨
+            
             if (Files.exists(target)) {
                 Files.delete(target);
             }
         } catch (IOException e) {
-            // 로그만 찍고, 예외는 상위로 올리지 않음 (게시글 삭제 자체는 진행)
             e.printStackTrace();
         }
     }
+    // ▲▲▲ [오류 수정 1] ▲▲▲
 
     @Override
-    public List<Map<String, Object>> getFilesByPostId(int postId) { // ★ 추가됨
-        return postFileDAO.findByPostId(postId); // ★ 추가됨
-    } // ★ 추가됨
+    public List<Map<String, Object>> getFilesByPostId(int postId) { 
+        return postFileDAO.findByPostId(postId); 
+    } 
 
-        @Override
-    public Map<String, Object> getFileById(int fileId) {        // ★ 수정됨
-        // PostFileDAO 의 findById(Optional) 를 사용해서 한 건 조회
-        return postFileDAO.findById(fileId).orElse(null);       // ★ 수정됨
-    }                                                           // ★ 수정됨
-
-
+    @Override
+    public Map<String, Object> getFileById(int fileId) {        
+        return postFileDAO.findById(fileId).orElse(null);       
+    }                                                           
 }
