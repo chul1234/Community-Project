@@ -42,9 +42,9 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         List<Map<String, Object>> posts = boardDAO.findAll(size, offset, searchType, searchKeyword); // posts 변수 초기화
 
         // --------------------------------------------------------------------
-        // ★ 추가됨: 게시글 목록에 파일/이미지 정보를 포함시킴
+        // ★ 추가됨: 게시글 목록에 파일/이미지/폴더 정보를 포함시킴
         // --------------------------------------------------------------------
-        for (Map<String, Object> post : posts) { // ★ 수정됨
+        for (Map<String, Object> post : posts) { // ★ 기존 유지
 
             int postId = (int) post.get("post_id"); // ★ 기존 유지
 
@@ -55,8 +55,57 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
                 // 첨부파일 없음
                 post.put("fileType", "NONE");  // ★ 기존 유지
                 post.put("thumbUrl", null);    // ★ 기존 유지
+                post.put("fileCount", 0);      // ★ 추가됨: 첨부파일 수
                 continue;
             }
+
+            // ★ 추가됨: 첨부파일 수 저장
+            post.put("fileCount", files.size()); // ★ 추가됨
+
+            // ----------------------------------------------------------------
+            // ★ 추가됨: 폴더 업로드인지 여부 확인 (file_path 기준)
+            //   - file_path가 비어있지 않은 파일이 하나라도 있으면 "폴더 첨부"로 간주
+            // ----------------------------------------------------------------
+            boolean hasFolder = false;        // ★ 추가됨
+            String topFolderName = null;      // ★ 추가됨
+
+            for (Map<String, Object> f : files) {             // ★ 추가됨
+                Object pathObj = f.get("file_path");          // ★ 추가됨
+                if (pathObj == null) {
+                    continue;                                // ★ 추가됨
+                }
+                String path = pathObj.toString();             // ★ 추가됨
+                if (path.isBlank()) {
+                    continue;                                // ★ 추가됨
+                }
+
+                hasFolder = true;                            // ★ 추가됨
+
+                // "test용/하위/..." 형태에서 최상위 폴더명만 추출 // ★ 추가됨
+                String normalized = path.replace("\\", "/");  // 윈도우 경로 대비 // ★ 추가됨
+                if (!normalized.endsWith("/")) {             // ★ 추가됨
+                    normalized = normalized + "/";           // ★ 추가됨
+                }
+                int idx = normalized.indexOf('/');           // ★ 추가됨
+                if (idx != -1) {                             // ★ 추가됨
+                    topFolderName = normalized.substring(0, idx); // 예: "test용" // ★ 추가됨
+                } else {
+                    topFolderName = normalized;              // ★ 추가됨
+                }
+                break;                                       // ★ 추가됨
+            }
+
+            if (hasFolder) { // ★ 추가됨
+                // 폴더 업로드로 판단된 경우: 목록에서는 폴더 아이콘으로 표시 // ★ 추가됨
+                post.put("fileType", "FOLDER");           // ★ 추가됨
+                post.put("folderName", topFolderName);    // ★ 추가됨
+                post.put("thumbUrl", null);               // ★ 추가됨
+                continue;                                 // ★ 추가됨: 아래 이미지/파일 로직은 건너뜀
+            }
+
+            // ----------------------------------------------------------------
+            // 여기부터는 기존 "첫 번째 파일 기준으로 IMAGE / FILE 판단" 로직
+            // ----------------------------------------------------------------
 
             // 첫 번째 첨부파일 기준
             Map<String, Object> file = files.get(0); // ★ 기존 유지
@@ -64,16 +113,16 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
             String contentType = (String) file.get("content_type"); // ★ 기존 유지
 
             // ★ 추가됨: file_id 추출 (정수로 변환)
-            Object fileIdObj = file.get("file_id");                 // ★ 추가됨
-            int fileId = (fileIdObj instanceof Number)              // ★ 추가됨
-                    ? ((Number) fileIdObj).intValue()               // ★ 추가됨
-                    : Integer.parseInt(fileIdObj.toString());       // ★ 추가됨
+            Object fileIdObj = file.get("file_id");                 // ★ 기존 유지(추가됨)
+            int fileId = (fileIdObj instanceof Number)              // ★ 기존 유지(추가됨)
+                    ? ((Number) fileIdObj).intValue()               // ★ 기존 유지(추가됨)
+                    : Integer.parseInt(fileIdObj.toString());       // ★ 기존 유지(추가됨)
 
             // 이미지 여부 판단
             if (contentType != null && contentType.startsWith("image")) {
                 post.put("fileType", "IMAGE"); // ★ 기존 유지
                 // ★ 수정됨: 저장 파일명을 직접 쓰지 않고, 파일 뷰 API 경로로 변경
-                post.put("thumbUrl", "/api/files/" + fileId + "/view"); // ★ 수정됨
+                post.put("thumbUrl", "/api/files/" + fileId + "/view"); // ★ 기존 유지(수정됨)
             } else {
                 post.put("fileType", "FILE"); // ★ 기존 유지
                 post.put("thumbUrl", null);   // ★ 기존 유지

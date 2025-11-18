@@ -6,8 +6,7 @@
                 type="button"
                 class="action-btn"
                 ng-show="!showSearch"
-                ng-click="openSearch()
-"
+                ng-click="openSearch()"
                 style="background-color: #6c757d; color: white; margin-right: 10px"
             >
                 🔍 검색
@@ -126,7 +125,7 @@
                     <a href="#!/board/{{ post.post_id }}">{{ post.title }}</a>
                 </td>
 
-                <!-- ★ 추가됨: 첨부파일 / 이미지 표시 셀 -->
+                <!-- ★ 첨부파일 / 이미지 / 폴더 표시 셀 -->
                 <td class="file-cell">
                     <!-- 이미지가 있을 때: 썸네일 표시 -->
                     <div ng-if="post.fileType === 'IMAGE'">
@@ -137,13 +136,21 @@
                         />
                     </div>
 
-                    <!-- 이미지 없고 파일만 있을 때: 파일 아이콘 -->
+                    <!-- 일반 파일만 있을 때: 파일 아이콘 -->
                     <div ng-if="post.fileType === 'FILE'">
                         <span class="file-icon">📄</span>
                     </div>
 
+                    <!-- ★ 폴더로 업로드된 경우: 폴더 아이콘 + 폴더 이름 + 파일 개수 표시 -->
+                    <div ng-if="post.fileType === 'FOLDER'">
+                        <span class="file-icon">📁</span>
+                        </span>
+                    </div>
+
                     <!-- 파일도 없을 때: 빈칸 -->
-                    <div ng-if="post.fileType === 'NONE'">-</div>
+                    <div ng-if="post.fileType === 'NONE' || !post.fileType">
+                        -
+                    </div>
                 </td>
 
                 <td>{{ post.author_name || '탈퇴한 사용자' }} ({{ post.user_id }})</td>
