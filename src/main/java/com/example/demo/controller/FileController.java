@@ -27,7 +27,7 @@ public class FileController {
     private IFileService fileService;    // 첨부파일 서비스
 
     // ★ 수정됨: @Value("${file.upload-dir}") 제거, FileServiceImpl 과 동일하게 하드코딩 경로 사용
-    private final String uploadDir = "uploads";  // 프로젝트 루트 기준 uploads 폴더  // ★ 수정됨
+    private final String uploadDir = "C:/upload";  // 프로젝트 루트 기준 uploads 폴더  // ★ 수정됨
 
     /**
      * 첨부파일 다운로드

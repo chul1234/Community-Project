@@ -22,7 +22,7 @@ import com.example.demo.service.file.IFileService;
 public class FileServiceImpl implements IFileService {
 
     // 업로드 폴더 경로 (프로젝트 루트 기준)
-    private final String uploadDir = "uploads";  // ★ 유지: properties 없이 직접 지정
+    private final String uploadDir = "C:/upload";  // ★ 유지: properties 없이 직접 지정
 
     @Autowired
     private PostFileDAO postFileDAO; // ★ 수정됨: DB 연동용 DAO 주입
