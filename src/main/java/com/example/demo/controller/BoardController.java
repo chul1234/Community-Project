@@ -73,9 +73,9 @@ public class BoardController { // BoardController 클래스 정의 시작
     // @PostMapping("/api/posts"): HTTP POST /api/posts 요청 처리
     @PostMapping("/api/posts")
     public ResponseEntity<Map<String, Object>> createPost(
-            @RequestParam("title") String title, // ★ 수정됨: @RequestParam으로 제목 수신
-            @RequestParam("content") String content, // ★ 수정됨: @RequestParam으로 내용 수신
-            @RequestParam(value = "files", required = false) List<MultipartFile> files, // ★ 추가됨: 첨부파일 목록
+            @RequestParam String title, // ★ 수정됨: @RequestParam으로 제목 수신
+            @RequestParam String content, // ★ 수정됨: @RequestParam으로 내용 수신
+            @RequestParam(required = false) List<MultipartFile> files, // ★ 추가됨: 첨부파일 목록
             Authentication authentication) { // createPost 메소드 정의 시작
 
         // authentication.getName() 메소드: 현재 로그인 사용자 ID(username) 반환

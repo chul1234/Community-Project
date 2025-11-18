@@ -37,24 +37,24 @@ public class FileServiceImpl implements IFileService {
 
         if (files == null || files.isEmpty()) {
             return savedFiles;
-        }
+        } //파일 아예 없으면 빈 리스트 반환
 
-        for (MultipartFile file : files) {
-            if (file != null && !file.isEmpty()) {
+        for (MultipartFile file : files) { // 각 파일마다 saveFile 호출 -> 실제 파일 저장 + 정보 Map 생성
+            if (file != null && !file.isEmpty()) { 
                 Map<String, Object> info = saveFile(file);   // 디스크에 저장
                 postFileDAO.insertFile(postId, info);        // DB에 메타데이터 저장
-                savedFiles.add(info);
+                savedFiles.add(info); 
             }
         }
 
-        return savedFiles;
+        return savedFiles; //저장된 정보들을 리스트에 모아서 반환
     }
 
     /**
      * (2) 단일 파일 저장 (디스크에만 저장, DB 작업은 호출하는 쪽에서)
      */
     @Override
-    public Map<String, Object> saveFile(MultipartFile file) {
+    public Map<String, Object> saveFile(MultipartFile file) { 
     Map<String, Object> fileInfo = new HashMap<>();
 
     if (file == null || file.isEmpty()) {
@@ -63,15 +63,15 @@ public class FileServiceImpl implements IFileService {
 
     try {
         // ------------- 1) webkitRelativePath에서 폴더 경로/파일명 분리 -------------
-        String originalFullPath = file.getOriginalFilename();
+        String originalFullPath = file.getOriginalFilename(); // 정체 경로/ 이름 획득
         if (originalFullPath == null) originalFullPath = "unknown";
 
-        originalFullPath = originalFullPath.replace("\\", "/");
+        originalFullPath = originalFullPath.replace("\\", "/"); //윈도우 경로를 슬래시로 통일
 
         String filePath = "";      // DB에 넣을 폴더 경로
         String originalName = "";  // DB에 넣을 파일명
 
-        int idx = originalFullPath.lastIndexOf("/");
+        int idx = originalFullPath.lastIndexOf("/"); // 폴더 경로와 파일명 분리
         if (idx != -1) {
             filePath = originalFullPath.substring(0, idx + 1);   // "test8/폴더1/폴더2/"
             originalName = originalFullPath.substring(idx + 1);  // "파일명.txt"
@@ -81,7 +81,7 @@ public class FileServiceImpl implements IFileService {
         }
 
         // ------------- 2) 저장 파일명 생성 (UUID_원본명) -------------
-        String uuid = UUID.randomUUID().toString();
+        String uuid = UUID.randomUUID().toString(); //UUID로 서버 저장용 파일 생성
         String savedName = uuid + "_" + originalName;
 
         // ------------- 3) 실제 저장 경로 만들기 -------------

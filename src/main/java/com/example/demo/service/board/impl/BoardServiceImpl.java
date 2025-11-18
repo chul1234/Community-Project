@@ -174,7 +174,7 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         if (!(postIdObj instanceof Number)) {
             return null; // 안전 장치 (예외 상황)
         }
-        int postId = ((Number) postIdObj).intValue();
+        int postId = ((Number) postIdObj).intValue(); 
 
         // 4. 첨부파일이 있다면 저장
         if (files != null && !files.isEmpty()) { // ★ 추가됨: 파일 저장 로직

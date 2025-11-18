@@ -211,15 +211,15 @@ app.controller('BoardNewController', function ($scope, $http, $location) {
     $scope.getAllUploadFiles = function () {
         var list = [];
 
-        if ($scope.uploadFiles && $scope.uploadFiles.length > 0) {
-            for (var i = 0; i < $scope.uploadFiles.length; i++) {
-                list.push($scope.uploadFiles[i]);
+        if ($scope.uploadFiles && $scope.uploadFiles.length > 0) { //uploadFiles 배열이 존재, 길이가 0보다 크면
+            for (var i = 0; i < $scope.uploadFiles.length; i++) { //0부터 uploadFile.length -1까지 반복
+                list.push($scope.uploadFiles[i]); //list 배열에 하나씩 push
             }
         }
 
-        if ($scope.uploadFolderFiles && $scope.uploadFolderFiles.length > 0) {
-            for (var j = 0; j < $scope.uploadFolderFiles.length; j++) {
-                list.push($scope.uploadFolderFiles[j]);
+        if ($scope.uploadFolderFiles && $scope.uploadFolderFiles.length > 0) { //uploadFolderFiles 배열이 존재, 길이가 0보다 크면
+            for (var j = 0; j < $scope.uploadFolderFiles.length; j++) { //0부터 끝까지 반복
+                list.push($scope.uploadFolderFiles[j]); //각 파일을 list에 push
             }
         }
 
@@ -227,19 +227,20 @@ app.controller('BoardNewController', function ($scope, $http, $location) {
     };
 
     // (2) 폴더에서 온 파일인지 여부 (3번: 폴더 아이콘용)
-    $scope.isFolderFile = function (file) {
+    $scope.isFolderFile = function (file) { 
         // 폴더 선택으로 들어온 파일이면 webkitRelativePath에 "폴더/파일명" 형식이 들어 있음
         return !!(file.webkitRelativePath && file.webkitRelativePath.indexOf('/') !== -1);
-    };
+    }; //webkitRelativePaht가 존재, 그안에 '/'문자가 하나 이사 있으면 -> 폴더 경로가 포함 되어 있는것
+        // 둘다 만족 true(폴더에서 온 파일), 아니면 false, !! truthy -> true, falsy -> false 바꾸는 패턴
 
     // (3) 이미지 파일인지 여부 (이미지 아이콘 표시용)
     $scope.isImageFile = function (file) {
-        return !!(file.type && file.type.indexOf('image') === 0);
-    };
+        return !!(file.type && file.type.indexOf('image') === 0); //file.type이 존재, image/...로 시작 -> 이미지 파일
+    }; 
 
     // (4) 화면에 보여줄 이름: 폴더 선택이면 경로, 아니면 파일명만
     $scope.getDisplayName = function (file) {
-        if (file.webkitRelativePath && file.webkitRelativePath.length > 0) {
+        if (file.webkitRelativePath && file.webkitRelativePath.length > 0) { //폴더에서 올라온 파일, 웹킷 상대결로 전체(폴더/ 파일명)
             return file.webkitRelativePath; // 예: "사진폴더/여행/제주도1.jpg"
         }
         return file.name;
