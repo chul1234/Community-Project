@@ -790,15 +790,15 @@ app.controller('BoardEditController', function ($scope, $http, $routeParams, $lo
 
     // 2. (로딩) 게시글 상세 정보 가져오기 (제목, 내용 채우기)
     $http
-        .get('/api/posts/' + postId)
-        .then(function (response) {
-            $scope.post = response.data;
-            // textarea + ng-model 로 자동 표시되므로 별도 summernote 처리 없음
-        })
-        .catch(function () {
-            alert('게시글 정보를 불러오는데 실패했습니다.');
-            $location.path('/board');
-        });
+    .get('/api/posts/' + postId + '/edit') // ★ 수정됨: 조회수 증가 없는 수정용 API
+    .then(function (response) {
+        $scope.post = response.data;
+        // textarea + ng-model 로 자동 표시되므로 별도 summernote 처리 없음
+    })
+    .catch(function () {
+        alert('게시글 정보를 불러오는데 실패했습니다.');
+        $location.path('/board');
+    });
 
     // 3. (로딩) 기존 첨부파일 목록 가져오기
     $http.get('/api/posts/' + postId + '/files').then(function (response) {

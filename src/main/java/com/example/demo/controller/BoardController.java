@@ -23,8 +23,6 @@ import org.springframework.web.multipart.MultipartFile; // MultipartFile import
 import com.example.demo.service.board.IBoardService;
 import com.example.demo.service.file.IFileService;
 
-
-
 // json 같은 순수 데이터로 응답하는 컨트롤러 (@RestController = @Controller + @ResponseBody)
 @RestController
 public class BoardController { // BoardController 클래스 정의 시작
@@ -124,6 +122,19 @@ public class BoardController { // BoardController 클래스 정의 시작
             return ResponseEntity.notFound().build();
         } // if-else 끝
     } // getPostById 메소드 끝
+
+    // ★★★ [추가됨] 수정 화면 전용 게시글 조회 API (조회수 증가 없음) ★★★
+    @GetMapping("/api/posts/{postId}/edit")
+    public ResponseEntity<Map<String, Object>> getPostForEdit(@PathVariable int postId) {
+        // 조회수 증가 없이 게시글만 조회
+        Map<String, Object> post = boardService.getPost(postId);
+
+        if (post != null) {
+            return ResponseEntity.ok(post);          // 성공 시 200 + 데이터
+        } else {
+            return ResponseEntity.notFound().build(); // 게시글 없으면 404
+        }
+    }
 
     @GetMapping("/api/posts/{postId}/files") //
     public ResponseEntity<List<Map<String, Object>>> getFilesByPost(@PathVariable int postId) { //
