@@ -18,14 +18,14 @@ import org.springframework.stereotype.Repository;
 public class LikeDAO {
 
     @Autowired
-    private DataSource dataSource;  // ★ 기존 코드 스타일 따라 DataSource 사용
+    private DataSource dataSource;  //기존 코드 스타일 따라 DataSource 사용
 
     // DB 연결 메소드
     private Connection getConnection() throws SQLException {
         return dataSource.getConnection();
     }
 
-    // ★ 좋아요 여부 확인 (중복 방지용)
+    //좋아요 여부 확인 (중복 방지용)
     public boolean exists(String targetType, int targetId, String userId) {
         String sql = "SELECT 1 FROM likes WHERE target_type=? AND target_id=? AND user_id=? LIMIT 1";
 
@@ -46,7 +46,7 @@ public class LikeDAO {
         }
     }
 
-    // ★ 좋아요 추가 (INSERT)
+    //좋아요 추가 (INSERT)
     public int insert(String targetType, int targetId, String userId) {
         String sql = "INSERT INTO likes (target_type, target_id, user_id) VALUES (?, ?, ?)";
 
@@ -65,7 +65,7 @@ public class LikeDAO {
         }
     }
 
-    // ★ 좋아요 삭제 (DELETE)
+    //좋아요 삭제 (DELETE)
     public int delete(String targetType, int targetId, String userId) {
         String sql = "DELETE FROM likes WHERE target_type=? AND target_id=? AND user_id=?";
 
@@ -84,7 +84,7 @@ public class LikeDAO {
         }
     }
 
-    // ★ 좋아요 개수 조회
+    //좋아요 개수 조회
     public int count(String targetType, int targetId) {
         String sql = "SELECT COUNT(*) FROM likes WHERE target_type=? AND target_id=?";
 

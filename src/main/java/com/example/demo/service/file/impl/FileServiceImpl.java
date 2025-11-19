@@ -46,7 +46,7 @@ public class FileServiceImpl implements IFileService {
             if (file != null) { 
                 Map<String, Object> info = saveFile(file);   // 디스크에 저장
 
-            // ★ 보완: saveFile이 "업로드 스킵"으로 빈 Map을 반환했을 때는 DB에 넣지 않기
+            //보완: saveFile이 "업로드 스킵"으로 빈 Map을 반환했을 때는 DB에 넣지 않기
             if (info != null && !info.isEmpty()) {
                 postFileDAO.insertFile(postId, info);        
                 savedFiles.add(info); 
@@ -102,7 +102,7 @@ public class FileServiceImpl implements IFileService {
 
             // 폴더가 있을 경우 서버 내 폴더까지 생성
             Path folderPath = basePath.resolve(filePath);
-            Files.createDirectories(folderPath);   // ★ 폴더 존재 안 하면 자동 생성
+            Files.createDirectories(folderPath);   //폴더 존재 안 하면 자동 생성
 
             // 실제 파일 저장 위치
             Path savePath = folderPath.resolve(savedName);
@@ -112,7 +112,7 @@ public class FileServiceImpl implements IFileService {
             // ------------- 4) DB 저장용 정보 세팅 -------------
             fileInfo.put("original_name", originalName);
             fileInfo.put("saved_name", savedName);
-            fileInfo.put("file_path", filePath);   // ★ 새로 추가한 컬럼
+            fileInfo.put("file_path", filePath);   //새로 추가한 컬럼
             fileInfo.put("content_type", file.getContentType());
             fileInfo.put("file_size", file.getSize());
 
@@ -134,7 +134,7 @@ public class FileServiceImpl implements IFileService {
         // ▼▼▼ [오류 수정 1] 삭제 시 file_path 사용 ▼▼▼
         for (Map<String, Object> file : files) {
             String savedName = (String) file.get("saved_name");
-            String subDir = (String) file.get("file_path"); // // 수정됨: file_path 읽기
+            String subDir = (String) file.get("file_path"); // //  file_path 읽기
             
             deletePhysicalFile(savedName, subDir); // // 수정됨
         }
@@ -158,9 +158,9 @@ public class FileServiceImpl implements IFileService {
             // ▼▼▼ [오류 수정 1] 삭제 시 file_path 사용 ▼▼▼
             postFileDAO.findById(fileId).ifPresent(file -> {
                 String savedName = (String) file.get("saved_name");
-                String subDir = (String) file.get("file_path"); // // 수정됨: file_path 읽기
+                String subDir = (String) file.get("file_path"); // //  file_path 읽기
                 
-                deletePhysicalFile(savedName, subDir);   // // 수정됨: 디스크 삭제
+                deletePhysicalFile(savedName, subDir);   // //  디스크 삭제
                 postFileDAO.deleteById(fileId);          // DB 삭제
             });
             // ▲▲▲ [오류 수정 1] ▲▲▲

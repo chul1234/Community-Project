@@ -3,7 +3,7 @@ package com.example.demo.service.board; // 패키지 선언
 import java.util.List; // List 인터페이스 import
 import java.util.Map;  // Map 인터페이스 import
 
-import org.springframework.web.multipart.MultipartFile; // ★ 추가됨: 업로드 파일 처리용
+import org.springframework.web.multipart.MultipartFile; // 업로드 파일 처리용
 
 /**
  * 게시판 비즈니스 로직을 정의하는 서비스 인터페이스
@@ -27,7 +27,7 @@ public interface IBoardService { // IBoardService 인터페이스 정의 시작
      * @param userId  작성자 ID
      * @return 생성된 게시글 정보(Map). 실패 시 null.
      */
-    Map<String, Object> createPost(Map<String, Object> post, List<MultipartFile> files, String userId); // ★ 수정됨: files 파라미터 추가
+    Map<String, Object> createPost(Map<String, Object> post, List<MultipartFile> files, String userId); // files 파라미터 추가
 
     /**
      * 특정 게시글 상세 조회
@@ -48,10 +48,10 @@ public interface IBoardService { // IBoardService 인터페이스 정의 시작
     Map<String, Object> updatePost(
             int postId,
             Map<String, Object> postDetails,
-            List<MultipartFile> newFiles,      // ★ 추가됨
-            List<Integer> deleteFileIds,       // ★ 추가됨
+            List<MultipartFile> newFiles,      //추가됨
+            List<Integer> deleteFileIds,       //추가됨
             String currentUserId
-    ); // ★ 수정됨: 파일 관련 파라미터 추가
+    ); // 파일 관련 파라미터 추가
 
     /**
      * 게시글 삭제 (작성자 또는 ADMIN)

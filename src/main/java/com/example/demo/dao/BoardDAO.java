@@ -277,7 +277,7 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
     // try-with-resources: conn, pstmt 자동 자원 해제
     try (Connection conn = getConnection();
 
-         // ★ 수정됨: 자동 생성된 post_id 를 얻기 위해 RETURN_GENERATED_KEYS 사용
+         // 자동 생성된 post_id 를 얻기 위해 RETURN_GENERATED_KEYS 사용
          PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
         // SQL ? 파라미터 설정
@@ -288,11 +288,11 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
         // INSERT 실행
         int rows = pstmt.executeUpdate();  // 영향받은 행 수
 
-        // ★ 수정됨: 자동 생성된 post_id 읽어오기
+        // 자동 생성된 post_id 읽어오기
         try (ResultSet rs = pstmt.getGeneratedKeys()) {
             if (rs.next()) {
                 int generatedId = rs.getInt(1);
-                post.put("post_id", generatedId); // ★ 수정됨: post Map에 post_id 저장
+                post.put("post_id", generatedId); // post Map에 post_id 저장
             }
         }
 

@@ -16,8 +16,8 @@ spring:
             ddl-auto: update
         show-sql: true
 
-    # ★ 여기부터 추가: 파일 업로드 용량 설정
+    #여기부터 추가: 파일 업로드 용량 설정
     servlet:
         multipart:
-            max-file-size: 50MB       # 파일 하나당 최대 크기
-            max-request-size: 100MB   # 요청 전체(여러 파일 합) 최대 크기
+            max-file-size: 50MB # 파일 하나당 최대 크기
+            max-request-size: 100MB # 요청 전체(여러 파일 합) 최대 크기

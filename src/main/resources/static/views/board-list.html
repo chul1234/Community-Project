@@ -75,8 +75,9 @@
         <thead>
             <tr>
                 <th style="width: 8%">번호</th>
-                <!-- ★ 수정됨: 첨부 컬럼을 제목 앞이 아니라 ‘번호 바로 옆’으로 이동 -->
-                <th style="width: 10%">첨부</th> <!-- ★ 수정됨 -->
+                <!-- 첨부 컬럼을 제목 앞이 아니라 ‘번호 바로 옆’으로 이동 -->
+                <th style="width: 10%">첨부</th>
+                <!--수정됨 -->
                 <th style="width: 40%">제목</th>
                 <th style="width: 15%">작성자</th>
                 <th style="width: 17%">작성일</th>
@@ -88,7 +89,7 @@
         </thead>
         <tbody>
             <tr ng-if="!postList.length && totalItems === 0 && !searchKeyword">
-                <!-- ★ 수정됨: 컬럼 수가 7개가 되었으므로 colspan 7 -->
+                <!-- 컬럼 수가 7개가 되었으므로 colspan 7 -->
                 <td
                     colspan="7"
                     style="text-align: center; color: #777"
@@ -97,7 +98,7 @@
                 </td>
             </tr>
             <tr ng-if="!postList.length && totalItems === 0 && searchKeyword">
-                <!-- ★ 수정됨: 컬럼 수가 7개가 되었으므로 colspan 7 -->
+                <!-- 컬럼 수가 7개가 되었으므로 colspan 7 -->
                 <td
                     colspan="7"
                     style="text-align: center; color: #777"
@@ -116,13 +117,12 @@
                         style="font-weight: bold; color: #007bff"
                         >공지</span
                     >
-                    <span ng-if="post.pinned_order === null">
-                        {{ totalItems - (currentPage - 1) * pageSize - $index }}
-                    </span>
+                    <span ng-if="post.pinned_order === null"> {{ totalItems - (currentPage - 1) * pageSize - $index }} </span>
                 </td>
 
-                <!-- ★ 수정됨: 첨부파일 / 이미지 / 폴더 표시 셀을 번호 바로 뒤로 이동 -->
-                <td class="file-cell"> <!-- ★ 수정됨 -->
+                <!-- 첨부파일 / 이미지 / 폴더 표시 셀을 번호 바로 뒤로 이동 -->
+                <td class="file-cell">
+                    <!--수정됨 -->
                     <!-- 이미지가 있을 때: 썸네일 표시 -->
                     <div ng-if="post.fileType === 'IMAGE'">
                         <img
@@ -137,19 +137,18 @@
                         <span class="file-icon">📄</span>
                     </div>
 
-                    <!-- ★ 폴더로 업로드된 경우: 폴더 아이콘 표시 -->
+                    <!--폴더로 업로드된 경우: 폴더 아이콘 표시 -->
                     <div ng-if="post.fileType === 'FOLDER'">
                         <span class="file-icon">📁</span>
                     </div>
 
                     <!-- 파일도 없을 때: 빈칸 -->
-                    <div ng-if="post.fileType === 'NONE' || !post.fileType">
-                        -
-                    </div>
+                    <div ng-if="post.fileType === 'NONE' || !post.fileType">-</div>
                 </td>
 
                 <!-- 제목 -->
-                <td> <!-- ★ 수정됨: 제목 셀을 첨부 뒤로 이동 -->
+                <td>
+                    <!-- 제목 셀을 첨부 뒤로 이동 -->
                     <span
                         ng-if="post.pinned_order !== null"
                         style="margin-right: 5px"

@@ -24,7 +24,7 @@ public class LikeController {
     private ILikeService likeService;    // 
 
     /**
-     * ★ 좋아요 토글 API
+     *좋아요 토글 API
      * 프론트에서 type(POST/COMMENT), id(targetId), userId 를 전달받아
      * 좋아요 상태를 반전시킨다.
      *
@@ -56,7 +56,7 @@ public class LikeController {
 
 
     /**
-     * ★ 좋아요 개수 단독 조회 API (선택)
+     *좋아요 개수 단독 조회 API (선택)
      * 게시글/댓글을 처음 로딩할 때 count만 필요할 경우 사용 가능
      *
      * 요청:

@@ -3,7 +3,7 @@ package com.example.demo.controller; // 패키지 선언
 // 필요한 클래스 import
 import java.util.HashMap; // List 인터페이스 import
 import java.util.List; // Map 인터페이스 import
-import java.util.Map; // ★ 추가됨: HashMap import
+import java.util.Map; // HashMap import
 import java.util.stream.Collectors; // Collectors 클래스 import (Stream API)
 
 import org.springframework.beans.factory.annotation.Autowired; // @Autowired 어노테이션 import
@@ -15,10 +15,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;   // ★ 수정됨: pinPost에서 JSON 본문 수신용
+import org.springframework.web.bind.annotation.RequestBody;   // pinPost에서 JSON 본문 수신용
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile; // ★ 추가됨: MultipartFile import
+import org.springframework.web.multipart.MultipartFile; // MultipartFile import
 
 import com.example.demo.service.board.IBoardService;
 import com.example.demo.service.file.IFileService;
@@ -34,7 +34,7 @@ public class BoardController { // BoardController 클래스 정의 시작
     private IBoardService boardService; // IBoardService 객체 멤버 변수 선언
 
     @Autowired
-    private IFileService fileService; // ★ 추가됨: 첨부파일 서비스 주입
+    private IFileService fileService; // 첨부파일 서비스 주입
 
     /**
      * [수정됨] 페이지네이션 및 검색 적용된 게시글 목록 조회 API 메소드 정의 시작
@@ -73,21 +73,21 @@ public class BoardController { // BoardController 클래스 정의 시작
     // @PostMapping("/api/posts"): HTTP POST /api/posts 요청 처리
     @PostMapping("/api/posts")
     public ResponseEntity<Map<String, Object>> createPost(
-            @RequestParam String title, // ★ 수정됨: @RequestParam으로 제목 수신
-            @RequestParam String content, // ★ 수정됨: @RequestParam으로 내용 수신
-            @RequestParam(required = false) List<MultipartFile> files, // ★ 추가됨: 첨부파일 목록
+            @RequestParam String title, // @RequestParam으로 제목 수신
+            @RequestParam String content, // @RequestParam으로 내용 수신
+            @RequestParam(required = false) List<MultipartFile> files, // 첨부파일 목록
             Authentication authentication) { // createPost 메소드 정의 시작
 
         // authentication.getName() 메소드: 현재 로그인 사용자 ID(username) 반환
         String userId = authentication.getName(); // userId 변수 초기화
 
-        // ★ 추가됨: Service에 넘겨줄 Map 구성 (기존 JSON 구조 대체)
-        Map<String, Object> postData = new HashMap<>(); // ★ 추가됨
-        postData.put("title", title);   // ★ 추가됨
-        postData.put("content", content); // ★ 추가됨
+        // Service에 넘겨줄 Map 구성 (기존 JSON 구조 대체)
+        Map<String, Object> postData = new HashMap<>(); //추가됨
+        postData.put("title", title);   //추가됨
+        postData.put("content", content); //추가됨
 
-        // ★ 수정됨: boardService.createPost() 메소드 (텍스트 + 파일 동시 처리)
-        Map<String, Object> createdPost = boardService.createPost(postData, files, userId); // ★ 수정됨
+        // boardService.createPost() 메소드 (텍스트 + 파일 동시 처리)
+        Map<String, Object> createdPost = boardService.createPost(postData, files, userId); //수정됨
 
         // createdPost null 여부 확인 (null이면 생성 실패)
         if (createdPost != null) { // if 시작 (생성 성공)
@@ -125,11 +125,11 @@ public class BoardController { // BoardController 클래스 정의 시작
         } // if-else 끝
     } // getPostById 메소드 끝
 
-    @GetMapping("/api/posts/{postId}/files") // ★ 추가됨
-    public ResponseEntity<List<Map<String, Object>>> getFilesByPost(@PathVariable int postId) { // ★ 추가됨
-        List<Map<String, Object>> files = fileService.getFilesByPostId(postId); // ★ 추가됨
-        return ResponseEntity.ok(files); // ★ 추가됨
-    } // ★ 추가됨
+    @GetMapping("/api/posts/{postId}/files") //추가됨
+    public ResponseEntity<List<Map<String, Object>>> getFilesByPost(@PathVariable int postId) { //추가됨
+        List<Map<String, Object>> files = fileService.getFilesByPostId(postId); //추가됨
+        return ResponseEntity.ok(files); //추가됨
+    } //추가됨
 
     /**
      * [★ 수정됨] 게시글 수정 API (Multipart 폼 + 첨부파일 추가/삭제)
@@ -146,23 +146,23 @@ public class BoardController { // BoardController 클래스 정의 시작
     @PutMapping("/api/posts/{postId}")
     public ResponseEntity<Map<String, Object>> updatePost(
             @PathVariable int postId,
-            @RequestParam("title") String title, // ★ 수정됨: @RequestParam으로 제목 수신
-            @RequestParam("content") String content, // ★ 수정됨: @RequestParam으로 내용 수신
-            @RequestParam(value = "files", required = false) List<MultipartFile> files, // ★ 추가됨: 새 첨부파일
-            @RequestParam(value = "deleteFileIds", required = false) List<Integer> deleteFileIds, // ★ 추가됨: 삭제할 파일 ID 목록
+            @RequestParam("title") String title, // @RequestParam으로 제목 수신
+            @RequestParam("content") String content, // @RequestParam으로 내용 수신
+            @RequestParam(value = "files", required = false) List<MultipartFile> files, // 새 첨부파일
+            @RequestParam(value = "deleteFileIds", required = false) List<Integer> deleteFileIds, // 삭제할 파일 ID 목록
             Authentication authentication) { // updatePost 메소드 정의 시작
 
         // authentication.getName() 메소드: 현재 사용자 ID 획득
         String currentUserId = authentication.getName(); // currentUserId 변수 초기화
 
-        // ★ 추가됨: Service로 넘길 수정 데이터 Map 구성
-        Map<String, Object> postDetails = new HashMap<>(); // ★ 추가됨
-        postDetails.put("title", title);     // ★ 추가됨
-        postDetails.put("content", content); // ★ 추가됨
+        // Service로 넘길 수정 데이터 Map 구성
+        Map<String, Object> postDetails = new HashMap<>(); //추가됨
+        postDetails.put("title", title);     //추가됨
+        postDetails.put("content", content); //추가됨
 
         // boardService.updatePost() 호출하여 게시글 수정 로직 수행 (텍스트 + 파일 + 삭제 목록)
         Map<String, Object> updatedPost =
-                boardService.updatePost(postId, postDetails, files, deleteFileIds, currentUserId); // ★ 수정됨
+                boardService.updatePost(postId, postDetails, files, deleteFileIds, currentUserId); //수정됨
 
         // updatedPost null 여부 확인 (null이면 수정 실패 또는 권한 없음)
         if (updatedPost != null) { // if 시작 (수정 성공)
@@ -221,7 +221,7 @@ public class BoardController { // BoardController 클래스 정의 시작
     @PutMapping("/api/posts/{postId}/pin")
     public ResponseEntity<Void> pinPost(
             @PathVariable int postId,
-            @RequestBody Map<String, Integer> requestBody, // ★ 수정됨: JSON body(@RequestBody)로 order 수신
+            @RequestBody Map<String, Integer> requestBody, // JSON body(@RequestBody)로 order 수신
             Authentication authentication) { // pinPost 메소드 정의 시작
 
         // authentication.getName() 메소드: 현재 사용자 ID 획득

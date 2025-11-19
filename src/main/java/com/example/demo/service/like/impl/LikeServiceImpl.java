@@ -20,7 +20,7 @@ public class LikeServiceImpl implements ILikeService {   // : 인터페이스 �
     private LikeDAO likeDAO;  // : DAO 주입
 
     /**
-     * ★ 좋아요 토글 기능 구현
+     *좋아요 토글 기능 구현
      * alreadyLiked = true  → DELETE 실행 → false 반환
      * alreadyLiked = false → INSERT 실행 → true 반환
      */
@@ -43,7 +43,7 @@ public class LikeServiceImpl implements ILikeService {   // : 인터페이스 �
     }
 
     /**
-     * ★ 좋아요 개수 조회
+     *좋아요 개수 조회
      */
     @Override
     public int getLikeCount(String targetType, int targetId) {
