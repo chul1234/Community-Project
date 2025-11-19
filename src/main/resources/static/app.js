@@ -2,7 +2,7 @@
  * 1. AngularJS 애플리케이션 모듈을 정의합니다.
  * 'ngRoute' 모듈을 의존성으로 추가하여 라우팅 기능을 활성화합니다.
  */
-var app = angular.module('busApp', ['ngRoute']);
+var app = angular.module('busApp', ['ngRoute','ngSanitize']);
 
 /**
  * 2. 애플리케이션의 라우팅 규칙을 설정합니다.

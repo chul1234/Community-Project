@@ -199,104 +199,137 @@ app.controller('BoardController', function ($scope, $http, $rootScope) {
 }); // BoardController 정의 끝
 
 // 'BoardNewController' (새 글 작성) - ★ 파일 업로드 처리 추가됨
+// ▼▼▼ [수정됨] BoardNewController (Summernote 콜백 및 Logic) ▼▼▼
 app.controller('BoardNewController', function ($scope, $http, $location) {
     // BoardNewController 정의 시작
-    // $scope: 뷰와 컨트롤러 연결, $http: 백엔드와 HTTP 통신, $location: 페이지 이동 제어
-    $scope.post = { title: '', content: '' }; // 새 게시글 데이터를 담는 객체 초기화
-    // post 객체는 title(제목)과 content(내용) 속성을 가짐
+    $scope.post = { title: '', content: '' }; 
 
-    $scope.uploadFiles = []; // : 첨부 파일 목록 (file-model 디렉티브가 채워줌)
-    $scope.uploadFolderFiles = []; // : 업로드 폴더 내 파일 목록 (미리보기용)
+    $scope.uploadFiles = []; 
+    $scope.uploadFolderFiles = []; 
 
-    $scope.getAllUploadFiles = function () {
+    // ★ 본문 이미지 input 이 채워줄 FileList
+    $scope.inlineImageFilesNew = null;
+
+    // textarea 커서 위치에 text 삽입하는 헬퍼
+    function insertAtCursor(textareaId, text) {
+        var textarea = document.getElementById(textareaId);
+        if (!textarea) return;
+
+        var start = textarea.selectionStart || 0;
+        var end = textarea.selectionEnd || 0;
+
+        var before = textarea.value.substring(0, start);
+        var after = textarea.value.substring(end);
+
+        var newValue = before + text + after;
+        textarea.value = newValue;
+
+        // ng-model 동기화
+        $scope.post.content = newValue;
+
+        // 커서를 삽입된 텍스트 뒤로 이동
+        var newPos = (before + text).length;
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = newPos;
+    }
+
+    // ★ 본문 이미지 업로드 + textarea에 <img> 삽입
+    $scope.uploadInlineImageForNew = function () {
+        if (!$scope.inlineImageFilesNew || $scope.inlineImageFilesNew.length === 0) {
+            alert('먼저 이미지를 선택하세요.');
+            return;
+        }
+
+        var file = $scope.inlineImageFilesNew[0];
+        var formData = new FormData();
+        formData.append('file', file);
+
+        $http
+            .post('/api/editor-images', formData, {
+                transformRequest: angular.identity,
+                headers: { 'Content-Type': undefined },
+            })
+            .then(function (response) {
+                var data = response.data || {};
+                if (data.success && data.url) {
+                    var imgTag =
+                        '\n<p><img src="' +
+                        data.url +
+                        '" style="max-width:100%;"></p>\n';
+
+                    // postEditor textarea 커서 위치에 삽입
+                    insertAtCursor('postEditor', imgTag);
+                } else {
+                    alert('이미지 업로드에 실패했습니다.');
+                }
+            })
+            .catch(function (error) {
+                console.error('본문 이미지 업로드 실패:', error);
+                alert('이미지 업로드 중 오류가 발생했습니다.');
+            });
+    };
+
+    // [유지] 헬퍼 함수들은 그대로 유지합니다.
+    $scope.getAllUploadFiles = function () { 
         var list = [];
+        var uploadFilesArray = Array.from($scope.uploadFiles || []);
+        var uploadFolderFilesArray = Array.from($scope.uploadFolderFiles || []);
 
-        if ($scope.uploadFiles && $scope.uploadFiles.length > 0) { //uploadFiles 배열이 존재, 길이가 0보다 크면
-            for (var i = 0; i < $scope.uploadFiles.length; i++) { //0부터 uploadFile.length -1까지 반복
-                list.push($scope.uploadFiles[i]); //list 배열에 하나씩 push
-            }
-        }
-
-        if ($scope.uploadFolderFiles && $scope.uploadFolderFiles.length > 0) { //uploadFolderFiles 배열이 존재, 길이가 0보다 크면
-            for (var j = 0; j < $scope.uploadFolderFiles.length; j++) { //0부터 끝까지 반복
-                list.push($scope.uploadFolderFiles[j]); //각 파일을 list에 push
-            }
-        }
-
+        list = list.concat(uploadFilesArray);
+        list = list.concat(uploadFolderFilesArray);
+        
         return list;
     };
-
-    // (2) 폴더에서 온 파일인지 여부 (3번: 폴더 아이콘용)
-    $scope.isFolderFile = function (file) { 
-        // 폴더 선택으로 들어온 파일이면 webkitRelativePath에 "폴더/파일명" 형식이 들어 있음
-        return !!(file.webkitRelativePath && file.webkitRelativePath.indexOf('/') !== -1);
-    }; //webkitRelativePaht가 존재, 그안에 '/'문자가 하나 이사 있으면 -> 폴더 경로가 포함 되어 있는것
-        // 둘다 만족 true(폴더에서 온 파일), 아니면 false, !! truthy -> true, falsy -> false 바꾸는 패턴
-
-    // (3) 이미지 파일인지 여부 (이미지 아이콘 표시용)
-    $scope.isImageFile = function (file) {
-        return !!(file.type && file.type.indexOf('image') === 0); //file.type이 존재, image/...로 시작 -> 이미지 파일
-    }; 
-
-    // (4) 화면에 보여줄 이름: 폴더 선택이면 경로, 아니면 파일명만
-    $scope.getDisplayName = function (file) {
-        if (file.webkitRelativePath && file.webkitRelativePath.length > 0) { //폴더에서 올라온 파일, 웹킷 상대결로 전체(폴더/ 파일명)
-            return file.webkitRelativePath; // 예: "사진폴더/여행/제주도1.jpg"
-        }
-        return file.name;
-    };
+    $scope.isFolderFile = function (file) { return !!(file.webkitRelativePath && file.webkitRelativePath.indexOf('/') !== -1); }; 
+    $scope.isImageFile = function (file) { return !!(file.type && file.type.indexOf('image') === 0); }; 
+    $scope.getDisplayName = function (file) { return file.webkitRelativePath && file.webkitRelativePath.length > 0 ? file.webkitRelativePath : file.name; };
 
     // 게시글 등록 함수
     $scope.submitPost = function () {
-        // submitPost 함수 정의 시작
-        // 사용자에게 게시글 등록 여부 확인 (window.confirm() 함수)
+
+        if ($scope.post.content === '' || $scope.post.content === '<p><br></p>' || !$scope.post.title) {
+            alert('제목과 내용을 모두 입력해주세요.');
+            return;
+        }
+
         if (confirm('게시글을 등록하시겠습니까?')) {
-            // if 시작
+            var formData = new FormData(); 
 
-            // ★ 수정됨: JSON이 아니라 FormData로 텍스트 + 파일 함께 전송
-            var formData = new FormData(); //
+            formData.append('title', $scope.post.title || ''); 
+            formData.append('content', $scope.post.content); // ★ HTML 내용 전송
 
-            // 텍스트 필드 추가
-            formData.append('title', $scope.post.title || ''); //
-            formData.append('content', $scope.post.content || ''); //
-
-            // 파일들 추가 (백엔드에서 MultipartFile[] files 등으로 받는다고 가정)
-                        // 파일들 추가 (백엔드에서 MultipartFile[] files 등으로 받는다고 가정) // 수정됨
-            var allFiles = $scope.getAllUploadFiles(); // 파일 + 폴더 파일 모두 합침 // 수정됨
-            if (allFiles && allFiles.length > 0) { // 수정됨
-                for (var i = 0; i < allFiles.length; i++) { // 수정됨
-                    formData.append('files', allFiles[i]); //  (키 이름 'files'는 백엔드와 맞춰야 함)
+            // ▼▼▼ [첨부파일] 폴더 업로드 지원 로직 복구 ▼▼▼
+            var allFiles = $scope.getAllUploadFiles(); 
+            if (allFiles && allFiles.length > 0) { 
+                for (var i = 0; i < allFiles.length; i++) { 
+                    var file = allFiles[i]; 
+                    formData.append('files', file); 
+                    var path = file.webkitRelativePath || file.name;
+                    formData.append('filePaths', path); // ★ filePaths 전송 복구
                 }
             }
+            // ▲▲▲ [첨부파일] ▲▲▲
 
 
-            //$http.post(url, data): HTTP POST 데이터 전송
-            //$scope.post: 기존에는 JSON이었으나, 이제는 formData 전송
             $http
                 .post('/api/posts', formData, {
-                    // ★ 수정됨
-                    transformRequest: angular.identity, // : Angular가 FormData를 건드리지 않도록
-                    headers: { 'Content-Type': undefined }, // : 브라우저가 boundary가 포함된 Content-Type 설정
+                    transformRequest: angular.identity, 
+                    headers: { 'Content-Type': undefined }, 
                 })
                 .then(function () {
-                    // .then(): 요청 성공 콜백
-                    // 성공 시 알림 (window.alert() 함수) 및 게시판 목록 페이지로 이동
-                    alert('게시글이 성공적으로 등록되었습니다.'); // 알림창 표시
-                    $location.path('/board'); // $location.path(): AngularJS 경로 변경
+                    alert('게시글이 성공적으로 등록되었습니다.'); 
+                    $location.path('/board'); 
                 })
                 .catch(function (error) {
-                    // .catch(): 요청 실패 콜백. error: 오류 객체
-                    alert('게시글 등록에 실패했습니다.'); // 오류 알림
-                    console.error('Post creation failed:', error); // console.error(): 개발자 도구 콘솔 오류 출력
-                }); // .catch() 끝
-        } // if 끝
+                    alert('게시글 등록에 실패했습니다.'); 
+                    console.error('Post creation failed:', error); 
+                }); 
+        } 
     }; // submitPost 함수 끝
 
-    // : 취소 버튼 처리 (목록으로 이동)
     $scope.cancel = function () {
-        //
-        $location.path('/board'); //
-    }; //
+        $location.path('/board'); 
+    }; 
 }); // BoardNewController 정의 끝
 
 /**
@@ -669,10 +702,77 @@ app.controller('BoardEditController', function ($scope, $http, $routeParams, $lo
     $scope.newFiles = [];   // 새로 추가할 파일 목록
     $scope.deletedFileIds = []; // 삭제할 파일 ID 목록
 
+    // ★★★ [수정됨] 에디터 제거 + 본문 이미지 업로드용 변수 추가 ★★★
+    $scope.inlineImageFilesEdit = null; // 수정됨: 수정 화면용 본문 이미지 FileList
+
+    // ★★★ [수정됨] textarea 커서 위치에 text 삽입 헬퍼 함수 ★★★
+    function insertAtCursor(textareaId, text) { // 수정됨
+        var textarea = document.getElementById(textareaId); // 수정됨
+        if (!textarea) return; // 수정됨
+
+        var start = textarea.selectionStart || 0; // 수정됨
+        var end = textarea.selectionEnd || 0; // 수정됨
+
+        var before = textarea.value.substring(0, start); // 수정됨
+        var after = textarea.value.substring(end); // 수정됨
+
+        var newValue = before + text + after; // 수정됨
+        textarea.value = newValue; // 수정됨
+
+        // ng-model 동기화
+        $scope.post.content = newValue; // 수정됨
+
+        // 커서를 삽입된 텍스트 뒤로 이동
+        var newPos = (before + text).length; // 수정됨
+        textarea.focus(); // 수정됨
+        textarea.selectionStart = textarea.selectionEnd = newPos; // 수정됨
+    } // 수정됨
+
+    // ★★★ [수정됨] 본문 이미지 업로드 + textarea에 <img> 삽입 (수정 화면용) ★★★
+    $scope.uploadInlineImageForEdit = function () { // 수정됨
+        if (
+            !$scope.inlineImageFilesEdit ||
+            $scope.inlineImageFilesEdit.length === 0
+        ) { // 수정됨
+            alert('먼저 이미지를 선택하세요.'); // 수정됨
+            return; // 수정됨
+        } // 수정됨
+
+        var file = $scope.inlineImageFilesEdit[0]; // 수정됨
+        var formData = new FormData(); // 수정됨
+        formData.append('file', file); // 수정됨
+
+        $http
+            .post('/api/editor-images', formData, { // 수정됨
+                transformRequest: angular.identity, // 수정됨
+                headers: { 'Content-Type': undefined }, // 수정됨
+            })
+            .then(function (response) { // 수정됨
+                var data = response.data || {}; // 수정됨
+                if (data.success && data.url) { // 수정됨
+                    var imgTag =
+                        '\n<p><img src="' +
+                        data.url +
+                        '" style="max-width:100%;"></p>\n'; // 수정됨
+
+                    // postContent textarea 커서 위치에 삽입
+                    insertAtCursor('postContent', imgTag); // 수정됨
+                } else { // 수정됨
+                    alert('이미지 업로드에 실패했습니다.'); // 수정됨
+                } // 수정됨
+            })
+            .catch(function (error) { // 수정됨
+                console.error('본문 이미지 업로드 실패:', error); // 수정됨
+                alert('이미지 업로드 중 오류가 발생했습니다.'); // 수정됨
+            });
+    }; // 수정됨
+
     // 2. (로딩) 게시글 상세 정보 가져오기 (제목, 내용 채우기)
-    $http.get('/api/posts/' + postId)
+    $http
+        .get('/api/posts/' + postId)
         .then(function (response) {
             $scope.post = response.data;
+            // textarea + ng-model 로 자동 표시되므로 별도 summernote 처리 없음 // 수정됨
         })
         .catch(function () {
             alert('게시글 정보를 불러오는데 실패했습니다.');
@@ -680,18 +780,24 @@ app.controller('BoardEditController', function ($scope, $http, $routeParams, $lo
         });
 
     // 3. (로딩) 기존 첨부파일 목록 가져오기
-    $http.get('/api/posts/' + postId + '/files')
-        .then(function (response) {
-            $scope.fileList = response.data || [];
-            // 체크박스 초기화
-            $scope.fileList.forEach(function (f) {
-                f._delete = false;
-            });
+    $http.get('/api/posts/' + postId + '/files').then(function (response) {
+        $scope.fileList = response.data || [];
+        // 체크박스 초기화
+        $scope.fileList.forEach(function (f) {
+            f._delete = false;
         });
+    });
 
     // 4. (액션) 수정 완료 버튼 클릭
     $scope.saveChanges = function () {
         if (confirm('수정하시겠습니까?')) {
+
+            // textarea 값과 $scope.post.content 동기화 (안전용) // 수정됨
+            var textarea = document.getElementById('postContent'); // 수정됨
+            if (textarea) { // 수정됨
+                $scope.post.content = textarea.value; // 수정됨
+            } // 수정됨
+
             var formData = new FormData();
 
             // 1) 수정된 제목, 내용
@@ -699,7 +805,7 @@ app.controller('BoardEditController', function ($scope, $http, $routeParams, $lo
             formData.append('content', $scope.post.content || '');
 
             // 2) 삭제 체크된 기존 파일 ID 수집
-            $scope.deletedFileIds = []; 
+            $scope.deletedFileIds = [];
             angular.forEach($scope.fileList, function (f) {
                 if (f._delete) {
                     $scope.deletedFileIds.push(f.file_id);
@@ -717,19 +823,20 @@ app.controller('BoardEditController', function ($scope, $http, $routeParams, $lo
             }
 
             // 4) PUT 전송
-            $http.put('/api/posts/' + postId, formData, {
-                transformRequest: angular.identity,
-                headers: { 'Content-Type': undefined },
-            })
-            .then(function () {
-                alert('게시글이 수정되었습니다.');
-                // 성공 시 상세보기 페이지로 이동
-                $location.path('/board/' + postId);
-            })
-            .catch(function (error) {
-                alert('게시글 수정 중 오류가 발생했습니다.');
-                console.error('Post update failed:', error);
-            });
+            $http
+                .put('/api/posts/' + postId, formData, {
+                    transformRequest: angular.identity,
+                    headers: { 'Content-Type': undefined },
+                })
+                .then(function () {
+                    alert('게시글이 수정되었습니다.');
+                    // 성공 시 상세보기 페이지로 이동
+                    $location.path('/board/' + postId);
+                })
+                .catch(function (error) {
+                    alert('게시글 수정 중 오류가 발생했습니다.');
+                    console.error('Post update failed:', error);
+                });
         }
     }; // saveChanges 끝
 
@@ -738,9 +845,9 @@ app.controller('BoardEditController', function ($scope, $http, $routeParams, $lo
         // 상세보기 페이지로 이동
         $location.path('/board/' + postId);
     };
-
 }); // BoardEditController 정의 끝
 // ▲▲▲ [신규 추가] ▲▲▲
+
 
 // ★★★ [공통] file-model 디렉티브 추가 (board-new.html / board-detail.html에서 사용) ★★★
 app.directive('fileModel', [

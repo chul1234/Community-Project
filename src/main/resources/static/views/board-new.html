@@ -30,13 +30,34 @@
 
                 <!-- 내용 -->
                 <div class="form-group">
-                    <label for="content">내용</label>
+                    <label for="postEditor">내용</label>
                     <textarea
-                        id="content"
+                        id="postEditor"
                         class="form-control"
                         ng-model="post.content"
-                        rows="10"
                     ></textarea>
+                    <!-- 본문 이미지 업로드 (에디터 없이) -->
+<div class="form-group">
+    <label>본문 이미지 업로드</label>
+    <div style="display: flex; gap: 8px; align-items: center;">
+        <input
+            type="file"
+            accept="image/*"
+            file-model="inlineImageFilesNew"  
+        />
+        <button
+            type="button"
+            class="secondary-btn"
+            ng-click="uploadInlineImageForNew()"
+        >
+            본문에 삽입
+        </button>
+    </div>
+    <div style="font-size: 12px; color: #6c757d; margin-top: 4px;">
+        이미지를 선택한 뒤 "본문에 삽입"을 누르면, 현재 커서 위치에 이미지 태그가 들어갑니다.
+    </div>
+</div>
+
                 </div>
 
                 <!-- : 파일 업로드 -->
