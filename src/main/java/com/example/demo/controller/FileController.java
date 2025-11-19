@@ -110,6 +110,21 @@ public class FileController {
                         "inline; filename*=UTF-8''" + encodedName)
                 .body(resource);
     }
+
+    // 파일 메타데이터 조회 (다운로드 미리보기용) 
+    // 예: GET /api/files/3/meta
+    @GetMapping("/api/files/{fileId}/meta")              
+    public ResponseEntity<Map<String, Object>> getFileMeta(  
+            @PathVariable int fileId) {                     
+
+        Map<String, Object> fileMeta = fileService.getFileById(fileId);  // ★ 추가됨
+
+        if (fileMeta == null) {                             
+            return ResponseEntity.notFound().build();       
+        }                                                   
+
+        return ResponseEntity.ok(fileMeta);                 
+    }                                                       
     
     // =========================================================================
     // ▼▼▼ [신규 추가] 인라인 이미지 에디터용 API (3단계) ▼▼▼
