@@ -5,6 +5,16 @@ import java.util.HashMap; // BoardDAO 클래스 import
 import java.util.List; // IBoardService 인터페이스 import
 import java.util.Map; // @Autowired 어노테이션 import
 
+// : editor 이미지 정리용 import
+import java.util.ArrayList;          // 
+import java.util.HashSet;            // 
+import java.util.Set;                // 
+import java.util.regex.Matcher;      // 
+import java.util.regex.Pattern;      // 
+import java.nio.file.Files;          // 
+import java.nio.file.Path;           // 
+import java.nio.file.Paths;          // 
+
 import org.springframework.beans.factory.annotation.Autowired; // @Service 어노테이션 import
 import org.springframework.stereotype.Service; // HashMap 클래스 import
 import org.springframework.web.multipart.MultipartFile; // Map 인터페이스 import
@@ -21,6 +31,9 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
 
     @Autowired
     private IFileService fileService; // 추가: 첨부파일 관련 작업 담당
+
+    // : editor 인라인 이미지가 저장된 기본 경로 (FileController 의 uploadDir 과 맞춰야 함)
+    private final String uploadDir = "C:/upload"; // : C:/upload/editor 밑에서 이미지 삭제용
 
     /**
      * [수정됨] 특정 페이지의 게시글 목록과 전체 페이지 정보를 조회 메소드 정의 시작
@@ -222,9 +235,13 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
             return null; // 권한 없음 또는 게시글 없음
         }
 
+        // : editor 이미지 정리를 위한 이전/이후 내용 확보
+        String oldContent = (String) post.get("content");                // 
+        String newContent = (String) postDetails.get("content");         // 
+
         // 3. 제목/내용 수정
         post.put("title", postDetails.get("title"));     // "title" 키 값 업데이트
-        post.put("content", postDetails.get("content")); // "content" 키 값 업데이트
+        post.put("content", newContent);                 // ★ 수정됨: postDetails.get("content") 대신 newContent 사용
 
         // 4. DB에 게시글 UPDATE
         int affectedRows = boardDAO.update(post); // boardDAO.update() 메소드 호출
@@ -232,6 +249,9 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         if (affectedRows <= 0) {
             return null; // UPDATE 실패
         }
+
+        // : UPDATE 성공 후 editor 인라인 이미지 정리
+        cleanupEditorImagesOnUpdate(oldContent, newContent); // 
 
         // 5. 첨부파일 삭제 처리 (체크된 파일들)
         if (deleteFileIds != null && !deleteFileIds.isEmpty()) { //
@@ -261,6 +281,10 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
 
         // 권한 확인 로직 시작 (게시글 존재 여부 및 관리자 또는 작성자 일치 확인)
         if (post != null && (roles.contains("ADMIN") || post.get("user_id").equals(currentUserId))) { // if 시작
+
+            // : 게시글 삭제 전에 본문에 연결된 editor 인라인 이미지 삭제
+            String content = (String) post.get("content");          // 
+            cleanupEditorImagesOnDelete(content);                   // 
 
             //수정됨: 게시글 삭제 전에 첨부 파일 전체 삭제
             // 1) post_files 테이블에서 해당 post_id의 파일 메타데이터 전체 조회
@@ -343,5 +367,64 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         // 결과(영향받은 행 수)가 0보다 큰지 비교하여 boolean 값(true/false) 반환
         return affectedRows > 0;
     } // unpinPost 메소드 끝
+
+    // ======================================================================
+    // ▼▼▼ editor 인라인 이미지 정리를 위한 private 헬퍼 메소드들 ▼▼▼
+    // ======================================================================
+
+    // 본문 HTML에서 <img src="/api/editor-images/view/파일명"> 패턴만 뽑아서
+    // "파일명(UUID_원본명)" 리스트로 반환
+    private List<String> extractEditorImageFileNames(String html) { // 
+        List<String> result = new ArrayList<>();                    // 
+        if (html == null || html.isBlank()) return result;          // 
+
+        Pattern p = Pattern.compile(                                // 
+                "<img[^>]+src=[\"'](/api/editor-images/view/([^\"']+))[\"'][^>]*>",
+                Pattern.CASE_INSENSITIVE
+        );
+        Matcher m = p.matcher(html);                                // 
+        while (m.find()) {                                          // 
+            String fileName = m.group(2); // UUID_파일명             // 
+            result.add(fileName);                                   // 
+        }
+        return result;                                              // 
+    }
+
+    // 수정 시: oldHtml 에만 있고 newHtml 에는 없는 editor 이미지 파일들만 삭제
+    private void cleanupEditorImagesOnUpdate(String oldHtml, String newHtml) { // 
+        List<String> before = extractEditorImageFileNames(oldHtml);           // 
+        List<String> after  = extractEditorImageFileNames(newHtml);           // 
+
+        Set<String> toDelete = new HashSet<>(before);                          // 
+        toDelete.removeAll(after);                                            // 
+
+        for (String fn : toDelete) {                                          // 
+            deleteEditorImageFile(fn);                                        // 
+        }
+    }
+
+    // 삭제 시: 해당 글 본문에 포함된 editor 이미지 전부 삭제
+    private void cleanupEditorImagesOnDelete(String html) {       // 
+        List<String> files = extractEditorImageFileNames(html);   // 
+        for (String fn : files) {                                 // 
+            deleteEditorImageFile(fn);                            // 
+        }
+    }
+
+    // 실제 C:/upload/editor/파일명 삭제
+    private void deleteEditorImageFile(String savedName) {        // 
+        try {
+            if (savedName == null || savedName.isBlank()) return; // 
+
+            Path editorBasePath = Paths.get(uploadDir, "editor"); // 
+            Path target = editorBasePath.resolve(savedName);      // 
+
+            Files.deleteIfExists(target);                         // 
+        } catch (Exception e) {                                   // 
+            // 에디터 이미지 삭제 실패해도 게시글 수정/삭제 자체는 진행  // 
+            e.printStackTrace();                                  // 
+        }
+    }
+    // ======================================================================
 
 } // BoardServiceImpl 클래스 정의 끝
