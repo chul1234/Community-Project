@@ -530,3 +530,20 @@ header h1 {
     margin-left: auto;
 }
 /* ▲▲▲ [수정됨] 수정 완료 ▲▲▲ */
+
+/* ... (기존 코드들) ... */
+
+/* ▼▼▼ [신규 추가] 글쓰기 화면 내용 입력창 스타일 ▼▼▼ */
+/* ▼▼▼ [수정됨] #content(글쓰기)와 #postContent(수정) 모두 적용 ▼▼▼ */
+#content, #postContent {
+    width: 100%;
+    height: 300px; /* 높이 고정 */
+    padding: 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    box-sizing: border-box;
+    resize: vertical;
+    font-size: 14px;
+    line-height: 1.5;
+}
+/* ▲▲▲ [수정됨] ▲▲▲ */
