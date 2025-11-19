@@ -1,6 +1,6 @@
 package com.example.demo.secutiry;
 
-import com.example.demo.dao.UserDAO; // DB의 users 테이블과 통신하는 UserDAO
+import com.example.demo.dao.UserDAO; // DB의 users 테이블과 통하는 UserDAO
 import org.springframework.beans.factory.annotation.Autowired; // Spring의 의존성 주입 기능을 사용하기 위한 도구
 import org.springframework.security.core.userdetails.User; // Spring Security가 제공하는 UserDetails의 표준 구현체
 import org.springframework.security.core.userdetails.UserDetails; // 사용자의 핵심 정보(ID, PW, 권한)를 담는 설계도

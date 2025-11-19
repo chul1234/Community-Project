@@ -34,10 +34,10 @@ public class UserController {
             @RequestParam(defaultValue = "1") int page, // [유지] page 파라미터
             @RequestParam(defaultValue = "10") int size, // [유지] size 파라미터
             
-            // ▼▼▼ [신규 추가] 검색 파라미터 2개 (BoardController.java 참고) ▼▼▼
+            // ▼▼▼ [ 추가] 검색 파라미터 2개 (BoardController.java 참고) ▼▼▼
             @RequestParam(required = false) String searchType,
             @RequestParam(required = false) String searchKeyword
-            // ▲▲▲ [신규 추가] ▲▲▲
+            // ▲▲▲ [ 추가] ▲▲▲
     ) {
         // [수정] page, size, searchType, searchKeyword를 서비스로 전달
         return userService.findAllUsers(page, size, searchType, searchKeyword); 

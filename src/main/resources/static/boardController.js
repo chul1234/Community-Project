@@ -1,14 +1,14 @@
 // 'BoardController' (게시판 목록)
 app.controller('BoardController', function ($scope, $http, $rootScope) {
     // BoardController 정의 시작 // $rootScope 추가
-    //$scope 컨트롤러 와 뷰 연결, $http 백엔드와 HTTP통신
+    //$scope 컨트롤러 와 뷰 연결, $http 백엔드와 HTTP통
     $scope.postList = []; // 게시글 목록 변수 (배열 초기화)
 
     // [유지] 페이지네이션 상태 변수
     $scope.currentPage = 1; // 현재 페이지 번호 (int, 1부터 시작). 기본값 1
 
     // ▼▼▼ [수정] '5개씩 보기' 버그 수정 ▼▼▼
-    // [신규] HTML <option value="10">과 일치하도록 '숫자' 10 대신 '문자열' "10"으로 변경
+    // [] HTML <option value="10">과 일치하도록 '숫자' 10 대 '문자열' "10"으로 변경
     $scope.pageSize = '10'; // 페이지당 보여줄 게시글 수 (String). 기본값 "10"
     // ▲▲▲ [수정] ▲▲▲
 
@@ -36,7 +36,7 @@ app.controller('BoardController', function ($scope, $http, $rootScope) {
         // page 파라미터 받음
 
         // [수정됨] params 객체를 생성하여 page와 size를 담음
-        // [신규] $scope.pageSize가 이제 문자열 "10"이므로, parseInt로 숫자로 변환
+        // [] $scope.pageSize가 이제 문자열 "10"이므로, parseInt로 숫자로 변환
         var params = {
             page: page,
             size: parseInt($scope.pageSize, 10), // 10진수 정수로 변환하여 전송
@@ -91,11 +91,11 @@ app.controller('BoardController', function ($scope, $http, $rootScope) {
      * [수정됨] HTML의 select 태그(ng-model="pageSize") 값이 변경될 때(ng-change) 호출됨.
      */
     $scope.pageSizeChanged = function () {
-        // [신규] 페이지 크기가 변경되었으므로, (검색어 유지한 채) 1페이지부터 다시 조회
+        // [] 페이지 크기가 변경되었으므로, (검색어 유지한 채) 1페이지부터 다시 조회
         fetchPosts(1);
     };
 
-    // [신규] $watch('pageSize', ...) 함수 삭제
+    // [] $watch('pageSize', ...) 함수 삭제
     // ▲▲▲ [수정] ▲▲▲
 
     /**
@@ -125,7 +125,7 @@ app.controller('BoardController', function ($scope, $http, $rootScope) {
     }; // getNumber 함수 끝
 
     /**
-     * [신규] 현재 페이지 기준으로 화면에 보여줄 페이지 번호 목록 계산  // 수정됨
+     * [] 현재 페이지 기준으로 화면에 보여줄 페이지 번호 목록 계산  // 수정됨
      * 예) currentPage=7, totalPages=52, maxPageLinks=10 → [1..10]  // 수정됨
      * currentPage=17 → [11..20] 식으로 동작  // 수정됨
      */
@@ -198,7 +198,7 @@ app.controller('BoardController', function ($scope, $http, $rootScope) {
     fetchPosts($scope.currentPage); // fetchPosts 함수 초기 호출 (1페이지 로드)
 }); // BoardController 정의 끝
 
-// 'BoardNewController' (새 글 작성) -파일 업로드 처리 추가됨
+// 'BoardNewController' (새 글 작성) -파일 업로드 처리
 // ▼▼▼ [수정됨] BoardNewController (Summernote 콜백 및 Logic) ▼▼▼
 app.controller('BoardNewController', function ($scope, $http, $location) {
     // BoardNewController 정의 시작
@@ -209,6 +209,9 @@ app.controller('BoardNewController', function ($scope, $http, $location) {
 
     //본문 이미지 input 이 채워줄 FileList
     $scope.inlineImageFilesNew = null;
+
+    // ★★★ [] 본문 이미지 max-width % 값 (기본 100) ★★★
+    $scope.inlineImageWidthNew = 100; // 사용자가 %로 입력할 값
 
     // textarea 커서 위치에 text 삽입하는 헬퍼
     function insertAtCursor(textareaId, text) {
@@ -252,7 +255,17 @@ app.controller('BoardNewController', function ($scope, $http, $location) {
             .then(function (response) {
                 var data = response.data || {};
                 if (data.success && data.url) {
-                    var imgTag = '\n<p><img src="' + data.url + '" style="max-width:100%;"></p>\n';
+                    // ★★★ [수정됨] 입력한 %값을 이용해 max-width 설정 ★★★
+                    var width = parseInt($scope.inlineImageWidthNew, 10);
+                    if (isNaN(width) || width <= 0) {
+                        width = 100;
+                    }
+                    if (width > 100) {
+                        width = 100;
+                    }
+                    var styleText = 'max-width:' + width + '%;';
+
+                    var imgTag = '\n<p><img src="' + data.url + '" style="' + styleText + '"></p>\n';
 
                     // postEditor textarea 커서 위치에 삽입
                     insertAtCursor('postEditor', imgTag);
@@ -452,7 +465,7 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
         if (confirm('게시글을 삭제하시겠습니까?')) {
             // window.confirm() 함수
             $http.delete('/api/posts/' + postId).then(function () {
-                // 화살표 함수 대신 일반 함수로 유지해도 무방
+                // 화살표 함수 대 일반 함수로 유지해도 무방
                 $location.path('/board'); // 경로 변경
             }); // .then() 끝
         } // if 끝
@@ -465,13 +478,13 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
         }
     }); // $watch 정의
 
-    // --- [신규 추가됨] 게시글 고정 관련 함수들 (관리자 전용) ---
+    // ---  게시글 고정 관련 함수들 (관리자 전용) ---
     /**
      * 게시글 고정 함수. HTML의 '고정하기' 버튼 클릭 시 호출됨 (ng-click="pinPost()")
      * [수정됨] prompt 입력 제거, order 값 1로 고정
      */
     $scope.pinPost = function () {
-        // [신규] 고정 순서(order) 값을 1로 고정 (prompt 제거)
+        // [] 고정 순서(order) 값을 1로 고정 (prompt 제거)
         const order = 1; // order 변수 1 할당
 
         $http
@@ -642,7 +655,7 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
                     $scope.newComment.content = '';
                 }
 
-                // 3. fetchComments() 함수 호출하여 댓글 목록 다시 불러와 화면 갱신
+                // 3. fetchComments() 함수 호출하여 댓글 목록 다시 불러와 화면 갱
                 fetchComments();
             })
             .catch(function () {
@@ -693,7 +706,7 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
     }; // cancelCommentEdit 함수 끝
 }); // BoardDetailController 정의 끝
 
-// ▼▼▼ [신규 추가] BoardEditController (수정 전용) ▼▼▼
+// ▼▼▼ [ 추가] BoardEditController (수정 전용) ▼▼▼
 app.controller('BoardEditController', function ($scope, $http, $routeParams, $location) {
     const postId = $routeParams.postId;
 
@@ -703,79 +716,84 @@ app.controller('BoardEditController', function ($scope, $http, $routeParams, $lo
     $scope.newFiles = []; // 새로 추가할 파일 목록
     $scope.deletedFileIds = []; // 삭제할 파일 ID 목록
 
-    // ★★★ [수정됨] 에디터 제거 + 본문 이미지 업로드용 변수 추가 ★★★
-    $scope.inlineImageFilesEdit = null; //  수정 화면용 본문 이미지 FileList
+    // 수정 화면용 본문 이미지 FileList
+    $scope.inlineImageFilesEdit = null;
 
-    // ★★★ [수정됨] textarea 커서 위치에 text 삽입 헬퍼 함수 ★★★
+    // ★★★ [] 수정 화면에서도 본문 이미지 max-width % 값 (기본 100) ★★★
+    $scope.inlineImageWidthEdit = 100; // 수정 화면용 % 값
+
+    // textarea 커서 위치에 text 삽입 헬퍼 함수
     function insertAtCursor(textareaId, text) {
-        // 수정됨
-        var textarea = document.getElementById(textareaId); // 수정됨
-        if (!textarea) return; // 수정됨
+        var textarea = document.getElementById(textareaId);
+        if (!textarea) return;
 
-        var start = textarea.selectionStart || 0; // 수정됨
-        var end = textarea.selectionEnd || 0; // 수정됨
+        var start = textarea.selectionStart || 0;
+        var end = textarea.selectionEnd || 0;
 
-        var before = textarea.value.substring(0, start); // 수정됨
-        var after = textarea.value.substring(end); // 수정됨
+        var before = textarea.value.substring(0, start);
+        var after = textarea.value.substring(end);
 
-        var newValue = before + text + after; // 수정됨
-        textarea.value = newValue; // 수정됨
+        var newValue = before + text + after;
+        textarea.value = newValue;
 
         // ng-model 동기화
-        $scope.post.content = newValue; // 수정됨
+        $scope.post.content = newValue;
 
         // 커서를 삽입된 텍스트 뒤로 이동
-        var newPos = (before + text).length; // 수정됨
-        textarea.focus(); // 수정됨
-        textarea.selectionStart = textarea.selectionEnd = newPos; // 수정됨
-    } // 수정됨
+        var newPos = (before + text).length;
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = newPos;
+    }
 
-    // ★★★ [수정됨] 본문 이미지 업로드 + textarea에 <img> 삽입 (수정 화면용) ★★★
+    // 본문 이미지 업로드 + textarea에 <img> 삽입 (수정 화면용)
     $scope.uploadInlineImageForEdit = function () {
-        // 수정됨
         if (!$scope.inlineImageFilesEdit || $scope.inlineImageFilesEdit.length === 0) {
-            // 수정됨
-            alert('먼저 이미지를 선택하세요.'); // 수정됨
-            return; // 수정됨
-        } // 수정됨
+            alert('먼저 이미지를 선택하세요.');
+            return;
+        }
 
-        var file = $scope.inlineImageFilesEdit[0]; // 수정됨
-        var formData = new FormData(); // 수정됨
-        formData.append('file', file); // 수정됨
+        var file = $scope.inlineImageFilesEdit[0];
+        var formData = new FormData();
+        formData.append('file', file);
 
         $http
             .post('/api/editor-images', formData, {
-                // 수정됨
-                transformRequest: angular.identity, // 수정됨
-                headers: { 'Content-Type': undefined }, // 수정됨
+                transformRequest: angular.identity,
+                headers: { 'Content-Type': undefined },
             })
             .then(function (response) {
-                // 수정됨
-                var data = response.data || {}; // 수정됨
+                var data = response.data || {};
                 if (data.success && data.url) {
-                    // 수정됨
-                    var imgTag = '\n<p><img src="' + data.url + '" style="max-width:100%;"></p>\n'; // 수정됨
+                    // ★★★ [수정됨] 수정 화면에서도 %값으로 max-width 설정 ★★★
+                    var width = parseInt($scope.inlineImageWidthEdit, 10);
+                    if (isNaN(width) || width <= 0) {
+                        width = 100;
+                    }
+                    if (width > 100) {
+                        width = 100;
+                    }
+                    var styleText = 'max-width:' + width + '%;';
+
+                    var imgTag = '\n<p><img src="' + data.url + '" style="' + styleText + '"></p>\n';
 
                     // postContent textarea 커서 위치에 삽입
-                    insertAtCursor('postContent', imgTag); // 수정됨
+                    insertAtCursor('postContent', imgTag);
                 } else {
-                    // 수정됨
-                    alert('이미지 업로드에 실패했습니다.'); // 수정됨
-                } // 수정됨
+                    alert('이미지 업로드에 실패했습니다.');
+                }
             })
             .catch(function (error) {
-                // 수정됨
-                console.error('본문 이미지 업로드 실패:', error); // 수정됨
-                alert('이미지 업로드 중 오류가 발생했습니다.'); // 수정됨
+                console.error('본문 이미지 업로드 실패:', error);
+                alert('이미지 업로드 중 오류가 발생했습니다.');
             });
-    }; // 수정됨
+    };
 
     // 2. (로딩) 게시글 상세 정보 가져오기 (제목, 내용 채우기)
     $http
         .get('/api/posts/' + postId)
         .then(function (response) {
             $scope.post = response.data;
-            // textarea + ng-model 로 자동 표시되므로 별도 summernote 처리 없음 // 수정됨
+            // textarea + ng-model 로 자동 표시되므로 별도 summernote 처리 없음
         })
         .catch(function () {
             alert('게시글 정보를 불러오는데 실패했습니다.');
@@ -794,12 +812,11 @@ app.controller('BoardEditController', function ($scope, $http, $routeParams, $lo
     // 4. (액션) 수정 완료 버튼 클릭
     $scope.saveChanges = function () {
         if (confirm('수정하시겠습니까?')) {
-            // textarea 값과 $scope.post.content 동기화 (안전용) // 수정됨
-            var textarea = document.getElementById('postContent'); // 수정됨
+            // textarea 값과 $scope.post.content 동기화 (안전용)
+            var textarea = document.getElementById('postContent');
             if (textarea) {
-                // 수정됨
-                $scope.post.content = textarea.value; // 수정됨
-            } // 수정됨
+                $scope.post.content = textarea.value;
+            }
 
             var formData = new FormData();
 
@@ -849,7 +866,7 @@ app.controller('BoardEditController', function ($scope, $http, $routeParams, $lo
         $location.path('/board/' + postId);
     };
 }); // BoardEditController 정의 끝
-// ▲▲▲ [신규 추가] ▲▲▲
+// ▲▲▲ [ 추가] ▲▲▲
 
 // ★★★ [공통] file-model 디렉티브 추가 (board-new.html / board-detail.html에서 사용) ★★★
 app.directive('fileModel', [
@@ -873,16 +890,16 @@ app.directive('fileModel', [
     },
 ]); // fileModel 디렉티브 끝 //
 
-// 파일 다운로드뷰 컨트롤러 //추가됨
+// 파일 다운로드뷰 컨트롤러 //
 app.controller('FileViewController', function ($scope, $routeParams, $http, $window) {
-    $scope.file = null; // 파일 메타데이터 //추가됨
-    $scope.isImage = false; // 이미지 여부 //추가됨
-    $scope.viewUrl = ''; // /api/files/{id}/view //추가됨
-    $scope.downloadUrl = ''; // /api/files/{id}/download //추가됨
+    $scope.file = null; // 파일 메타데이터 //
+    $scope.isImage = false; // 이미지 여부 //
+    $scope.viewUrl = ''; // /api/files/{id}/view //
+    $scope.downloadUrl = ''; // /api/files/{id}/download //
 
-    var fileId = $routeParams.fileId; // URL에서 파일 ID 추출 //추가됨
+    var fileId = $routeParams.fileId; // URL에서 파일 ID 추출 //
 
-    // 파일 메타데이터 조회 //추가됨
+    // 파일 메타데이터 조회 //
     $http
         .get('/api/files/' + fileId + '/meta')
         .then(function (response) {
@@ -900,7 +917,7 @@ app.controller('FileViewController', function ($scope, $routeParams, $http, $win
             alert('파일 정보를 불러오는 중 오류가 발생했습니다.');
         });
 
-    // 뒤로가기 //추가됨
+    // 뒤로가기 //
     $scope.goBack = function () {
         $window.history.back();
     };

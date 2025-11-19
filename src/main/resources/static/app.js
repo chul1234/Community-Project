@@ -2,10 +2,10 @@
  * 1. AngularJS 애플리케이션 모듈을 정의합니다.
  * 'ngRoute' 모듈을 의존성으로 추가하여 라우팅 기능을 활성화합니다.
  */
-var app = angular.module('busApp', ['ngRoute','ngSanitize']);
+var app = angular.module('busApp', ['ngRoute', 'ngSanitize']);
 
 /**
- * 2. 애플리케이션의 라우팅 규칙을 설정합니다.
+ * 2. 애플리케이션의 라우팅 칙을 설정합니다.
  * URL 경로에 따라 어떤 HTML 템플릿과 컨트롤러를 사용할지 정의합니다.
  */
 app.config(function ($routeProvider) {
@@ -28,7 +28,7 @@ app.config(function ($routeProvider) {
         // ▼▼▼ [수정됨] 이 부분의 주석(//)을 제거하여 경로를 활성화합니다. ▼▼▼
         .when('/board/edit/:postId', {
             templateUrl: 'views/board-edit.html',
-            controller: 'BoardEditController'
+            controller: 'BoardEditController',
         })
         // ▲▲▲ [수정됨] ▲▲▲
 
@@ -56,14 +56,15 @@ app.config(function ($routeProvider) {
 
         .when('/files/:fileId', {
             templateUrl: 'views/file-view.html',
-            controller: 'FileViewController'
+            controller: 'FileViewController',
         })
 
-        .when('/big-posts', { // URL 경로
+        .when('/big-posts', {
+            // URL 경로
             templateUrl: 'views/big-post-list.html', // 뷰 파일
-            controller: 'BigPostController' // 컨트롤러
+            controller: 'BigPostController', // 컨트롤러
         })
-        
+
         .otherwise({
             redirectTo: '/users',
         });

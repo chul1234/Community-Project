@@ -13,7 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-//@Repository: 이 클래스가 데이터베이스와 통신하는 부품(DAO)임을 Spring
+//@Repository: 이 클래스가 데이터베이스와 통하는 부품(DAO)임을 Spring
 @Repository
 public class RoleDAO {
 

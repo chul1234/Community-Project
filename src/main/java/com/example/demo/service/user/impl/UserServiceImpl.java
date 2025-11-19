@@ -1,16 +1,17 @@
 package com.example.demo.service.user.impl;
 
-import com.example.demo.dao.UserDAO;
-import com.example.demo.service.user.IUserService;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import com.example.demo.dao.UserDAO;
+import com.example.demo.service.user.IUserService;
 
 @Service
 public class UserServiceImpl implements IUserService {
@@ -106,7 +107,7 @@ public class UserServiceImpl implements IUserService {
 
         // 5. 결과를 Map에 담아 반환 (BoardServiceImpl과 동일한 구조)
         Map<String, Object> result = new HashMap<>();
-        result.put("users", users); // "posts" 대신 "users" 라는 키 사용
+        result.put("users", users); // "posts" 대 "users" 라는 키 사용
         result.put("totalItems", totalItems);
         result.put("totalPages", totalPages);
         result.put("currentPage", page);

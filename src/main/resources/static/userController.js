@@ -4,7 +4,7 @@
 // 'UserListController' 등록. user-list.html과 연결됨.
 app.controller('UserListController', function ($scope, $http, $location, $rootScope) {
     // $scope: HTML-컨트롤러 데이터 연결용
-    // $http: 서버 통신용
+    // $http: 서버 통용
     // $location: 페이지 이동용
     // $rootScope: 전역 데이터 접근용
 
@@ -17,9 +17,9 @@ app.controller('UserListController', function ($scope, $http, $location, $rootSc
     $scope.currentPage = 1; // 현재 페이지 번호 (int, 1부터 시작). 기본값 1
 
     // ▼▼▼ [유지] '5개씩 보기' 버그 수정 ▼▼▼
-    // [유지] HTML <option value="10">과 일치하도록 '숫자' 10 대신 '문자열' "10"으로 변경
+    // [유지] HTML <option value="10">과 일치하도록 '숫자' 10 대 '문자열' "10"으로 변경
     // $scope.pageSize = "10"; // 페이지당 보여줄 사용자 수 (String). 기본값 "10"
-    $scope.pagination = { pageSize: '10' }; // [변경] 원시값 대신 객체로 래핑하여 ng-if 자식 스코프 섀도잉 방지
+    $scope.pagination = { pageSize: '10' }; // [변경] 원시값 대 객체로 래핑하여 ng-if 자식 스코프 섀도잉 방지
     // ▲▲▲ [유지] ▲▲▲
 
     $scope.totalPages = 0; // 총 페이지 수 (int). 백엔드 응답으로 업데이트됨
@@ -90,29 +90,29 @@ app.controller('UserListController', function ($scope, $http, $location, $rootSc
     };
     // ▲▲▲ [페이지네이션 수정] fetchAllUsers 함수 완료 ▲▲▲
 
-    // ▼▼▼ [신규 추가] boardController.js에서 가져온 검색 관련 함수 3개 ▼▼▼
+    // ▼▼▼ [ 추가] boardController.js에서 가져온 검색 관련 함수 3개 ▼▼▼
     /**
-     * [신규] 검색창 열기 함수
+     * [] 검색창 열기 함수
      */
     $scope.openSearch = function () {
         $scope.showSearch = true;
     };
     /**
-     * [신규] 검색창 닫기 함수
+     * [] 검색창 닫기 함수
      */
     $scope.closeSearch = function () {
         $scope.showSearch = false;
     };
 
     /**
-     * [신규] HTML의 '검색' 버튼 (ng-click="searchUsers()") 클릭 시 호출됨.
+     * [] HTML의 '검색' 버튼 (ng-click="searchUsers()") 클릭 시 호출됨.
      */
     $scope.searchUsers = function () {
         // searchUsers 함수 정의 시작
-        // [신규] 검색은 항상 1페이지부터 결과를 보여줘야 함
+        // [] 검색은 항상 1페이지부터 결과를 보여줘야 함
         $scope.fetchAllUsers(1);
     }; // searchUsers 함수 정의 끝
-    // ▲▲▲ [신규 추가] 검색 함수 3개 완료 ▲▲▲
+    // ▲▲▲ [ 추가] 검색 함수 3개 완료 ▲▲▲
 
     // ▼▼▼ [페이지네이션 유지] 페이지 이동 관련 함수 3개 ▼▼▼
 
@@ -146,7 +146,7 @@ app.controller('UserListController', function ($scope, $http, $location, $rootSc
         return new Array(num);
     };
 
-    // ▼▼▼ [신규] 현재 페이지 기준으로 화면에 보여줄 페이지 번호 목록 계산 ▼▼▼  // 수정됨
+    // ▼▼▼ [] 현재 페이지 기준으로 화면에 보여줄 페이지 번호 목록 계산 ▼▼▼  // 수정됨
     $scope.getPageRange = function () {
         // 수정됨
         if (!$scope.totalPages || $scope.totalPages < 1) return []; // 수정됨
@@ -270,9 +270,9 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
     // ▼▼▼ [페이지네이션 유지] 페이지네이션 상태 변수 ▼▼▼
     $scope.currentPage = 1; // 현재 페이지 번호 (int, 1부터 시작). 기본값 1
 
-    // [유지] HTML <option value="10">과 일치하도록 '숫자' 10 대신 '문자열' "10"으로 변경
+    // [유지] HTML <option value="10">과 일치하도록 '숫자' 10 대 '문자열' "10"으로 변경
     // $scope.pageSize = "10"; //권한 관리 페이지는 10개씩 보기로 설정
-    $scope.pagination = { pageSize: '10' }; // [변경] 원시값 대신 객체로 래핑
+    $scope.pagination = { pageSize: '10' }; // [변경] 원시값 대 객체로 래핑
     // 위와 동일한 이유(ng-if 자식 스코프 섀도잉 방지)
 
     $scope.totalPages = 0; // 총 페이지 수 (int). 백엔드 응답으로 업데이트됨
@@ -282,13 +282,13 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
     //페이지 네이션 블록 크기
     $scope.maxPageLinks = 10;
 
-    // ▼▼▼ [신규 추가] RoleManagementController용 검색 객체 선언 (ng-if 스코프 문제 해결) ▼▼▼
+    // ▼▼▼ [ 추가] RoleManagementController용 검색 객체 선언 (ng-if 스코프 문제 해결) ▼▼▼
     $scope.search = {
         type: 'user_id', // 기본 검색 기준
         keyword: '', // 기본 검색어
     };
     $scope.showSearch = false; // 검색창 기본 숨김
-    // ▲▲▲ [신규 추가] ▲▲▲
+    // ▲▲▲ [ 추가] ▲▲▲
 
     // [유지] 현재 사용자 역할 감시($watch) 시작. 역할 확인 후 isAdmin 값 설정 및 데이터 로딩용.
     //$watch (데이터가 변경될 때마다 즉시 특정 작업을 수행)
@@ -334,8 +334,8 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
                 page: page,
                 // [유지] pageSize(문자열)를 숫자로 변환
                 size: parseInt($scope.pagination.pageSize, 10), // [변경] pageSize -> pagination.pageSize
-                searchType: $scope.search.type, // [신규]
-                searchKeyword: $scope.search.keyword, // [신규]
+                searchType: $scope.search.type, // []
+                searchKeyword: $scope.search.keyword, // []
             };
             // ▲▲▲ [수정] ▲▲▲
 
@@ -364,7 +364,7 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
     } // initializePageData 함수 끝.
     // ▲▲▲ [수정] initializePageData 함수 완료 ▲▲▲
 
-    // ▼▼▼ [신규 추가] UserListController와 동일한 검색 함수 3개 ▼▼▼
+    // ▼▼▼ [ 추가] UserListController와 동일한 검색 함수 3개 ▼▼▼
     $scope.openSearch = function () {
         $scope.showSearch = true;
     };
@@ -372,13 +372,13 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
         $scope.showSearch = false;
     };
     /**
-     * [신규] 검색 버튼 클릭 시 initializePageData(1) 호출
+     * [] 검색 버튼 클릭 시 initializePageData(1) 호출
      */
     $scope.searchUsers = function () {
         // 검색 시 1페이지부터
         initializePageData(1);
     };
-    // ▲▲▲ [신규 추가] ▲▲▲
+    // ▲▲▲ [ 추가] ▲▲▲
 
     // ▼▼▼ [페이지네이션 유지] 페이지 이동 관련 함수 3개 (수정 없음) ▼▼▼
 
@@ -408,7 +408,7 @@ app.controller('RoleManagementController', function ($scope, $http, $rootScope, 
         return new Array(num);
     };
 
-    // ▼▼▼ [신규] 현재 페이지 기준으로 화면에 보여줄 페이지 번호 목록 계산 ▼▼▼  // 수정됨
+    // ▼▼▼ [] 현재 페이지 기준으로 화면에 보여줄 페이지 번호 목록 계산 ▼▼▼  // 수정됨
     $scope.getPageRange = function () {
         // 수정됨
         if (!$scope.totalPages || $scope.totalPages < 1) return []; // 수정됨

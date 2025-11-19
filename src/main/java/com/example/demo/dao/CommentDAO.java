@@ -1,7 +1,7 @@
 package com.example.demo.dao;
 
 import org.springframework.beans.factory.annotation.Autowired; // Spring의 의존성 주입 기능을 사용하기 위한 도구
-import org.springframework.stereotype.Repository; // 이 클래스가 DB와 통신하는 부품임을 알리는 도구
+import org.springframework.stereotype.Repository; // 이 클래스가 DB와 통하는 부품임을 알리는 도구
 import javax.sql.DataSource; // 데이터베이스 연결 정보를 관리하는 도구
 import java.sql.*; // Connection, PreparedStatement, ResultSet 등 JDBC(자바 DB 연결) 관련 핵심 도구들
 import java.util.*; // ArrayList, HashMap, List, Map, Optional 등 자바의 여러 유용한 도구들

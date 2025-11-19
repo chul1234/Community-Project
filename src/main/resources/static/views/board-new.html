@@ -1,7 +1,14 @@
-<div class="container" ng-controller="BoardNewController">
+<div
+    class="container"
+    ng-controller="BoardNewController"
+>
     <div class="page-header">
         <h1>게시글 작성</h1>
-        <a href="#!/board" class="cancel-link">← 목록으로</a>
+        <a
+            href="#!/board"
+            class="cancel-link"
+            >← 목록으로</a
+        >
     </div>
 
     <div class="user-entry-card">
@@ -35,15 +42,33 @@
                         name="content"
                     ></textarea>
                 </div>
-                
+
+                <!-- ★ 수정됨: 본문 이미지 업로드 + 너비 % 입력 -->
                 <div class="form-group">
                     <label>본문 이미지 업로드</label>
-                    <div style="display: flex; gap: 8px; align-items: center;">
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+                        <!-- 파일 선택 -->
                         <input
                             type="file"
                             accept="image/*"
-                            file-model="inlineImageFilesNew"   
+                            file-model="inlineImageFilesNew"
                         />
+
+                        <!-- ★ : 이미지 너비 % 입력 -->
+                        <div style="display: flex; align-items: center; gap: 4px">
+                            <input
+                                type="number"
+                                min="1"
+                                max="100"
+                                ng-model="inlineImageWidthNew"
+                                class="form-control"
+                                style="width: 80px; padding: 4px 8px"
+                                placeholder="100"
+                            />
+                            <span style="font-size: 13px">%</span>
+                        </div>
+
+                        <!-- 본문에 삽입 버튼 -->
                         <button
                             type="button"
                             class="secondary-btn"
@@ -52,10 +77,9 @@
                             본문에 삽입
                         </button>
                     </div>
-                    <div style="font-size: 12px; color: #6c757d; margin-top: 4px;">
-                        이미지를 선택한 뒤 "본문에 삽입"을 누르면, 현재 커서 위치에 이미지 태그가 들어갑니다.
-                    </div>
+                    <div style="font-size: 12px; color: #6c757d; margin-top: 4px">이미지를 선택한 뒤 크기(%‌)를 입력하고 "본문에 삽입"을 누르면, 현재 커서 위치에 해당 크기로 이미지 태그가 들어갑니다.</div>
                 </div>
+
                 <div class="form-group">
                     <label for="fileInput">첨부 파일</label>
 
@@ -66,8 +90,8 @@
                         file-model="uploadFiles"
                     />
 
-                    <div style="margin-top: 8px;">
-                        <label style="font-size: 14px;">
+                    <div style="margin-top: 8px">
+                        <label style="font-size: 14px">
                             폴더 선택:
                             <input
                                 type="file"
@@ -77,26 +101,36 @@
                                 file-model="uploadFolderFiles"
                             />
                         </label>
-                        <div style="font-size: 12px; color: #6c757d; margin-top: 4px;">
-                            ※ 폴더를 선택하면, 그 폴더 안의 모든 파일이 함께 업로드됩니다.
-                        </div>
+                        <div style="font-size: 12px; color: #6c757d; margin-top: 4px">※ 폴더를 선택하면, 그 폴더 안의 모든 파일이 함께 업로드됩니다.</div>
                     </div>
 
                     <ul
                         class="file-upload-list"
                         ng-if="getAllUploadFiles().length > 0"
-                        style="margin-top: 10px;"
+                        style="margin-top: 10px"
                     >
                         <li ng-repeat="file in getAllUploadFiles()">
-                            <span ng-if="isFolderFile(file)" style="margin-right: 4px;">📁</span>
-                            <span ng-if="!isFolderFile(file) && isImageFile(file)" style="margin-right: 4px;">🖼️</span>
-                            <span ng-if="!isFolderFile(file) && !isImageFile(file)" style="margin-right: 4px;">📄</span>
+                            <span
+                                ng-if="isFolderFile(file)"
+                                style="margin-right: 4px"
+                                >📁</span
+                            >
+                            <span
+                                ng-if="!isFolderFile(file) && isImageFile(file)"
+                                style="margin-right: 4px"
+                                >🖼️</span
+                            >
+                            <span
+                                ng-if="!isFolderFile(file) && !isImageFile(file)"
+                                style="margin-right: 4px"
+                                >📄</span
+                            >
                             {{ getDisplayName(file) }} ({{file.size}} bytes)
                         </li>
                     </ul>
                     <div
                         ng-if="getAllUploadFiles().length === 0"
-                        style="font-size: 13px; color: #6c757d; margin-top: 4px;"
+                        style="font-size: 13px; color: #6c757d; margin-top: 4px"
                     >
                         선택된 파일이 없습니다.
                     </div>

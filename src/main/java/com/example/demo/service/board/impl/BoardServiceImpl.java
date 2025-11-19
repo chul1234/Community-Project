@@ -20,25 +20,25 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
     private BoardDAO boardDAO; // BoardDAO 객체 멤버 변수 선언
 
     @Autowired
-    private IFileService fileService; //신규 추가: 첨부파일 관련 작업 담당
+    private IFileService fileService; // 추가: 첨부파일 관련 작업 담당
 
     /**
      * [수정됨] 특정 페이지의 게시글 목록과 전체 페이지 정보를 조회 메소드 정의 시작
      * @param page 요청 페이지 번호 (int, 1부터 시작) - 파라미터 설명
      * @param size 페이지당 게시글 수 (int) - 파라미터 설명
-     * @param searchType [신규] 검색 타입 (String) - 파라미터 설명
-     * @param searchKeyword [신규] 검색어 (String) - 파라미터 설명
+     * @param searchType [] 검색 타입 (String) - 파라미터 설명
+     * @param searchKeyword [] 검색어 (String) - 파라미터 설명
      * @return Map (키: "posts", "totalPages", "totalItems", "currentPage") - 반환 타입 설명
      */
     @Override // IBoardService 인터페이스 메소드 구현 명시
-    // [신규] searchType, searchKeyword 파라미터 2개 추가
+    // [] searchType, searchKeyword 파라미터 2개 추가
     public Map<String, Object> getAllPosts(int page, int size, String searchType, String searchKeyword) {
 
         // 1. offset 계산 (DB 건너뛸 개수). page는 1부터 시작
         int offset = (page - 1) * size; // offset 변수 계산 및 할당
 
         // 2. DAO findAll 호출하여 해당 페이지 게시글 목록 조회. limit(size), offset 전달
-        // [신규] searchType, searchKeyword 파라미터를 DAO로 전달
+        // [] searchType, searchKeyword 파라미터를 DAO로 전달
         List<Map<String, Object>> posts = boardDAO.findAll(size, offset, searchType, searchKeyword); // posts 변수 초기화
 
         // --------------------------------------------------------------------
@@ -60,46 +60,46 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
             }
 
             // 첨부파일 수 저장
-            post.put("fileCount", files.size()); //추가됨
+            post.put("fileCount", files.size()); //
 
             // ----------------------------------------------------------------
             // 폴더 업로드인지 여부 확인 (file_path 기준)
             //   - file_path가 비어있지 않은 파일이 하나라도 있으면 "폴더 첨부"로 간주
             // ----------------------------------------------------------------
-            boolean hasFolder = false;        //추가됨
-            String topFolderName = null;      //추가됨
+            boolean hasFolder = false;        //
+            String topFolderName = null;      //
 
-            for (Map<String, Object> f : files) {             //추가됨
-                Object pathObj = f.get("file_path");          //추가됨
+            for (Map<String, Object> f : files) {             //
+                Object pathObj = f.get("file_path");          //
                 if (pathObj == null) {
-                    continue;                                //추가됨
+                    continue;                                //
                 }
-                String path = pathObj.toString();             //추가됨
+                String path = pathObj.toString();             //
                 if (path.isBlank()) {
-                    continue;                                //추가됨
+                    continue;                                //
                 }
 
-                hasFolder = true;                            //추가됨
+                hasFolder = true;                            //
 
-                // "test용/하위/..." 형태에서 최상위 폴더명만 추출 //추가됨
-                String normalized = path.replace("\\", "/");  // 윈도우 경로 대비 //추가됨
-                if (!normalized.endsWith("/")) {             //추가됨
-                    normalized = normalized + "/";           //추가됨
+                // "test용/하위/..." 형태에서 최상위 폴더명만 추출 //
+                String normalized = path.replace("\\", "/");  // 윈도우 경로 대비 //
+                if (!normalized.endsWith("/")) {             //
+                    normalized = normalized + "/";           //
                 }
-                int idx = normalized.indexOf('/');           //추가됨
-                if (idx != -1) {                             //추가됨
-                    topFolderName = normalized.substring(0, idx); // 예: "test용" //추가됨
+                int idx = normalized.indexOf('/');           //
+                if (idx != -1) {                             //
+                    topFolderName = normalized.substring(0, idx); // 예: "test용" //
                 } else {
-                    topFolderName = normalized;              //추가됨
+                    topFolderName = normalized;              //
                 }
-                break;                                       //추가됨
+                break;                                       //
             }
 
-            if (hasFolder) { //추가됨
-                // 폴더 업로드로 판단된 경우: 목록에서는 폴더 아이콘으로 표시 //추가됨
-                post.put("fileType", "FOLDER");           //추가됨
-                post.put("folderName", topFolderName);    //추가됨
-                post.put("thumbUrl", null);               //추가됨
+            if (hasFolder) { //
+                // 폴더 업로드로 판단된 경우: 목록에서는 폴더 아이콘으로 표시 //
+                post.put("fileType", "FOLDER");           //
+                post.put("folderName", topFolderName);    //
+                post.put("thumbUrl", null);               //
                 continue;                                 // 아래 이미지/파일 로직은 건너뜀
             }
 
@@ -113,10 +113,10 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
             String contentType = (String) file.get("content_type"); //기존 유지
 
             // file_id 추출 (정수로 변환)
-            Object fileIdObj = file.get("file_id");                 //기존 유지(추가됨)
-            int fileId = (fileIdObj instanceof Number)              //기존 유지(추가됨)
-                    ? ((Number) fileIdObj).intValue()               //기존 유지(추가됨)
-                    : Integer.parseInt(fileIdObj.toString());       //기존 유지(추가됨)
+            Object fileIdObj = file.get("file_id");                 //기존 유지()
+            int fileId = (fileIdObj instanceof Number)              //기존 유지()
+                    ? ((Number) fileIdObj).intValue()               //기존 유지()
+                    : Integer.parseInt(fileIdObj.toString());       //기존 유지()
 
             // 이미지 여부 판단
             if (contentType != null && contentType.startsWith("image")) {
@@ -131,7 +131,7 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         // --------------------------------------------------------------------
 
         // 3. DAO countAll 호출하여 전체 게시글 수 조회
-        // [신규] searchType, searchKeyword 파라미터를 DAO로 전달 (검색 조건에 맞는 전체 개수)
+        // [] searchType, searchKeyword 파라미터를 DAO로 전달 (검색 조건에 맞는 전체 개수)
         int totalItems = boardDAO.countAll(searchType, searchKeyword); // totalItems 변수 초기화
 
         // 4. 전체 페이지 수 계산. Math.ceil() 메소드 사용하여 올림 처리
@@ -182,7 +182,7 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         }
 
         // 5. 최종적으로 생성된 게시글 전체 정보(첨부파일 포함)를 다시 조회해서 반환
-        return getPost(postId); //수정됨: post 대신 getPost(postId) 결과 반환
+        return getPost(postId); //수정됨: post 대 getPost(postId) 결과 반환
     }
 
     /**
@@ -210,8 +210,8 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
     public Map<String, Object> updatePost(
             int postId,
             Map<String, Object> postDetails,
-            List<MultipartFile> newFiles,      //추가됨
-            List<Integer> deleteFileIds,       //추가됨
+            List<MultipartFile> newFiles,      //
+            List<Integer> deleteFileIds,       //
             String currentUserId) {            //수정됨: 시그니처 변경
 
         // 1. 수정 대상 게시글 조회
@@ -234,17 +234,17 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         }
 
         // 5. 첨부파일 삭제 처리 (체크된 파일들)
-        if (deleteFileIds != null && !deleteFileIds.isEmpty()) { //추가됨
-            fileService.deleteFilesByIds(deleteFileIds); // 선택된 파일 ID들 삭제 //추가됨
+        if (deleteFileIds != null && !deleteFileIds.isEmpty()) { //
+            fileService.deleteFilesByIds(deleteFileIds); // 선택된 파일 ID들 삭제 //
         }
 
         // 6. 새로 추가된 첨부파일 저장
-        if (newFiles != null && !newFiles.isEmpty()) { //추가됨
-            fileService.saveFilesForPost(postId, newFiles); // 게시글 ID 기준으로 파일들 추가 저장 //추가됨
+        if (newFiles != null && !newFiles.isEmpty()) { //
+            fileService.saveFilesForPost(postId, newFiles); // 게시글 ID 기준으로 파일들 추가 저장 //
         }
 
-        // 7. 수정 후 최신 게시글 정보(첨부파일 포함)를 다시 조회해서 반환
-        return getPost(postId); //수정됨: post 대신 getPost(postId) 반환
+        // 7. 수정 후 최 게시글 정보(첨부파일 포함)를 다시 조회해서 반환
+        return getPost(postId); //수정됨: post 대 getPost(postId) 반환
     }
 
     /**
@@ -287,7 +287,7 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
     } // incrementViewCount 메소드 끝
 
     /**
-     * [신규 추가] 게시글 고정 메소드 정의 시작 (관리자 전용)
+     * [ 추가] 게시글 고정 메소드 정의 시작 (관리자 전용)
      * @param postId 고정할 게시글 ID (int) - 파라미터 설명
      * @param order 고정 순서 (int, 예: 1, 2, 3) - 파라미터 설명
      * @param currentUserId 현재 사용자 ID (String) - 권한 확인용 파라미터 설명
@@ -322,7 +322,7 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
     } // pinPost 메소드 끝
 
     /**
-     * [신규 추가] 게시글 고정 해제 메소드 정의 시작 (관리자 전용)
+     * [ 추가] 게시글 고정 해제 메소드 정의 시작 (관리자 전용)
      * @param postId 고정 해제할 게시글 ID (int) - 파라미터 설명
      * @param currentUserId 현재 사용자 ID (String) - 권한 확인용 파라미터 설명
      * @param roles 현재 사용자 역할 목록 (List<String>) - 권한 확인용 파라미터 설명

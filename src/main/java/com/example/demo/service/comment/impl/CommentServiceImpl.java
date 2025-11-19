@@ -1,14 +1,15 @@
 package com.example.demo.service.comment.impl;
 
-import com.example.demo.dao.CommentDAO; // DB의 comments 테이블과 통신하는 CommentDAO
-import com.example.demo.service.comment.ICommentService; // 댓글 서비스의 설계도(인터페이스)
-import org.springframework.beans.factory.annotation.Autowired; // Spring의 의존성 주입 기능을 사용하기 위한 도구
-import org.springframework.stereotype.Service; // 이 클래스가 서비스 부품임을 알리는 도구
+import java.util.ArrayList; // DB의 comments 테이블과 통하는 CommentDAO
+import java.util.HashMap; // 댓글 서비스의 설계도(인터페이스)
+import java.util.List; // Spring의 의존성 주입 기능을 사용하기 위한 도구
+import java.util.Map; // 이 클래스가 서비스 부품임을 알리는 도구
 
-import java.util.ArrayList; // [대댓글 수정] ArrayList 임포트
-import java.util.HashMap;   // [대댓글 수정] HashMap 임포트
-import java.util.List; // 여러 데이터를 목록 형태로 다루기 위한 도구
-import java.util.Map; // 데이터를 '이름표-값' 쌍으로 다루기 위한 도구
+import org.springframework.beans.factory.annotation.Autowired; // [대댓글 수정] ArrayList 임포트
+import org.springframework.stereotype.Service;   // [대댓글 수정] HashMap 임포트
+
+import com.example.demo.dao.CommentDAO; // 여러 데이터를 목록 형태로 다루기 위한 도구
+import com.example.demo.service.comment.ICommentService; // 데이터를 '이름표-값' 쌍으로 다루기 위한 도구
 
 @Service
 //'CommentServiceImpl'이라는 클래스를 선언하고, 'ICommentService' 설계도를 구현(implements)

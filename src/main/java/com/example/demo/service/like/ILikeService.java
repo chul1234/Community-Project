@@ -8,7 +8,7 @@ package com.example.demo.service.like;
 public interface ILikeService {
 
     /**
-     *좋아요 토글 기능 (추가됨)
+     *좋아요 토글 기능 ()
      * 이미 좋아요 상태이면 삭제하고, 아니면 추가한다.
      *
      * @param targetType  'POST' 또는 'COMMENT'
@@ -19,7 +19,7 @@ public interface ILikeService {
     boolean toggleLike(String targetType, int targetId, String userId); // 
 
     /**
-     *좋아요 개수 조회 기능 (추가됨)
+     *좋아요 개수 조회 기능 ()
      * 대상 게시글/댓글의 총 좋아요 숫자를 가져온다.
      *
      * @param targetType 'POST' 또는 'COMMENT'

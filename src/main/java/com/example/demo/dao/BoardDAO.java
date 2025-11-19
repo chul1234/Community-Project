@@ -34,8 +34,8 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
      * [수정됨] posts 테이블의 특정 범위 게시글 목록 조회 메소드 (페이지네이션 + 고정글 정렬 + **동적 검색**) 정의 시작
      * @param limit 가져올 개수 (int) - 파라미터 설명
      * @param offset 건너뛸 개수 (int) - 파라미터 설명
-     * @param searchType [신규] 검색 타입 (String, 예: "author", "content", "title") - 파라미터 설명
-     * @param searchKeyword [신규] 검색어 (String) - 파라미터 설명
+     * @param searchType [] 검색 타입 (String, 예: "author", "content", "title") - 파라미터 설명
+     * @param searchKeyword [] 검색어 (String) - 파라미터 설명
      * @return 게시글 목록 (List<Map<String, Object>>) - 반환 타입 설명
      */
     // [유지] searchType, searchKeyword 파라미터 2개 추가
@@ -58,15 +58,15 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
         
         // [유지] 검색어(searchKeyword)가 null이 아니고 빈 문자열("")이 아닐 경우에만
         if (searchKeyword != null && !searchKeyword.isEmpty()) {
-            // ▼▼▼ [신규 추가] '제목' 검색 로직 ▼▼▼
-            // [신규] 만약 검색 타입(searchType)이 "title"(제목)이라면
+            // ▼▼▼ [ 추가] '제목' 검색 로직 ▼▼▼
+            // [] 만약 검색 타입(searchType)이 "title"(제목)이라면
             if ("title".equals(searchType)) {
-                // [신규] WHERE 절에 '게시글 제목(p.title) LIKE ?' 조건 추가
+                // [] WHERE 절에 '게시글 제목(p.title) LIKE ?' 조건 추가
                 whereSql.append(" AND p.title LIKE ? ");
-                // [신규] 파라미터 리스트에 ? 에 바인딩할 값(검색어) 추가
+                // [] 파라미터 리스트에 ? 에 바인딩할 값(검색어) 추가
                 params.add("%" + searchKeyword + "%");
             }
-            // ▲▲▲ [신규 추가] '제목' 검색 로직 끝 ▲▲▲
+            // ▲▲▲ [ 추가] '제목' 검색 로직 끝 ▲▲▲
             // [유지] 만약 검색 타입(searchType)이 "author"(작성자)라면
             else if ("author".equals(searchType)) {
                 // [유지] WHERE 절에 '작성자 이름(u.name) LIKE ?' 조건 추가
@@ -81,17 +81,17 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
                 // [유지] 파라미터 리스트에 ? 에 바인딩할 값(검색어) 추가
                 params.add("%" + searchKeyword + "%");
             }
-            // ▼▼▼ [신규 추가] '제목+내용' 검색 로직 ▼▼▼
-            // [신규] 만약 검색 타입(searchType)이 "title_content"(제목+내용)라면
+            // ▼▼▼ [ 추가] '제목+내용' 검색 로직 ▼▼▼
+            // [] 만약 검색 타입(searchType)이 "title_content"(제목+내용)라면
             else if ("title_content".equals(searchType)) {
-                // [신규] WHERE 절에 '제목 LIKE ? 또는 내용 LIKE ?' (OR) 조건 추가
+                // [] WHERE 절에 '제목 LIKE ? 또는 내용 LIKE ?' (OR) 조건 추가
                 whereSql.append(" AND (p.title LIKE ? OR p.content LIKE ?) ");
-                // [신규] 파라미터 리스트에 첫 번째 ? (p.title) 값 추가
+                // [] 파라미터 리스트에 첫 번째 ? (p.title) 값 추가
                 params.add("%" + searchKeyword + "%");
-                // [신규] 파라미터 리스트에 두 번째 ? (p.content) 값 추가
+                // [] 파라미터 리스트에 두 번째 ? (p.content) 값 추가
                 params.add("%" + searchKeyword + "%");
             }
-            // ▲▲▲ [신규 추가] '제목+내용' 검색 로직 끝 ▲▲▲
+            // ▲▲▲ [ 추가] '제목+내용' 검색 로직 끝 ▲▲▲
             // [유지] 만약 검색 타입(searchType)이 "author_content"(작성자+내용)라면
             else if ("author_content".equals(searchType)) {
                 // [유지] WHERE 절에 '작성자 이름 LIKE ? 또는 게시글 내용 LIKE ?' (OR) 조건 추가
@@ -112,7 +112,7 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
 
         // [유지] 기본 SELECT SQL에 동적으로 생성된 WHERE 절 추가
         sql.append(whereSql);
-        // [유지] 고정글/최신순 정렬을 위한 ORDER BY 절 추가
+        // [유지] 고정글/최순 정렬을 위한 ORDER BY 절 추가
         sql.append(" ORDER BY CASE WHEN p.pinned_order IS NULL THEN 1 ELSE 0 END ASC, p.pinned_order ASC, p.post_id DESC ");
         // [유지] 페이지네이션을 위한 LIMIT/OFFSET 절 추가
         sql.append(" LIMIT ? OFFSET ? ");
@@ -162,8 +162,8 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
 
     /**
      * [수정됨] posts 테이블의 전체 게시글 수 조회 메소드 (**검색 조건 포함**) 정의 시작
-     * @param searchType [신규] 검색 타입 (String) - 파라미터 설명
-     * @param searchKeyword [신규] 검색어 (String) - 파라미터 설명
+     * @param searchType [] 검색 타입 (String) - 파라미터 설명
+     * @param searchKeyword [] 검색어 (String) - 파라미터 설명
      * @return 전체 게시글 수 (int) - 반환 타입 설명
      */
     // [유지] searchType, searchKeyword 파라미터 2개 추가
@@ -183,15 +183,15 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
 
         // [유지] 검색어(searchKeyword)가 null이 아니고 빈 문자열("")이 아닐 경우에만
         if (searchKeyword != null && !searchKeyword.isEmpty()) {
-            // ▼▼▼ [신규 추가] '제목' 검색 로직 (findAll과 동일) ▼▼▼
-            // [신규] 만약 검색 타입(searchType)이 "title"(제목)이라면
+            // ▼▼▼ [ 추가] '제목' 검색 로직 (findAll과 동일) ▼▼▼
+            // [] 만약 검색 타입(searchType)이 "title"(제목)이라면
             if ("title".equals(searchType)) {
-                // [신규] WHERE 절에 '게시글 제목(p.title) LIKE ?' 조건 추가
+                // [] WHERE 절에 '게시글 제목(p.title) LIKE ?' 조건 추가
                 whereSql.append(" AND p.title LIKE ? ");
-                // [신규] 파라미터 리스트에 ? 에 바인딩할 값(검색어) 추가
+                // [] 파라미터 리스트에 ? 에 바인딩할 값(검색어) 추가
                 params.add("%" + searchKeyword + "%");
             }
-            // ▲▲▲ [신규 추가] '제목' 검색 로직 끝 ▲▲▲
+            // ▲▲▲ [ 추가] '제목' 검색 로직 끝 ▲▲▲
             // [유지] 만약 검색 타입(searchType)이 "author"(작성자)라면
             else if ("author".equals(searchType)) {
                 // [유지] WHERE 절에 '작성자 이름(u.name) LIKE ?' 조건 추가
@@ -206,17 +206,17 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
                 // [유지] 파라미터 리스트에 ? 에 바인딩할 값(검색어) 추가
                 params.add("%" + searchKeyword + "%");
             }
-            // ▼▼▼ [신규 추가] '제목+내용' 검색 로직 (findAll과 동일) ▼▼▼
-            // [신규] 만약 검색 타입(searchType)이 "title_content"(제목+내용)라면
+            // ▼▼▼ [ 추가] '제목+내용' 검색 로직 (findAll과 동일) ▼▼▼
+            // [] 만약 검색 타입(searchType)이 "title_content"(제목+내용)라면
             else if ("title_content".equals(searchType)) {
-                // [신규] WHERE 절에 '제목 LIKE ? 또는 내용 LIKE ?' (OR) 조건 추가
+                // [] WHERE 절에 '제목 LIKE ? 또는 내용 LIKE ?' (OR) 조건 추가
                 whereSql.append(" AND (p.title LIKE ? OR p.content LIKE ?) ");
-                // [신규] 파라미터 리스트에 첫 번째 ? (p.title) 값 추가
+                // [] 파라미터 리스트에 첫 번째 ? (p.title) 값 추가
                 params.add("%" + searchKeyword + "%");
-                // [신규] 파라미터 리스트에 두 번째 ? (p.content) 값 추가
+                // [] 파라미터 리스트에 두 번째 ? (p.content) 값 추가
                 params.add("%" + searchKeyword + "%");
             }
-            // ▲▲▲ [신규 추가] '제목+내용' 검색 로직 끝 ▲▲▲
+            // ▲▲▲ [ 추가] '제목+내용' 검색 로직 끝 ▲▲▲
             // [유지] 만약 검색 타입(searchType)이 "author_content"(작성자+내용)라면
             else if ("author_content".equals(searchType)) {
                 // [유지] WHERE 절에 '작성자 이름 LIKE ? 또는 게시글 내용 LIKE ?' (OR) 조건 추가
@@ -331,7 +331,7 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
                     post.put("user_id", rs.getString("user_id")); // user_id 컬럼 (String)
                     post.put("author_name", rs.getString("author_name")); // author_name 별명 컬럼 (String)
                     post.put("created_at", rs.getTimestamp("created_at")); // created_at 컬럼 (Timestamp)
-                    // [신규 추가됨] pinned_order 읽기 (NULL 처리)
+                    //  pinned_order 읽기 (NULL 처리)
                     post.put("pinned_order", rs.getObject("pinned_order", Integer.class));
                     // [유지] view_count 읽기
                     post.put("view_count", rs.getInt("view_count")); // view_count 컬럼 (int)
@@ -415,7 +415,7 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
     } // incrementViewCount 메소드 끝
 
     /**
-     * [신규 추가됨] post_id로 특정 게시글 고정 상태/순서 업데이트 메소드 정의 시작
+     *  post_id로 특정 게시글 고정 상태/순서 업데이트 메소드 정의 시작
      * @param postId 업데이트할 게시글 ID (int) - 파라미터 설명
      * @param order 설정할 고정 순서 (Integer, null 가능 - null은 고정 해제 의미) - 파라미터 설명
      * @return 영향을 받은 행의 수 (성공 시 1, 실패 시 0) - 반환 타입 설명
@@ -445,7 +445,7 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
     } // updatePinnedOrder 메소드 끝
 
     /**
-     * [신규 추가됨] 현재 고정된 게시글 수 조회 메소드 정의 시작 (3개 제한용)
+     *  현재 고정된 게시글 수 조회 메소드 정의 시작 (3개 제한용)
      * @return 고정된 게시글 수 (int) - 반환 타입 설명
      */
     public int countPinned() { // countPinned 메소드 정의 시작

@@ -1,89 +1,144 @@
-<div ng-controller="BoardEditController" class="container">
+<div
+    ng-controller="BoardEditController"
+    class="container"
+>
     <div class="page-header">
         <h1>게시글 수정</h1>
-        <a href="" ng-click="cancelEdit()" class="cancel-link">취소 (상세보기로 돌아가기)</a>
+        <a
+            href=""
+            ng-click="cancelEdit()"
+            class="cancel-link"
+            >취소 (상세보기로 돌아가기)</a
+        >
     </div>
 
-    <form name="postForm" novalidate>
+    <form
+        name="postForm"
+        novalidate
+    >
         <div class="form-group">
             <label for="postTitle">제목</label>
-            <input type="text" id="postTitle" ng-model="post.title" required class="form-control" />
+            <input
+                type="text"
+                id="postTitle"
+                ng-model="post.title"
+                required
+                class="form-control"
+            />
         </div>
 
         <div class="form-group">
             <label for="postContent">내용</label>
-            <textarea id="postContent"
-                      ng-model="post.content"
-                      required
-                      rows="10"
-                      class="form-control" 
-                      style="width: 100%;">
+            <textarea
+                id="postContent"
+                ng-model="post.content"
+                required
+                rows="10"
+                class="form-control"
+                style="width: 100%"
+            >
             </textarea>
-            <!-- 본문 이미지 업로드 (수정 화면용) -->
-<div class="form-group">
-    <label>본문 이미지 업로드</label>
-    <div style="display: flex; gap: 8px; align-items: center;">
-        <input
-            type="file"
-            accept="image/*"
-            file-model="inlineImageFilesEdit"
-        />
-        <button
-            type="button"
-            class="secondary-btn"
-            ng-click="uploadInlineImageForEdit()"
-        >
-            본문에 삽입
-        </button>
-    </div>
-    <div style="font-size: 12px; color: #6c757d; margin-top: 4px;">
-        이미지를 선택한 뒤 "본문에 삽입"을 누르면, 현재 커서 위치에 이미지 태그가 들어갑니다.
-    </div>
-</div>
 
+            <!-- ★★★ 본문 이미지 업로드 (수정 화면용) + 너비% 입력  ★★★ -->
+            <div
+                class="form-group"
+                style="margin-top: 12px"
+            >
+                <label>본문 이미지 업로드</label>
+
+                <!-- flex 정렬 영역 -->
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+                    <!-- 이미지 파일 선택 -->
+                    <input
+                        type="file"
+                        accept="image/*"
+                        file-model="inlineImageFilesEdit"
+                    />
+
+                    <!-- ★ : 이미지 너비 % 입력 -->
+                    <div style="display: flex; align-items: center; gap: 4px">
+                        <input
+                            type="number"
+                            min="1"
+                            max="100"
+                            ng-model="inlineImageWidthEdit"
+                            class="form-control"
+                            style="width: 80px; padding: 4px 8px"
+                            placeholder="100"
+                        />
+                        <span style="font-size: 13px">%</span>
+                    </div>
+
+                    <!-- 본문 삽입 버튼 -->
+                    <button
+                        type="button"
+                        class="secondary-btn"
+                        ng-click="uploadInlineImageForEdit()"
+                    >
+                        본문에 삽입
+                    </button>
+                </div>
+
+                <div style="font-size: 12px; color: #6c757d; margin-top: 4px">이미지 선택 → 크기(%) 입력 → "본문에 삽입" 버튼을 누르면, 해당 크기로 이미지 태그가 본문에 들어갑니다.</div>
+            </div>
         </div>
     </form>
 
-    <hr style="margin: 30px 0;" />
+    <hr style="margin: 30px 0" />
 
-    <div class="existing-files" ng-if="fileList && fileList.length > 0">
+    <div
+        class="existing-files"
+        ng-if="fileList && fileList.length > 0"
+    >
         <h3>기존 첨부 파일</h3>
         <ul>
             <li ng-repeat="file in fileList">
                 {{ file.original_name }}
-                <span style="color:#6c757d; font-size:12px">
-                    ({{ file.file_size | number }} bytes)
-                </span>
+                <span style="color: #6c757d; font-size: 12px"> ({{ file.file_size | number }} bytes) </span>
 
-                <label style="margin-left:10px;">
-                    <input type="checkbox" ng-model="file._delete" />
+                <label style="margin-left: 10px">
+                    <input
+                        type="checkbox"
+                        ng-model="file._delete"
+                    />
                     삭제
                 </label>
             </li>
         </ul>
     </div>
 
-    <div ng-if="!fileList || fileList.length === 0" style="color:#6c757d; margin-bottom:20px;">
+    <div
+        ng-if="!fileList || fileList.length === 0"
+        style="color: #6c757d; margin-bottom: 20px"
+    >
         첨부된 파일이 없습니다.
     </div>
 
-    <hr style="margin: 20px 0;" />
+    <hr style="margin: 20px 0" />
 
     <div class="new-files">
         <h3>파일 추가</h3>
-        <input type="file" multiple file-model="newFiles" />
-        <div ng-if="newFiles.length > 0" style="margin-top: 10px; font-size: 14px;">
+        <input
+            type="file"
+            multiple
+            file-model="newFiles"
+        />
+        <div
+            ng-if="newFiles.length > 0"
+            style="margin-top: 10px; font-size: 14px"
+        >
             <strong>{{ newFiles.length }}</strong>개의 파일 선택됨
         </div>
     </div>
 
-    <hr style="margin: 30px 0;" />
+    <hr style="margin: 30px 0" />
 
-    <button type="button"
-            ng-click="saveChanges()"
-            ng-disabled="postForm.$invalid"
-            class="submit-btn-full">
+    <button
+        type="button"
+        ng-click="saveChanges()"
+        ng-disabled="postForm.$invalid"
+        class="submit-btn-full"
+    >
         수정 완료
     </button>
-
 </div>

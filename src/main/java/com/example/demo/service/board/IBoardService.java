@@ -48,8 +48,8 @@ public interface IBoardService { // IBoardService 인터페이스 정의 시작
     Map<String, Object> updatePost(
             int postId,
             Map<String, Object> postDetails,
-            List<MultipartFile> newFiles,      //추가됨
-            List<Integer> deleteFileIds,       //추가됨
+            List<MultipartFile> newFiles,      //
+            List<Integer> deleteFileIds,       //
             String currentUserId
     ); // 파일 관련 파라미터 추가
 

@@ -26,7 +26,7 @@ public class SecurityConfig { // SecurityConfig: 웹 보안 설정을 위한 메
             .csrf(csrf -> csrf.disable())
 
             // 2. URL별 접근 권한 설정 시작. (authorizeHttpRequests() 메소드)
-            // [수정됨] 규칙의 순서가 매우 중요합니다. 구체적인 경로를 먼저, 넓은 범위를 나중에 설정해야 합니다.
+            // [수정됨] 칙의 순서가 매우 중요합니다. 구체적인 경로를 먼저, 넓은 범위를 나중에 설정해야 합니다.
             .authorizeHttpRequests(auth -> auth
                 // (1) 1순위: 인증 없이 누구나 접근 가능한 경로
                 // .requestMatchers(): 특정 경로(URL) 지정.
@@ -43,7 +43,7 @@ public class SecurityConfig { // SecurityConfig: 웹 보안 설정을 위한 메
                 .permitAll() // .permitAll(): 위 경로들에 대해 모든 사용자(비로그인 포함)의 접근 허용
 
                 // (2) 2순위: 인증(로그인)만 하면 누구나(USER, ADMIN) 사용 가능한 API
-                // (3순위의 관리자 전용 규칙보다 먼저 선언해야 합니다.)
+                // (3순위의 관리자 전용 칙보다 먼저 선언해야 합니다.)
                 .requestMatchers(
                     "/api/me", // (GET) 내 정보 조회
                     "/api/users/me" // (DELETE) 회원 탈퇴

@@ -26,7 +26,7 @@ public class BigPostDAO {
 
     // 목록 조회
     public List<Map<String, Object>> findAll(int limit, int offset) {
-        // 작성하신 SQL 키: bigpost.select.page = ... LIMIT ?, ?
+        // 작성하 SQL 키: bigpost.select.page = ... LIMIT ?, ?
         String sql = SqlLoader.getSql("bigpost.select.page"); 
         List<Map<String, Object>> list = new ArrayList<>();
 
@@ -56,7 +56,7 @@ public class BigPostDAO {
 
     // 전체 개수 조회
     public int countAll() {
-        // 작성하신 SQL 키: bigpost.select.count
+        // 작성하 SQL 키: bigpost.select.count
         String sql = SqlLoader.getSql("bigpost.select.count");
         
         try (Connection conn = getConnection();

@@ -1,11 +1,11 @@
 package com.example.demo.dao;
 
-// [신규] java.sql.Types 임포트 (countAll 수정 시 필요할 수 있음)
+// [] java.sql.Types 임포트 (countAll 수정 시 필요할 수 있음)
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList; // [신규] (혹시 몰라 추가, 이 케이스엔 불필요)
+import java.util.ArrayList; // [] (혹시 몰라 추가, 이 케이스엔 불필요)
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,7 +89,7 @@ public class UserDAO {
     public List<Map<String, Object>> findAll(int limit, int offset, String searchType, String searchKeyword) {
         List<Map<String, Object>> userList = new ArrayList<>();
         
-        // [수정] SqlLoader 대신 StringBuilder 사용 (BoardDAO.java 참고)
+        // [수정] SqlLoader 대 StringBuilder 사용 (BoardDAO.java 참고)
         // [주의] user.select.all 쿼리 기반 (JOIN 및 GROUP_CONCAT 포함)
         StringBuilder sql = new StringBuilder(
             "SELECT u.*, GROUP_CONCAT(r.role_id SEPARATOR ', ') as role_ids, " +
@@ -99,9 +99,9 @@ public class UserDAO {
             "LEFT JOIN roles r ON ur.role_id = r.role_id"
         );
         
-        // [신규] 파라미터를 담을 List 생성 (BoardDAO.java 참고)
+        // [] 파라미터를 담을 List 생성 (BoardDAO.java 참고)
         List<Object> params = new ArrayList<>();
-        // [신규] 동적 WHERE 절 생성 (BoardDAO.java 참고)
+        // [] 동적 WHERE 절 생성 (BoardDAO.java 참고)
         StringBuilder whereSql = new StringBuilder(" WHERE 1=1 ");
 
         // [디버깅] System.out.println 추가
@@ -127,11 +127,11 @@ public class UserDAO {
             }
         }
 
-        // [신규] 기본 SQL에 동적 WHERE 절 추가
+        // [] 기본 SQL에 동적 WHERE 절 추가
         sql.append(whereSql);
         // [중요] GROUP BY를 LIMIT/OFFSET *전에* 반드시 추가해야 함
         sql.append(" GROUP BY u.user_id LIMIT ? OFFSET ? ");
-        // [신규] 페이징 파라미터 추가
+        // [] 페이징 파라미터 추가
         params.add(limit);
         params.add(offset);
         
@@ -141,11 +141,11 @@ public class UserDAO {
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql.toString())) { 
 
-            // ▼▼▼ [신규] 파라미터 바인딩 (BoardDAO.java 참고) ▼▼▼
+            // ▼▼▼ [] 파라미터 바인딩 (BoardDAO.java 참고) ▼▼▼
             for (int i = 0; i < params.size(); i++) {
                 pstmt.setObject(i + 1, params.get(i));
             }
-            // ▲▲▲ [신규] ▲▲▲
+            // ▲▲▲ [] ▲▲▲
 
             try (ResultSet rs = pstmt.executeQuery()) { // (쿼리 실행)
                 while (rs.next()) {
@@ -176,7 +176,7 @@ public class UserDAO {
     // [수정] 시그니처 변경 (searchType, searchKeyword 추가)
     public int countAll(String searchType, String searchKeyword) {
         
-        // [수정] SqlLoader 대신 StringBuilder 사용 (BoardDAO.java 참고)
+        // [수정] SqlLoader 대 StringBuilder 사용 (BoardDAO.java 참고)
         // [주의] '권한명' 검색을 위해 JOIN이 필요하며, 중복 카운트를 막기 위해 COUNT(DISTINCT u.user_id) 사용
         StringBuilder sql = new StringBuilder(
             "SELECT COUNT(DISTINCT u.user_id) " +
@@ -185,9 +185,9 @@ public class UserDAO {
             "LEFT JOIN roles r ON ur.role_id = r.role_id"
         );
 
-        // [신규] 파라미터를 담을 List 생성
+        // [] 파라미터를 담을 List 생성
         List<Object> params = new ArrayList<>();
-        // [신규] findAll과 동일한 WHERE 로직 적용
+        // [] findAll과 동일한 WHERE 로직 적용
         StringBuilder whereSql = new StringBuilder(" WHERE 1=1 ");
 
         // [디버깅] System.out.println 추가
@@ -213,7 +213,7 @@ public class UserDAO {
             }
         }
         
-        // [신규] 기본 SQL에 동적 WHERE 절 추가
+        // [] 기본 SQL에 동적 WHERE 절 추가
         sql.append(whereSql);
 
         System.out.println("[UserDAO.countAll] 실행 SQL: " + sql.toString()); // [디버깅]
@@ -222,7 +222,7 @@ public class UserDAO {
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
             
-            // [신규] 파라미터 바인딩
+            // [] 파라미터 바인딩
             for (int i = 0; i < params.size(); i++) {
                 pstmt.setObject(i + 1, params.get(i));
             }

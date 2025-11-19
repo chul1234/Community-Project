@@ -1,14 +1,15 @@
 package com.example.demo.service.menu.impl; // (새 패키지)
 
-import com.example.demo.dao.MenuDAO; // DB의 menus 테이블과 통신하는 MenuDAO import
-import com.example.demo.service.menu.IMenuService; // IMenuService 인터페이스(설계도) import
-import org.springframework.beans.factory.annotation.Autowired; // Spring의 @Autowired (의존성 주입) 기능 사용
-import org.springframework.stereotype.Service; // Spring의 @Service (서비스 계층) 선언
+import java.util.ArrayList; // DB의 menus 테이블과 통하는 MenuDAO import
+import java.util.HashMap; // IMenuService 인터페이스(설계도) import
+import java.util.List; // Spring의 @Autowired (의존성 주입) 기능 사용
+import java.util.Map; // Spring의 @Service (서비스 계층) 선언
 
-import java.util.ArrayList; // ArrayList: 가변 크기 리스트를 만들기 위해 import
-import java.util.HashMap; // HashMap: 키-값 쌍의 맵(보관함)을 만들기 위해 import
-import java.util.List; // List 인터페이스 import
-import java.util.Map; // Map 인터페이스 import
+import org.springframework.beans.factory.annotation.Autowired; // ArrayList: 가변 크기 리스트를 만들기 위해 import
+import org.springframework.stereotype.Service; // HashMap: 키-값 쌍의 맵(보관함)을 만들기 위해 import
+
+import com.example.demo.dao.MenuDAO; // List 인터페이스 import
+import com.example.demo.service.menu.IMenuService; // Map 인터페이스 import
 
 @Service // 이 클래스가 Spring의 서비스 컴포넌트임을 선언
 public class MenuServiceImpl implements IMenuService {

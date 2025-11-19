@@ -9,7 +9,7 @@ public class SqlLoader {
     static { //static 초기화 블록 : 클래스가 처음 로드될 때 한 번 실행
         //sql.properties 파일을 읽어서 Properties 객체에 로드
         try (InputStream input = SqlLoader.class.getClassLoader().getResourceAsStream("sql.properties")) {
-            sqls.load(input); //sql가 input스트림을 통해 파일을 읽어들여, 키=값쌍을 자신의 내부에 저장
+            sqls.load(input); //sql가 input스트림을 통해 파일을 읽어들여, 키=값쌍을 자의 내부에 저장
         } catch (Exception e) {
             e.printStackTrace();
         }

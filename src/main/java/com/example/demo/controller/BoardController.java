@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;   // pinPost에서 JSON 본문 수신용
+import org.springframework.web.bind.annotation.RequestBody;   // pinPost에서 JSON 본문 수용
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile; // MultipartFile import
@@ -40,8 +40,8 @@ public class BoardController { // BoardController 클래스 정의 시작
      * [수정됨] 페이지네이션 및 검색 적용된 게시글 목록 조회 API 메소드 정의 시작
      * @param page 요청 페이지 번호 (int, 기본값 1) - 파라미터 설명
      * @param size 페이지당 게시글 수 (int, 기본값 10) - 파라미터 설명
-     * @param searchType [신규] 검색 타입 (String, 필수 아님) - 파라미터 설명
-     * @param searchKeyword [신규] 검색어 (String, 필수 아님) - 파라미터 설명
+     * @param searchType [] 검색 타입 (String, 필수 아님) - 파라미터 설명
+     * @param searchKeyword [] 검색어 (String, 필수 아님) - 파라미터 설명
      * @return Map (키: "posts", "totalPages", "totalItems", "currentPage") - 반환 타입 설명
      */
     // @GetMapping("/api/posts"): HTTP GET /api/posts 요청 처리
@@ -52,7 +52,7 @@ public class BoardController { // BoardController 클래스 정의 시작
             @RequestParam(defaultValue = "1") int page, // page 파라미터 (int)
             @RequestParam(defaultValue = "10") int size, // size 파라미터 (int)
             
-            // [신규] required = false: 이 파라미터가 없어도 400 Bad Request 오류를 내지 않음 (검색 안 할 경우)
+            // [] required = false: 이 파라미터가 없어도 400 Bad Request 오류를 내지 않음 (검색 안 할 경우)
             @RequestParam(required = false) String searchType,
             @RequestParam(required = false) String searchKeyword
             
@@ -73,8 +73,8 @@ public class BoardController { // BoardController 클래스 정의 시작
     // @PostMapping("/api/posts"): HTTP POST /api/posts 요청 처리
     @PostMapping("/api/posts")
     public ResponseEntity<Map<String, Object>> createPost(
-            @RequestParam String title, // @RequestParam으로 제목 수신
-            @RequestParam String content, // @RequestParam으로 내용 수신
+            @RequestParam String title, // @RequestParam으로 제목 수
+            @RequestParam String content, // @RequestParam으로 내용 수
             @RequestParam(required = false) List<MultipartFile> files, // 첨부파일 목록
             Authentication authentication) { // createPost 메소드 정의 시작
 
@@ -82,9 +82,9 @@ public class BoardController { // BoardController 클래스 정의 시작
         String userId = authentication.getName(); // userId 변수 초기화
 
         // Service에 넘겨줄 Map 구성 (기존 JSON 구조 대체)
-        Map<String, Object> postData = new HashMap<>(); //추가됨
-        postData.put("title", title);   //추가됨
-        postData.put("content", content); //추가됨
+        Map<String, Object> postData = new HashMap<>(); //
+        postData.put("title", title);   //
+        postData.put("content", content); //
 
         // boardService.createPost() 메소드 (텍스트 + 파일 동시 처리)
         Map<String, Object> createdPost = boardService.createPost(postData, files, userId); //수정됨
@@ -125,11 +125,11 @@ public class BoardController { // BoardController 클래스 정의 시작
         } // if-else 끝
     } // getPostById 메소드 끝
 
-    @GetMapping("/api/posts/{postId}/files") //추가됨
-    public ResponseEntity<List<Map<String, Object>>> getFilesByPost(@PathVariable int postId) { //추가됨
-        List<Map<String, Object>> files = fileService.getFilesByPostId(postId); //추가됨
-        return ResponseEntity.ok(files); //추가됨
-    } //추가됨
+    @GetMapping("/api/posts/{postId}/files") //
+    public ResponseEntity<List<Map<String, Object>>> getFilesByPost(@PathVariable int postId) { //
+        List<Map<String, Object>> files = fileService.getFilesByPostId(postId); //
+        return ResponseEntity.ok(files); //
+    } //
 
     /**
      * [★ 수정됨] 게시글 수정 API (Multipart 폼 + 첨부파일 추가/삭제)
@@ -146,8 +146,8 @@ public class BoardController { // BoardController 클래스 정의 시작
     @PutMapping("/api/posts/{postId}")
     public ResponseEntity<Map<String, Object>> updatePost(
             @PathVariable int postId,
-            @RequestParam("title") String title, // @RequestParam으로 제목 수신
-            @RequestParam("content") String content, // @RequestParam으로 내용 수신
+            @RequestParam("title") String title, // @RequestParam으로 제목 수
+            @RequestParam("content") String content, // @RequestParam으로 내용 수
             @RequestParam(value = "files", required = false) List<MultipartFile> files, // 새 첨부파일
             @RequestParam(value = "deleteFileIds", required = false) List<Integer> deleteFileIds, // 삭제할 파일 ID 목록
             Authentication authentication) { // updatePost 메소드 정의 시작
@@ -156,9 +156,9 @@ public class BoardController { // BoardController 클래스 정의 시작
         String currentUserId = authentication.getName(); // currentUserId 변수 초기화
 
         // Service로 넘길 수정 데이터 Map 구성
-        Map<String, Object> postDetails = new HashMap<>(); //추가됨
-        postDetails.put("title", title);     //추가됨
-        postDetails.put("content", content); //추가됨
+        Map<String, Object> postDetails = new HashMap<>(); //
+        postDetails.put("title", title);     //
+        postDetails.put("content", content); //
 
         // boardService.updatePost() 호출하여 게시글 수정 로직 수행 (텍스트 + 파일 + 삭제 목록)
         Map<String, Object> updatedPost =
@@ -209,7 +209,7 @@ public class BoardController { // BoardController 클래스 정의 시작
     } // deletePost 메소드 끝
 
     /**
-     * [신규 추가됨] 게시글 고정 API 메소드 정의 시작 (관리자 전용)
+     *  게시글 고정 API 메소드 정의 시작 (관리자 전용)
      * @param postId URL 경로에서 추출한 게시글 ID (int) - 파라미터 설명
      * @param requestBody 요청 본문 JSON 데이터 (Map, 예: { "order": 1 }) - 파라미터 설명
      * @param authentication 현재 인증 정보 (Authentication) - 파라미터 설명
@@ -221,7 +221,7 @@ public class BoardController { // BoardController 클래스 정의 시작
     @PutMapping("/api/posts/{postId}/pin")
     public ResponseEntity<Void> pinPost(
             @PathVariable int postId,
-            @RequestBody Map<String, Integer> requestBody, // JSON body(@RequestBody)로 order 수신
+            @RequestBody Map<String, Integer> requestBody, // JSON body(@RequestBody)로 order 수
             Authentication authentication) { // pinPost 메소드 정의 시작
 
         // authentication.getName() 메소드: 현재 사용자 ID 획득
@@ -255,7 +255,7 @@ public class BoardController { // BoardController 클래스 정의 시작
     } // pinPost 메소드 끝
 
     /**
-     * [신규 추가됨] 게시글 고정 해제 API 메소드 정의 시작 (관리자 전용)
+     *  게시글 고정 해제 API 메소드 정의 시작 (관리자 전용)
      * @param postId URL 경로에서 추출한 게시글 ID (int) - 파라미터 설명
      * @param authentication 현재 인증 정보 (Authentication) - 파라미터 설명
      * @return ResponseEntity<Void> - 성공(200 OK) 또는 실패(403 Forbidden - 권한 없음) 응답 - 반환 타입 설명
