@@ -3,7 +3,7 @@ app.controller('BigPostController', function ($scope, $http) {
     $scope.currentPage = 1;
     $scope.totalPages = 0;
     $scope.totalItems = 0;
-    $scope.pageSize = 20; // 20개씩 보기
+    $scope.pageSize = 10000; // 20개씩 보기
 
     // 데이터 불러오기 함수
     function fetchPosts(page) {
