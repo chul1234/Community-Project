@@ -16,19 +16,18 @@ public class BigPostServiceImpl implements IBigPostService {
     @Autowired
     private BigPostDAO bigPostDAO;
 
+    // --------------------------------------------
+    // 기존 OFFSET 페이징 방식
+    // --------------------------------------------
     @Override
     public Map<String, Object> getBigPosts(int page, int size) {
-        // 1. Offset 계산 (1페이지 -> 0, 2페이지 -> 20 ...)
         int offset = (page - 1) * size;
 
-        // 2. DAO 호출
         List<Map<String, Object>> posts = bigPostDAO.findAll(size, offset);
         int totalItems = bigPostDAO.countAll();
-        
-        // 3. 총 페이지 수 계산
+
         int totalPages = (int) Math.ceil((double) totalItems / size);
 
-        // 4. 결과 리턴
         Map<String, Object> result = new HashMap<>();
         result.put("posts", posts);
         result.put("totalItems", totalItems);
@@ -36,5 +35,19 @@ public class BigPostServiceImpl implements IBigPostService {
         result.put("currentPage", page);
 
         return result;
+    }
+
+    // ---------------------------------------------------------
+    // ▼▼▼ 초고속 키셋 페이징 방식 (OFFSET 없음) ▼▼▼  // 수정됨
+    // ---------------------------------------------------------
+
+    @Override
+    public List<Map<String, Object>> getFirstPage(int size) {   // 수정됨
+        return bigPostDAO.findFirstPage(size);  // 수정됨
+    }
+
+    @Override
+    public List<Map<String, Object>> getNextPage(long lastId, int size) {  // 수정됨
+        return bigPostDAO.findNextPage(lastId, size);  // 수정됨
     }
 }
