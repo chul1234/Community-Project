@@ -339,7 +339,7 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
                     // Optional.of() 메소드: 조회된 post 맵을 Optional 객체로 감싸서 반환
                     return Optional.of(post);
                 } // if 끝
-            } // rs 자동 해제됨 (try-with-resources 끝)
+            } // rs 자동 해제됨 (try-with-resOURCES 끝)
         } catch (SQLException e) { // SQLException 예외 처리 블록 시작
             e.printStackTrace(); // 콘솔 에러 로그 출력
         } // try-catch 끝 (conn, pstmt 자동 해제됨)
@@ -465,5 +465,30 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
         } // try-catch 끝 (conn, pstmt, rs 자동 해제됨)
         return 0; // 오류 발생 시 0 반환
     } // countPinned 메소드 끝
+
+    // ------------------------------------------------------
+    // 에디터 이미지 사용 개수 카운트 (다른 글에서도 쓰는지 확인용)  // 수정됨
+    // ------------------------------------------------------
+    public int countPostsUsingEditorImage(String savedName) { // 수정됨
+        // posts.content 안에서 '/api/editor-images/view/파일명' 패턴 검색 // 수정됨
+        String sql = SqlLoader.getSql("post.count.by_editor_image"); // 수정됨
+
+        String likePattern = "%/api/editor-images/view/" + savedName + "%"; // 수정됨
+
+        try (Connection conn = getConnection(); // 수정됨
+             PreparedStatement pstmt = conn.prepareStatement(sql)) { // 수정됨
+
+            pstmt.setString(1, likePattern); // 수정됨
+
+            try (ResultSet rs = pstmt.executeQuery()) { // 수정됨
+                if (rs.next()) { // 수정됨
+                    return rs.getInt(1); // 수정됨
+                }
+            }
+        } catch (SQLException e) { // 수정됨
+            e.printStackTrace(); // 수정됨
+        }
+        return 0; // 수정됨
+    }
 
 } // BoardDAO 클래스 정의 끝

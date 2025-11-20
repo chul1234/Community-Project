@@ -1,19 +1,17 @@
 package com.example.demo.service.board.impl; // 패키지 선언
 
 // 필요한 클래스 import
-import java.util.HashMap; // BoardDAO 클래스 import
-import java.util.List; // IBoardService 인터페이스 import
-import java.util.Map; // @Autowired 어노테이션 import
-
-// : editor 이미지 정리용 import
-import java.util.ArrayList;          // 
-import java.util.HashSet;            // 
-import java.util.Set;                // 
-import java.util.regex.Matcher;      // 
-import java.util.regex.Pattern;      // 
-import java.nio.file.Files;          // 
-import java.nio.file.Path;           // 
-import java.nio.file.Paths;          // 
+import java.nio.file.Files; // BoardDAO 클래스 import
+import java.nio.file.Path; // IBoardService 인터페이스 import
+import java.nio.file.Paths; // @Autowired 어노테이션 import
+import java.util.ArrayList;          //
+import java.util.HashMap;            //
+import java.util.HashSet;                //
+import java.util.List;      //
+import java.util.Map;      //
+import java.util.Set;          //
+import java.util.regex.Matcher;           //
+import java.util.regex.Pattern;          // 
 
 import org.springframework.beans.factory.annotation.Autowired; // @Service 어노테이션 import
 import org.springframework.stereotype.Service; // HashMap 클래스 import
@@ -399,7 +397,7 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         toDelete.removeAll(after);                                            // 
 
         for (String fn : toDelete) {                                          // 
-            deleteEditorImageFile(fn);                                        // 
+            deleteEditorImageFileOnUpdate(fn);                                // 수정됨
         }
     }
 
@@ -407,22 +405,56 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
     private void cleanupEditorImagesOnDelete(String html) {       // 
         List<String> files = extractEditorImageFileNames(html);   // 
         for (String fn : files) {                                 // 
-            deleteEditorImageFile(fn);                            // 
+            deleteEditorImageFileOnDelete(fn);                    // 수정됨
         }
     }
 
-    // 실제 C:/upload/editor/파일명 삭제
-    private void deleteEditorImageFile(String savedName) {        // 
+    // 수정(update) 시에 쓰는 삭제 로직:
+    //  - 이미 이 글에서는 사용이 제거된 상태
+    //  - 다른 글에서 계속 사용 중이면 DB count 가 1 이상이므로 파일 삭제하지 않음
+    private void deleteEditorImageFileOnUpdate(String savedName) {        // 수정됨
         try {
-            if (savedName == null || savedName.isBlank()) return; // 
+            if (savedName == null || savedName.isBlank()) return;         // 수정됨
 
-            Path editorBasePath = Paths.get(uploadDir, "editor"); // 
-            Path target = editorBasePath.resolve(savedName);      // 
+            // 현재 DB에서 이 파일명을 사용하는 게시글 수 조회
+            int count = boardDAO.countPostsUsingEditorImage(savedName);   // 수정됨
 
-            Files.deleteIfExists(target);                         // 
-        } catch (Exception e) {                                   // 
-            // 에디터 이미지 삭제 실패해도 게시글 수정/삭제 자체는 진행  // 
-            e.printStackTrace();                                  // 
+            // 수정 후에도 다른 게시글에서 사용 중이면 파일 삭제 금지
+            if (count > 0) {                                             // 수정됨
+                return;                                                  // 수정됨
+            }
+
+            Path editorBasePath = Paths.get(uploadDir, "editor");        // 수정됨
+            Path target = editorBasePath.resolve(savedName);             // 수정됨
+
+            Files.deleteIfExists(target);                                // 수정됨
+        } catch (Exception e) {                                          // 수정됨
+            e.printStackTrace();                                         // 수정됨
+        }
+    }
+
+    // 삭제(delete) 시에 쓰는 삭제 로직:
+    //  - 아직 이 글의 content도 DB에 남아있기 때문에
+    //  - count == 1  → 이 글만 사용 → 삭제 OK
+    //  - count >= 2 → 다른 글도 사용 → 삭제 금지
+    private void deleteEditorImageFileOnDelete(String savedName) {       // 수정됨
+        try {
+            if (savedName == null || savedName.isBlank()) return;        // 수정됨
+
+            int count = boardDAO.countPostsUsingEditorImage(savedName);  // 수정됨
+
+            // 이 글 말고 다른 게시글에서도 쓰이면 삭제하지 않음
+            if (count > 1) {                                             // 수정됨
+                return;                                                  // 수정됨
+            }
+
+            Path editorBasePath = Paths.get(uploadDir, "editor");        // 수정됨
+            Path target = editorBasePath.resolve(savedName);             // 수정됨
+
+            Files.deleteIfExists(target);                                // 수정됨
+        } catch (Exception e) {                                          // 수정됨
+            // 에디터 이미지 삭제 실패해도 게시글 삭제 자체는 진행
+            e.printStackTrace();                                         // 수정됨
         }
     }
     // ======================================================================
