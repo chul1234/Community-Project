@@ -22,7 +22,7 @@ import com.example.demo.service.file.IFileService;
 public class FileServiceImpl implements IFileService {
 
     // 업로드 폴더 경로 (C: 또는 D: 등 원하는 경로로 설정)
-    private final String uploadDir = "C:/upload";
+    private final String uploadDir = "D:/upload";
 
     @Autowired
     private PostFileDAO postFileDAO; // DB 연동용 DAO 주입
@@ -176,7 +176,7 @@ public class FileServiceImpl implements IFileService {
             if (savedName == null) return;
             if (subDir == null) subDir = ""; // file_path가 NULL인 경우 (기존 파일)
             
-            // [수정됨] "C:/upload" + "MyFolder" -> "C:/upload/MyFolder"
+            // [수정됨] "D:/upload" + "MyFolder" -> "C:/upload/MyFolder"
             Path folderPath = Paths.get(uploadDir).resolve(subDir); // // 수정됨
             Path target = folderPath.resolve(savedName); // // 수정됨
             
