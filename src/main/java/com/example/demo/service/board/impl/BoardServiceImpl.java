@@ -31,7 +31,7 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
     private IFileService fileService; // 추가: 첨부파일 관련 작업 담당
 
     // : editor 인라인 이미지가 저장된 기본 경로 (FileController 의 uploadDir 과 맞춰야 함)
-    private final String uploadDir = "D:/upload"; // : C:/upload/editor 밑에서 이미지 삭제용
+    private final String uploadDir = "C:/upload"; // : C:/upload/editor 밑에서 이미지 삭제용
 
     /**
      * [수정됨] 특정 페이지의 게시글 목록과 전체 페이지 정보를 조회 메소드 정의 시작

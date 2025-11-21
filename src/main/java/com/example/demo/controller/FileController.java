@@ -31,7 +31,7 @@ public class FileController {
     private IFileService fileService;    // 첨부파일 서비스
 
     // [참고] FileServiceImpl과 동일하게 C:/upload 또는 D:/upload 등으로 설정
-    private final String uploadDir = "D:/upload";  // 프로젝트 루트 기준 uploads 폴더
+    private final String uploadDir = "C:/upload";  // 프로젝트 루트 기준 uploads 폴더
 
     /**
      * 첨부파일 다운로드 (기존 기능 유지)
