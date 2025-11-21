@@ -372,20 +372,20 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
 
     // 본문 HTML에서 <img src="/api/editor-images/view/파일명"> 패턴만 뽑아서
     // "파일명(UUID_원본명)" 리스트로 반환
-    private List<String> extractEditorImageFileNames(String html) { 
-        List<String> result = new ArrayList<>();                    
-        if (html == null || html.isBlank()) return result;          
+    private List<String> extractEditorImageFileNames(String html) { //HTML문자열에서 이미지를 찾아서 파일명만 리스트에 담아 반환    
+        List<String> result = new ArrayList<>(); //RESULT는 빈 arrarylist로 초기화                       
+        if (html == null || html.isBlank()) return result;  //html이 null이거나 내용이 공백이거나 비어있으면 빈 리스트 반환 
 
         Pattern p = Pattern.compile(                                
-                "<img[^>]+src=[\"'](/api/editor-images/view/([^\"']+))[\"'][^>]*>",
-                Pattern.CASE_INSENSITIVE
-        );
-        Matcher m = p.matcher(html);                                
+                "<img[^>]+src=[\"'](/api/editor-images/view/([^\"']+))[\"'][^>]*>", 
+                Pattern.CASE_INSENSITIVE 
+        ); // <img로 시작하는 태그를 찾는다. src = 를 찾는다. 그룹 1 (전체 경로) , case_INSENSITIVE 이미지 캐그가 img or IMG 등 대소문자가 섞여도 매칭 되도록 옵션 저용
+        Matcher m = p.matcher(html); // HTML 전체에서 패턴을 탐색할 준비                               
         while (m.find()) {                                          
-            String fileName = m.group(2); // UUID_파일명             
+            String fileName = m.group(2); // 그룹2 (UUID_파일명)             
             result.add(fileName);                                   
-        }
-        return result;                                              
+        } // HTML안에서 정규식 패턴과 일치하는 이미지 태그를 하나씩 찾아냄, 이미지가 1개면 1번 10개면 10번 반복
+        return result;  // 파일명 변환                                         
     }
 
     // 수정 시: oldHtml 에만 있고 newHtml 에는 없는 editor 이미지 파일들만 삭제
@@ -396,40 +396,40 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         Set<String> toDelete = new HashSet<>(before);                          
         toDelete.removeAll(after);                                            
 
-        for (String fn : toDelete) {                                          
-            deleteEditorImageFileOnUpdate(fn);                                // 수정됨
+        for (String fn : toDelete) {  //toDelete 본문에서 사라진 이미지 파일 이름 목록(수정후 존재하지 않은 img 태그 파일명들)                                        
+            deleteEditorImageFileOnUpdate(fn); // 이미지 파일을 정말로 삭제해도 되는지 호가인, 다른 글에서도 안쓰이는 겨웅에만 식제 파일 삭제                               
         }
     }
 
     // 삭제 시: 해당 글 본문에 포함된 editor 이미지 전부 삭제
-    private void cleanupEditorImagesOnDelete(String html) {       
-        List<String> files = extractEditorImageFileNames(html);   
-        for (String fn : files) {                                 
-            deleteEditorImageFileOnDelete(fn);                    // 수정됨
-        }
+    private void cleanupEditorImagesOnDelete(String html) { // 게시물 학제시에만 호출      
+        List<String> files = extractEditorImageFileNames(html); // html에서 에디터 이미지 파일명들 추출
+        for (String fn : files) {  //실제 삭제해도 되는 지 db체크                               
+            deleteEditorImageFileOnDelete(fn);                    
+        } //
     }
 
     // 수정(update) 시에 쓰는 삭제 로직:
     //  - 이미 이 글에서는 사용이 제거된 상태
     //  - 다른 글에서 계속 사용 중이면 DB count 가 1 이상이므로 파일 삭제하지 않음
-    private void deleteEditorImageFileOnUpdate(String savedName) {        // 수정됨
+    private void deleteEditorImageFileOnUpdate(String savedName) {       
         try {
-            if (savedName == null || savedName.isBlank()) return;         // 수정됨
+            if (savedName == null || savedName.isBlank()) return;         
 
             // 현재 DB에서 이 파일명을 사용하는 게시글 수 조회
-            int count = boardDAO.countPostsUsingEditorImage(savedName);   // 수정됨
+            int count = boardDAO.countPostsUsingEditorImage(savedName);   
 
             // 수정 후에도 다른 게시글에서 사용 중이면 파일 삭제 금지
-            if (count > 0) {                                             // 수정됨
-                return;                                                  // 수정됨
+            if (count > 0) {                                             
+                return;                                                  
             }
 
-            Path editorBasePath = Paths.get(uploadDir, "editor");        // 수정됨
-            Path target = editorBasePath.resolve(savedName);             // 수정됨
+            Path editorBasePath = Paths.get(uploadDir, "editor");        
+            Path target = editorBasePath.resolve(savedName);             
 
-            Files.deleteIfExists(target);                                // 수정됨
-        } catch (Exception e) {                                          // 수정됨
-            e.printStackTrace();                                         // 수정됨
+            Files.deleteIfExists(target);                               
+        } catch (Exception e) {                                          
+            e.printStackTrace();                                         
         }
     }
 
@@ -437,24 +437,24 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
     //  - 아직 이 글의 content도 DB에 남아있기 때문에
     //  - count == 1  → 이 글만 사용 → 삭제 OK
     //  - count >= 2 → 다른 글도 사용 → 삭제 금지
-    private void deleteEditorImageFileOnDelete(String savedName) {       // 수정됨
+    private void deleteEditorImageFileOnDelete(String savedName) {       
         try {
-            if (savedName == null || savedName.isBlank()) return;        // 수정됨
+            if (savedName == null || savedName.isBlank()) return; // 삭제하려는 이미지 파일 이름이 null이거나 빈 문자열이면 삭제 작업을 할 이유 없음 증료       
 
-            int count = boardDAO.countPostsUsingEditorImage(savedName);  // 수정됨
+            int count = boardDAO.countPostsUsingEditorImage(savedName);  // 현재 DB에서 이 파일명을 사용하는 게시글 수 조회
 
             // 이 글 말고 다른 게시글에서도 쓰이면 삭제하지 않음
-            if (count > 1) {                                             // 수정됨
-                return;                                                  // 수정됨
-            }
+            if (count > 1) {                                             
+                return;                                                  
+            } // count>1 이면 이 이미지 파일을 이글 말고도 다른 글도 사용하고 있다.
 
-            Path editorBasePath = Paths.get(uploadDir, "editor");        // 수정됨
-            Path target = editorBasePath.resolve(savedName);             // 수정됨
+            Path editorBasePath = Paths.get(uploadDir, "editor"); //uploadDir 프로젝트 설정에서 사용하는 이미지 기본 저장 폴터 editor 서브 폴더       
+            Path target = editorBasePath.resolve(savedName); //"c:upload/editor/파일명" 정확한 정체 경로, resolve() os에 맞게 자동으로 경로 이어줌            
 
-            Files.deleteIfExists(target);                                // 수정됨
-        } catch (Exception e) {                                          // 수정됨
+            Files.deleteIfExists(target); // 실제 파일 삭제                               
+        } catch (Exception e) {                                          
             // 에디터 이미지 삭제 실패해도 게시글 삭제 자체는 진행
-            e.printStackTrace();                                         // 수정됨
+            e.printStackTrace();                                         
         }
     }
     // ======================================================================

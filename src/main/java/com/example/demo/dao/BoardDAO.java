@@ -467,28 +467,27 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
     } // countPinned 메소드 끝
 
     // ------------------------------------------------------
-    // 에디터 이미지 사용 개수 카운트 (다른 글에서도 쓰는지 확인용)  // 수정됨
+    // 에디터 이미지 사용 개수 카운트 (다른 글에서도 쓰는지 확인용)  
     // ------------------------------------------------------
-    public int countPostsUsingEditorImage(String savedName) { // 수정됨
-        // posts.content 안에서 '/api/editor-images/view/파일명' 패턴 검색 // 수정됨
-        String sql = SqlLoader.getSql("post.count.by_editor_image"); // 수정됨
+    public int countPostsUsingEditorImage(String savedName) { 
+        // posts.content 안에서 '/api/editor-images/view/파일명' 패턴 검색 
+        String sql = SqlLoader.getSql("post.count.by_editor_image"); 
 
-        String likePattern = "%/api/editor-images/view/" + savedName + "%"; // 수정됨
+        String likePattern = "%/api/editor-images/view/" + savedName + "%"; 
+        // try-with-resources: conn, pstmt, rs 자동 자원 해제 시작 
+        try (Connection conn = getConnection(); // getconnection() DB연결을 하나 비려온다.
+            PreparedStatement pstmt = conn.prepareStatement(sql)) { // 미리 준비된 SQL을 실행할 준비
+            pstmt.setString(1, likePattern); // SQL 안 첫번째 ? 자리에 likePattern 값을 넣는다.
 
-        try (Connection conn = getConnection(); // 수정됨
-             PreparedStatement pstmt = conn.prepareStatement(sql)) { // 수정됨
-
-            pstmt.setString(1, likePattern); // 수정됨
-
-            try (ResultSet rs = pstmt.executeQuery()) { // 수정됨
-                if (rs.next()) { // 수정됨
-                    return rs.getInt(1); // 수정됨
+            try (ResultSet rs = pstmt.executeQuery()) { //DB에 전달해서 조회 실행
+                if (rs.next()) { // 첫번째 행가져온다. 결과 있으면 true 없으면 false
+                    return rs.getInt(1); //첫번째 칼럼 int로 가져온다.
                 }
-            }
-        } catch (SQLException e) { // 수정됨
-            e.printStackTrace(); // 수정됨
+            } // rs 자동 해제됨 (try-with-resources 끝)
+        } catch (SQLException e) { 
+            e.printStackTrace(); 
         }
-        return 0; // 수정됨
+        return 0; 
     }
 
 } // BoardDAO 클래스 정의 끝
