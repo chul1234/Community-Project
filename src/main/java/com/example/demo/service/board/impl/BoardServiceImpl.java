@@ -4,14 +4,14 @@ package com.example.demo.service.board.impl; // 패키지 선언
 import java.nio.file.Files; // BoardDAO 클래스 import
 import java.nio.file.Path; // IBoardService 인터페이스 import
 import java.nio.file.Paths; // @Autowired 어노테이션 import
-import java.util.ArrayList;          //
-import java.util.HashMap;            //
-import java.util.HashSet;                //
-import java.util.List;      //
-import java.util.Map;      //
-import java.util.Set;          //
-import java.util.regex.Matcher;           //
-import java.util.regex.Pattern;          // 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;          
 
 import org.springframework.beans.factory.annotation.Autowired; // @Service 어노테이션 import
 import org.springframework.stereotype.Service; // HashMap 클래스 import
@@ -77,40 +77,40 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
             // 폴더 업로드인지 여부 확인 (file_path 기준)
             //   - file_path가 비어있지 않은 파일이 하나라도 있으면 "폴더 첨부"로 간주
             // ----------------------------------------------------------------
-            boolean hasFolder = false;        //
-            String topFolderName = null;      //
+            boolean hasFolder = false;        
+            String topFolderName = null;      
 
-            for (Map<String, Object> f : files) {             //
-                Object pathObj = f.get("file_path");          //
+            for (Map<String, Object> f : files) {             
+                Object pathObj = f.get("file_path");          
                 if (pathObj == null) {
-                    continue;                                //
+                    continue;                                
                 }
-                String path = pathObj.toString();             //
+                String path = pathObj.toString();             
                 if (path.isBlank()) {
-                    continue;                                //
+                    continue;                                
                 }
 
-                hasFolder = true;                            //
+                hasFolder = true;                            
 
                 // "test용/하위/..." 형태에서 최상위 폴더명만 추출 //
                 String normalized = path.replace("\\", "/");  // 윈도우 경로 대비 //
-                if (!normalized.endsWith("/")) {             //
-                    normalized = normalized + "/";           //
+                if (!normalized.endsWith("/")) {             
+                    normalized = normalized + "/";           
                 }
-                int idx = normalized.indexOf('/');           //
-                if (idx != -1) {                             //
+                int idx = normalized.indexOf('/');           
+                if (idx != -1) {                             
                     topFolderName = normalized.substring(0, idx); // 예: "test용" //
                 } else {
-                    topFolderName = normalized;              //
+                    topFolderName = normalized;              
                 }
-                break;                                       //
+                break;                                       
             }
 
             if (hasFolder) { //
                 // 폴더 업로드로 판단된 경우: 목록에서는 폴더 아이콘으로 표시 //
-                post.put("fileType", "FOLDER");           //
-                post.put("folderName", topFolderName);    //
-                post.put("thumbUrl", null);               //
+                post.put("fileType", "FOLDER");           
+                post.put("folderName", topFolderName);    
+                post.put("thumbUrl", null);               
                 continue;                                 // 아래 이미지/파일 로직은 건너뜀
             }
 
@@ -221,8 +221,8 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
     public Map<String, Object> updatePost(
             int postId,
             Map<String, Object> postDetails,
-            List<MultipartFile> newFiles,      //
-            List<Integer> deleteFileIds,       //
+            List<MultipartFile> newFiles,      
+            List<Integer> deleteFileIds,       
             String currentUserId) {            //수정됨: 시그니처 변경
 
         // 1. 수정 대상 게시글 조회
@@ -234,8 +234,8 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         }
 
         // : editor 이미지 정리를 위한 이전/이후 내용 확보
-        String oldContent = (String) post.get("content");                // 
-        String newContent = (String) postDetails.get("content");         // 
+        String oldContent = (String) post.get("content");                
+        String newContent = (String) postDetails.get("content");         
 
         // 3. 제목/내용 수정
         post.put("title", postDetails.get("title"));     // "title" 키 값 업데이트
@@ -249,15 +249,15 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         }
 
         // : UPDATE 성공 후 editor 인라인 이미지 정리
-        cleanupEditorImagesOnUpdate(oldContent, newContent); // 
+        cleanupEditorImagesOnUpdate(oldContent, newContent); 
 
         // 5. 첨부파일 삭제 처리 (체크된 파일들)
-        if (deleteFileIds != null && !deleteFileIds.isEmpty()) { //
+        if (deleteFileIds != null && !deleteFileIds.isEmpty()) { 
             fileService.deleteFilesByIds(deleteFileIds); // 선택된 파일 ID들 삭제 //
         }
 
         // 6. 새로 추가된 첨부파일 저장
-        if (newFiles != null && !newFiles.isEmpty()) { //
+        if (newFiles != null && !newFiles.isEmpty()) { 
             fileService.saveFilesForPost(postId, newFiles); // 게시글 ID 기준으로 파일들 추가 저장 //
         }
 
@@ -281,8 +281,8 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
         if (post != null && (roles.contains("ADMIN") || post.get("user_id").equals(currentUserId))) { // if 시작
 
             // : 게시글 삭제 전에 본문에 연결된 editor 인라인 이미지 삭제
-            String content = (String) post.get("content");          // 
-            cleanupEditorImagesOnDelete(content);                   // 
+            String content = (String) post.get("content");          
+            cleanupEditorImagesOnDelete(content);                   
 
             //수정됨: 게시글 삭제 전에 첨부 파일 전체 삭제
             // 1) post_files 테이블에서 해당 post_id의 파일 메타데이터 전체 조회
@@ -372,39 +372,39 @@ public class BoardServiceImpl implements IBoardService { // BoardServiceImpl 클
 
     // 본문 HTML에서 <img src="/api/editor-images/view/파일명"> 패턴만 뽑아서
     // "파일명(UUID_원본명)" 리스트로 반환
-    private List<String> extractEditorImageFileNames(String html) { // 
-        List<String> result = new ArrayList<>();                    // 
-        if (html == null || html.isBlank()) return result;          // 
+    private List<String> extractEditorImageFileNames(String html) { 
+        List<String> result = new ArrayList<>();                    
+        if (html == null || html.isBlank()) return result;          
 
-        Pattern p = Pattern.compile(                                // 
+        Pattern p = Pattern.compile(                                
                 "<img[^>]+src=[\"'](/api/editor-images/view/([^\"']+))[\"'][^>]*>",
                 Pattern.CASE_INSENSITIVE
         );
-        Matcher m = p.matcher(html);                                // 
-        while (m.find()) {                                          // 
-            String fileName = m.group(2); // UUID_파일명             // 
-            result.add(fileName);                                   // 
+        Matcher m = p.matcher(html);                                
+        while (m.find()) {                                          
+            String fileName = m.group(2); // UUID_파일명             
+            result.add(fileName);                                   
         }
-        return result;                                              // 
+        return result;                                              
     }
 
     // 수정 시: oldHtml 에만 있고 newHtml 에는 없는 editor 이미지 파일들만 삭제
-    private void cleanupEditorImagesOnUpdate(String oldHtml, String newHtml) { // 
-        List<String> before = extractEditorImageFileNames(oldHtml);           // 
-        List<String> after  = extractEditorImageFileNames(newHtml);           // 
+    private void cleanupEditorImagesOnUpdate(String oldHtml, String newHtml) { 
+        List<String> before = extractEditorImageFileNames(oldHtml);           
+        List<String> after  = extractEditorImageFileNames(newHtml);           
 
-        Set<String> toDelete = new HashSet<>(before);                          // 
-        toDelete.removeAll(after);                                            // 
+        Set<String> toDelete = new HashSet<>(before);                          
+        toDelete.removeAll(after);                                            
 
-        for (String fn : toDelete) {                                          // 
+        for (String fn : toDelete) {                                          
             deleteEditorImageFileOnUpdate(fn);                                // 수정됨
         }
     }
 
     // 삭제 시: 해당 글 본문에 포함된 editor 이미지 전부 삭제
-    private void cleanupEditorImagesOnDelete(String html) {       // 
-        List<String> files = extractEditorImageFileNames(html);   // 
-        for (String fn : files) {                                 // 
+    private void cleanupEditorImagesOnDelete(String html) {       
+        List<String> files = extractEditorImageFileNames(html);   
+        for (String fn : files) {                                 
             deleteEditorImageFileOnDelete(fn);                    // 수정됨
         }
     }
