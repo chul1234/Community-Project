@@ -77,7 +77,7 @@ public class SecurityConfig { // SecurityConfig: 웹 보안 설정을 위한 메
                 // .usernameParameter(): 로그인 ID로 사용할 파라미터 이름 (login.html의 input name과 일치)
                 .usernameParameter("username") //
                 // .defaultSuccessUrl(): 로그인 성공 시 이동할 기본 URL. (true: 항상 이 URL로 이동)
-                .defaultSuccessUrl("/#!/bus", true) //
+                .defaultSuccessUrl("/#!/welcome", true) //
                 .permitAll() // .permitAll(): 로그인 페이지 자체는 모든 사용자가 접근 가능
             )
 

@@ -10,6 +10,9 @@ var app = angular.module('busApp', ['ngRoute', 'ngSanitize']);
  */
 app.config(function ($routeProvider) {
     $routeProvider
+         .when('/welcome', {
+            templateUrl: 'views/welcome.html',})
+
         .when('/board', {
             templateUrl: 'views/board-list.html',
             controller: 'BoardController',
@@ -66,7 +69,7 @@ app.config(function ($routeProvider) {
         })
 
         .otherwise({
-            redirectTo: '/users',
+            redirectTo: '/welcome', // 기본 경로 설정
         });
 });
 
