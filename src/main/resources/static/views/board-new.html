@@ -104,6 +104,22 @@
                         <div style="font-size: 12px; color: #6c757d; margin-top: 4px">※ 폴더를 선택하면, 그 폴더 안의 모든 파일이 함께 업로드됩니다.</div>
                     </div>
 
+                    <div
+                        id="fileDropZone" 
+                        class="file-drop-zone" 
+                        style="
+                            margin-top: 10px;
+                            padding: 12px;
+                            border: 2px dashed #ccc;
+                            border-radius: 4px;
+                            text-align: center;
+                            font-size: 13px;
+                            color: #666;
+                        " 
+                    > 
+                        이 영역에 파일을 끌어다 놓으면 첨부 파일로 추가됩니다. <!-- 추가됨 -->
+                    </div> 
+
                     <ul
                         class="file-upload-list"
                         ng-if="getAllUploadFiles().length > 0"

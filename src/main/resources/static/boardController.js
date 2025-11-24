@@ -207,6 +207,17 @@ app.controller('BoardNewController', function ($scope, $http, $location) {
     $scope.uploadFiles = [];
     $scope.uploadFolderFiles = [];
 
+    // 드래그 앤 드롭으로 추가된 파일을 uploadFiles 배열에 넣는 헬퍼 // 추가됨
+    function addFilesToUpload(fileList) { // 추가됨
+        if (!fileList || !fileList.length) return; // 추가됨
+
+        // FileList를 배열처럼 순회하면서 하나씩 push // 추가됨
+        for (var i = 0; i < fileList.length; i++) { // 추가됨
+            var f = fileList[i]; // 추가됨
+            $scope.uploadFiles.push(f); // 추가됨
+        } // 추가됨
+    } // 추가됨
+
     //본문 이미지 input 이 채워줄 FileList
     $scope.inlineImageFilesNew = null;
 
@@ -299,6 +310,50 @@ app.controller('BoardNewController', function ($scope, $http, $location) {
     $scope.getDisplayName = function (file) {
         return file.webkitRelativePath && file.webkitRelativePath.length > 0 ? file.webkitRelativePath : file.name;
     };
+
+    // 드래그 앤 드롭 업로드 영역 초기화 함수 // 추가됨
+    function initFileDropZone() { // 추가됨
+        var dropZone = document.getElementById('fileDropZone'); // 추가됨
+        if (!dropZone) { // 추가됨
+            return; // 추가됨
+        } // 추가됨
+
+        // 기본 브라우저 동작(파일 열기 등) 막기 // 추가됨
+        function preventDefaults(e) { // 추가됨
+            e.preventDefault(); // 추가됨
+            e.stopPropagation(); // 추가됨
+        } // 추가됨
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function (eventName) { // 추가됨
+            dropZone.addEventListener(eventName, preventDefaults, false); // 추가됨
+        }); // 추가됨
+
+        dropZone.addEventListener('dragover', function () { // 추가됨
+            dropZone.classList.add('drag-over'); // 추가됨
+        }); // 추가됨
+
+        dropZone.addEventListener('dragleave', function () { // 추가됨
+            dropZone.classList.remove('drag-over'); // 추가됨
+        }); // 추가됨
+
+        dropZone.addEventListener('drop', function (e) { // 추가됨
+            dropZone.classList.remove('drag-over'); // 추가됨
+            var files = e.dataTransfer && e.dataTransfer.files; // 추가됨
+            if (!files || !files.length) { // 추가됨
+                return; // 추가됨
+            } // 추가됨
+
+            // Angular scope 갱신 // 추가됨
+            $scope.$apply(function () { // 추가됨
+                addFilesToUpload(files); // 추가됨
+            }); // 추가됨
+        }); // 추가됨
+    } // 추가됨
+
+    // 뷰가 로딩된 후 드롭존 초기화 // 추가됨
+    $scope.$on('$viewContentLoaded', function () { // 추가됨
+        initFileDropZone(); // 추가됨
+    }); // 추가됨
 
     // 게시글 등록 함수
     $scope.submitPost = function () {
