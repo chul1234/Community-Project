@@ -157,7 +157,9 @@ public class FileController {
 
             // ★★★ [수정됨] UUID 제거, "원본 파일명" 그대로 사용 (약간의 정제만) ★★★
             // 공백이나 한글/특수문자는 간단히 '_' 로 치환해서 파일시스템 문제만 피함
-            String sanitizedName = originalName.replaceAll("[^a-zA-Z0-9._-]", "_"); // 수정됨
+            // 글자(전 세계 언어의 문자) + 숫자는 그대로 두고, 나머지만 '_' 로 치환
+String sanitizedName = originalName.replaceAll("[^\\p{L}\\p{N}._-]", "_");
+
             String savedName = sanitizedName; // 수정됨
 
             // 4) 실제 저장 경로: C:/upload/editor ---------------------
