@@ -777,6 +777,16 @@ app.controller('BoardEditController', function ($scope, $http, $routeParams, $lo
     // ★★★ [] 수정 화면에서도 본문 이미지 max-width % 값 (기본 100) ★★★
     $scope.inlineImageWidthEdit = 100; // 수정 화면용 % 값
 
+    // ★★★ 드래그 앤 드롭으로 들어온 파일을 newFiles 배열에 넣는 함수 ★★★ 
+    function addFilesToNewFiles(fileList) { // 추가됨
+        if (!fileList || !fileList.length) return; // 추가됨
+
+        for (var i = 0; i < fileList.length; i++) { // 추가됨
+            var f = fileList[i]; // 추가됨
+            $scope.newFiles.push(f); // 추가됨
+        } // 추가됨
+    } // 추가됨
+
     // textarea 커서 위치에 text 삽입 헬퍼 함수
     function insertAtCursor(textareaId, text) {
         var textarea = document.getElementById(textareaId);
@@ -863,6 +873,55 @@ app.controller('BoardEditController', function ($scope, $http, $routeParams, $lo
             f._delete = false;
         });
     });
+
+    // ★★★ 수정 화면용 드래그 앤 드롭 DropZone 초기화 함수 ★★★ 
+    function initFileDropZoneEdit() { 
+        var dropZone = document.getElementById('fileDropZoneEdit'); 
+        if (!dropZone) { // 추가됨
+            return; // 화면에 드롭존 없으면 종료 
+        } 
+
+        // 기본 이벤트 방지 함수 
+        function preventDefaults(e) { 
+            e.preventDefault(); 
+            e.stopPropagation(); 
+        } 
+
+        // dragenter, dragover, dragleave, drop 이벤트 모두 기본 동작 막기 
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function (eventName) { 
+            dropZone.addEventListener(eventName, preventDefaults, false); 
+        }); 
+
+        // 드래그 중일 때 스타일 변경 
+        dropZone.addEventListener('dragover', function () { 
+            dropZone.classList.add('drag-over'); 
+        }); 
+
+        // 드래그 벗어날 때 스타일 복원 
+        dropZone.addEventListener('dragleave', function () { 
+            dropZone.classList.remove('drag-over'); 
+        }); 
+
+        // 파일 드롭 시 
+        dropZone.addEventListener('drop', function (e) { 
+            dropZone.classList.remove('drag-over'); 
+
+            var files = e.dataTransfer && e.dataTransfer.files; 
+            if (!files || !files.length) { 
+                return; 
+            } 
+
+            // Angular 스코프 업데이트 
+            $scope.$apply(function () { 
+                addFilesToNewFiles(files); 
+            }); 
+        }); 
+    } 
+
+    // 뷰(html)가 로드된 후 dropzone 활성화 
+    $scope.$on('$viewContentLoaded', function () { 
+        initFileDropZoneEdit(); 
+    }); 
 
     // 4. (액션) 수정 완료 버튼 클릭
     $scope.saveChanges = function () {
