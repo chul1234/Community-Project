@@ -134,6 +134,12 @@
             style="margin-top: 10px; font-size: 14px"
         >
             <strong>{{ newFiles.length }}</strong>개의 파일 선택됨
+            <ul style="margin-top: 5px; padding-left: 20px">
+                <li ng-repeat="file in newFiles">
+                    {{ file.webkitRelativePath || file.name }}
+                    ({{ file.size}} bytes)
+                </li>
+            </ul>
         </div>
     </div>
 
