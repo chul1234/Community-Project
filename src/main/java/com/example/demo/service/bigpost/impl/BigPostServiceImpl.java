@@ -1,3 +1,5 @@
+// 수정됨: 대용량 게시판 CRUD 서비스 메서드 추가
+
 package com.example.demo.service.bigpost.impl; // 서비스 구현 클래스가 속한 패키지 선언
 
 // 필요한 클래스 import
@@ -22,20 +24,27 @@ public class BigPostServiceImpl implements IBigPostService {
     // --------------------------------------------
     @Override
     public Map<String, Object> getBigPosts(int page, int size) { // OFFSET 방식 조회 메서드
-        int offset = (page - 1) * size; // OFFSET 계산: (현재 페이지 - 1) * size
+        // 1. OFFSET 계산: (현재 페이지 - 1) * size
+        int offset = (page - 1) * size;
 
-        List<Map<String, Object>> posts = bigPostDAO.findAll(size, offset); // OFFSET + LIMIT 방식으로 데이터 조회
-        int totalItems = bigPostDAO.countAll(); // 전체 게시글 수 SELECT COUNT(*)
+        // 2. OFFSET + LIMIT 방식으로 데이터 조회
+        List<Map<String, Object>> posts = bigPostDAO.findAll(size, offset);
 
-        int totalPages = (int) Math.ceil((double) totalItems / size); // 페이지 총 개수 계산 (올림)
+        // 3. 전체 게시글 수 조회 (이제는 카운터 테이블을 사용하는 countAll())
+        int totalItems = bigPostDAO.countAll();
 
-        Map<String, Object> result = new HashMap<>(); // 결과 Map 생성
-        result.put("posts", posts);          // 현재 페이지 게시글 목록
+        // 4. 페이지 총 개수 계산 (올림)
+        int totalPages = (int) Math.ceil((double) totalItems / size);
+
+        // 5. 결과 Map 구성
+        Map<String, Object> result = new HashMap<>();
+        result.put("posts", posts);           // 현재 페이지 게시글 목록
         result.put("totalItems", totalItems); // 전체 게시글 수
         result.put("totalPages", totalPages); // 전체 페이지 개수
         result.put("currentPage", page);      // 현재 페이지 번호
 
-        return result; // 결과 반환
+        // 6. 결과 반환
+        return result;
     }
 
     // ---------------------------------------------------------
@@ -44,11 +53,49 @@ public class BigPostServiceImpl implements IBigPostService {
 
     @Override
     public List<Map<String, Object>> getFirstPage(int size) { // 첫 페이지 조회 (키셋 페이징 시작 시 사용)
-        return bigPostDAO.findFirstPage(size); // 가장 최신 게시글부터 size 만큼 조회
+        // 가장 최신 게시글부터 size 만큼 조회
+        return bigPostDAO.findFirstPage(size);
     }
 
     @Override
     public List<Map<String, Object>> getNextPage(long lastId, int size) { // 다음 페이지 조회
-        return bigPostDAO.findNextPage(lastId, size); // lastId보다 작은 데이터를 size 만큼 조회
+        // lastId보다 post_id가 작은 데이터 중에서 size 만큼 조회
+        return bigPostDAO.findNextPage(lastId, size);
+    }
+
+    // ------------------------------------------------------
+    // ▼▼▼ 일반 게시판 스타일 CRUD 메서드 ▼▼▼
+    // ------------------------------------------------------
+
+    @Override
+    public Map<String, Object> getPost(long postId) {
+        // DAO에서 Optional<Map> 형태로 받아와서, 없으면 null 반환
+        return bigPostDAO.findById(postId).orElse(null);
+    }
+
+    @Override
+    public int createPost(Map<String, Object> post) {
+        // 단순히 DAO의 insert 호출
+        // BigPostDAO.insert() 내부에서:
+        //  - big_posts INSERT
+        //  - big_posts_counter.total_count +1
+        return bigPostDAO.insert(post);
+    }
+
+    @Override
+    public int updatePost(Map<String, Object> post) {
+        // post Map 안에 post_id, title, content 등이 들어있다고 가정
+        // 카운터(total_count)는 변경되지 않음
+        return bigPostDAO.update(post);
+    }
+
+    @Override
+    public int deletePost(long postId) {
+        // BigPostDAO.delete() 내부에서:
+        //  - big_posts DELETE
+        //  - big_posts_counter.total_count -1
+        return bigPostDAO.delete(postId);
     }
 }
+
+// 수정됨 끝

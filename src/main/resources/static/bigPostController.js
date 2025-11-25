@@ -1,5 +1,3 @@
-// 수정됨: BigPostController 전체에 라인별 주석 추가
-
 app.controller('BigPostController', function ($scope, $http) {
 
     $scope.postList = [];              // 현재 화면에 보여줄 게시글 목록
@@ -138,10 +136,144 @@ app.controller('BigPostController', function ($scope, $http) {
     };
 
     // ------------------------------------------
+    // 화면 표시용 연속 번호 계산 함수
+    //  - DB post_id와 상관없이
+    //  - totalItems 기준으로 페이지별 번호를 계산
+    // ------------------------------------------
+    $scope.getRowNumber = function (index) {
+        if (!$scope.totalItems || !$scope.pageSize) {
+            return '';
+        }
+        // 예) totalItems=100, currentPage=1, pageSize=10
+        //  → index=0 → 100, index=1 → 99 ...
+        return $scope.totalItems - (($scope.currentPage - 1) * Number($scope.pageSize)) - index;
+    };
+
+    // ------------------------------------------
     // 컨트롤러 초기 실행: 전체 건수 + 첫 페이지 로드
     // ------------------------------------------
     loadTotalInfo();   // 총 개수/전체 페이지 계산
     loadFirstPage();   // 실제 첫 페이지 데이터 로드
 });
 
-// 수정됨 끝
+// 새 글 작성 컨트롤러
+app.controller('BigPostNewController', function ($scope, $http, $location, $rootScope) {
+    $scope.post = { title: '', content: '' };
+
+    $scope.savePost = function () {
+        if (!$scope.post.title) {
+            alert('제목을 입력하세요.');
+            return;
+        }
+
+        // 로그인 사용자 ID (/api/me 응답: user_id)
+        var userId =
+            $rootScope.currentUser && $rootScope.currentUser.user_id
+                ? $rootScope.currentUser.user_id
+                : 'anonymous';
+
+        var payload = {
+            title: $scope.post.title,
+            content: $scope.post.content || '',
+            user_id: userId,
+        };
+
+        $http
+            .post('/api/big-posts', payload)
+            .then(function (response) {
+                var created = response.data;
+                if (created && created.post_id) {
+                    $location.path('/big-posts/' + created.post_id);
+                } else {
+                    $location.path('/big-posts');
+                }
+            })
+            .catch(function (error) {
+                console.error('대용량 게시글 등록 실패', error);
+                alert('등록 중 오류가 발생했습니다.');
+            });
+    };
+
+    $scope.goBack = function () {
+        $location.path('/big-posts');
+    };
+});
+
+// 상세 + 수정/삭제 컨트롤러
+app.controller(
+    'BigPostDetailController',
+    function ($scope, $http, $routeParams, $location, $window) {
+        var postId = $routeParams.postId;
+
+        $scope.post = {};
+        $scope.editMode = false;
+        $scope.editPost = {};
+
+        function loadPost() {
+            $http
+                .get('/api/big-posts/' + postId)
+                .then(function (response) {
+                    $scope.post = response.data || {};
+                })
+                .catch(function (error) {
+                    console.error('대용량 게시글 조회 실패', error);
+                    alert('게시글을 불러오지 못했습니다.');
+                    $location.path('/big-posts');
+                });
+        }
+
+        $scope.startEdit = function () {
+            $scope.editMode = true;
+            $scope.editPost = {
+                title: $scope.post.title,
+                content: $scope.post.content,
+            };
+        };
+
+        $scope.cancelEdit = function () {
+            $scope.editMode = false;
+        };
+
+        $scope.saveEdit = function () {
+            if (!$scope.editPost.title) {
+                alert('제목을 입력하세요.');
+                return;
+            }
+
+            var payload = {
+                title: $scope.editPost.title,
+                content: $scope.editPost.content,
+            };
+
+            $http
+                .put('/api/big-posts/' + postId, payload)
+                .then(function (response) {
+                    $scope.post = response.data || $scope.post;
+                    $scope.editMode = false;
+                })
+                .catch(function (error) {
+                    console.error('대용량 게시글 수정 실패', error);
+                    alert('수정 중 오류가 발생했습니다.');
+                });
+        };
+
+        $scope.deletePost = function () {
+            if (!$window.confirm('정말 삭제하시겠습니까?')) {
+                return;
+            }
+
+            $http
+                .delete('/api/big-posts/' + postId)
+                .then(function () {
+                    alert('삭제되었습니다.');
+                    $location.path('/big-posts');
+                })
+                .catch(function (error) {
+                    console.error('대용량 게시글 삭제 실패', error);
+                    alert('삭제 중 오류가 발생했습니다.');
+                });
+        };
+
+        loadPost();
+    }
+);

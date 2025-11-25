@@ -1,9 +1,15 @@
 <div class="container">
-    <h1>대용량 게시판</h1>
-    <hr/>
-    
-    <div style="margin-bottom: 15px; color: #666;">
-        ※ 총 게시글 수: <strong>{{ totalItems | number }}</strong> 건
+    <div class="action-bar">
+        <h1>대용량 게시판</h1>
+
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 10px">
+            <div style="color: #666;">
+                ※ 총 게시글 수: <strong>{{ totalItems | number }}</strong> 건
+            </div>
+
+            <!-- 새 글 쓰기 버튼 -->
+            <a href="#!/big-posts/new" class="action-btn create-btn">글쓰기</a>
+        </div>
     </div>
 
     <table class="user-table">
@@ -16,35 +22,48 @@
             </tr>
         </thead>
         <tbody>
-            <tr ng-if="!postList || postList.length == 0">
-                <td colspan="4" style="text-align:center; padding: 20px;">
-                    데이터가 없습니다. (DB에 데이터를 추가해주세요)
-                </td>
-            </tr>
             <tr ng-repeat="post in postList">
-                <td>{{ post.post_id }}</td>
-                <td>{{ post.title }}</td>
+                <!-- 표시용 연속 번호 -->
+                <td>{{ getRowNumber($index) | number }}</td>
+
+                <!-- 제목 클릭 → 상세 페이지 -->
+                <td>
+                    <a href="#!/big-posts/{{ post.post_id }}">
+                        {{ post.title }}
+                    </a>
+                </td>
+
                 <td>{{ post.user_id }}</td>
-                <td>{{ post.created_at | date:'yyyy-MM-dd HH:mm:ss' }}</td>
+                <td>{{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</td>
+            </tr>
+
+            <tr ng-if="!postList.length">
+                <td colspan="4" style="text-align: center; color: #999;">
+                    등록된 게시글이 없습니다.
+                </td>
             </tr>
         </tbody>
     </table>
 
-    <div class="pagination-container" style="text-align: center; margin-top: 20px;" ng-if="totalPages > 0">
-    <button ng-click="goToPage(currentPage - 1)" 
-            ng-disabled="currentPage &lt;= 1" 
-            class="action-btn">
-        &lt; 이전
-    </button>
-    
-    <span style="margin: 0 15px; font-weight: bold;">
-        Page {{ currentPage }} / {{ totalPages }}
-    </span>
-    
-    <button ng-click="goToPage(currentPage + 1)" 
-            ng-disabled="currentPage >= totalPages" 
-            class="action-btn">
-        다음 &gt;
-    </button>
-</div>
+    <div style="margin-top: 15px; text-align: center;">
+        <button
+            ng-click="goToPage(currentPage - 1)"
+            ng-disabled="currentPage <= 1"
+            class="action-btn"
+        >
+            &lt; 이전
+        </button>
+
+        <span style="margin: 0 15px; font-weight: bold;">
+            Page {{ currentPage }} / {{ totalPages }}
+        </span>
+
+        <button
+            ng-click="goToPage(currentPage + 1)"
+            ng-disabled="currentPage >= totalPages"
+            class="action-btn"
+        >
+            다음 &gt;
+        </button>
+    </div>
 </div>

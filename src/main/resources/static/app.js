@@ -10,8 +10,9 @@ var app = angular.module('busApp', ['ngRoute', 'ngSanitize']);
  */
 app.config(function ($routeProvider) {
     $routeProvider
-         .when('/welcome', {
-            templateUrl: 'views/welcome.html',})
+        .when('/welcome', {
+            templateUrl: 'views/welcome.html',
+        })
 
         .when('/board', {
             templateUrl: 'views/board-list.html',
@@ -63,9 +64,18 @@ app.config(function ($routeProvider) {
         })
 
         .when('/big-posts', {
-            // URL 경로
-            templateUrl: 'views/big-post-list.html', // 뷰 파일
-            controller: 'BigPostController', // 컨트롤러
+            templateUrl: 'views/big-post-list.html',
+            controller: 'BigPostController',
+        })
+
+        .when('/big-posts/new', {
+            templateUrl: 'views/big-post-new.html',
+            controller: 'BigPostNewController',
+        })
+
+        .when('/big-posts/:postId', {
+            templateUrl: 'views/big-post-detail.html',
+            controller: 'BigPostDetailController',
         })
 
         .otherwise({

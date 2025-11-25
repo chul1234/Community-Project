@@ -1,0 +1,94 @@
+<div class="container" ng-controller="BigPostDetailController">
+    <div class="page-header">
+        <h1>{{ post.title }}</h1>
+        <a href="#!/big-posts" class="cancel-link">← 목록으로</a>
+    </div>
+
+    <div
+        style="
+            color: #6c757d;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 10px;
+        "
+    >
+        <span>작성자: {{ post.user_id }}</span>
+        <span style="margin-left: 15px">
+            작성일: {{ post.created_at | date:'yyyy-MM-dd HH:mm' }}
+        </span>
+    </div>
+
+    <!-- 읽기 모드 -->
+    <div
+        class="user-entry-card"
+        ng-if="!editMode"
+        style="white-space: pre-wrap; min-height: 200px"
+    >
+        {{ post.content }}
+    </div>
+
+    <!-- 수정 모드 -->
+    <div class="user-entry-card" ng-if="editMode">
+        <div class="card-header">
+            <h4>게시글 수정</h4>
+        </div>
+
+        <div class="card-body">
+            <div class="form-group">
+                <label>제목</label>
+                <input type="text" class="form-control" ng-model="editPost.title" />
+            </div>
+
+            <div class="form-group">
+                <label>내용</label>
+                <textarea
+                    class="form-control"
+                    rows="10"
+                    ng-model="editPost.content"
+                ></textarea>
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-top: 15px; display: flex; gap: 10px">
+        <!-- 수정 전 -->
+        <button
+            type="button"
+            class="action-btn"
+            ng-if="!editMode"
+            ng-click="startEdit()"
+        >
+            수정
+        </button>
+
+        <!-- 수정 중 -->
+        <button
+            type="button"
+            class="action-btn"
+            ng-if="editMode"
+            ng-click="saveEdit()"
+        >
+            수정 완료
+        </button>
+
+        <button
+            type="button"
+            class="action-btn"
+            style="background-color: #6c757d"
+            ng-if="editMode"
+            ng-click="cancelEdit()"
+        >
+            취소
+        </button>
+
+        <!-- 삭제 -->
+        <button
+            type="button"
+            class="action-btn"
+            style="background-color: #dc3545"
+            ng-click="deletePost()"
+        >
+            삭제
+        </button>
+    </div>
+</div>

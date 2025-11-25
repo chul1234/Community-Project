@@ -434,6 +434,7 @@ header h1 {
     border: 1px solid #ced4da;
     border-radius: 4px;
     font-size: 14px;
+    box-sizing: border-box; /* ★ 추가: 제목/내용 입력창 모두 카드 안에 딱 맞게 */
 }
 
 .file-upload-list {

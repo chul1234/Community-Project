@@ -1,0 +1,58 @@
+<div class="container" ng-controller="BigPostNewController">
+    <!-- 상단 제목 + 목록으로 -->
+    <div class="page-header">
+        <h1>대용량 게시글 작성</h1>
+        <a href="#!/big-posts" class="cancel-link">← 목록으로</a>
+    </div>
+
+    <!-- 카드 레이아웃 -->
+    <div class="user-entry-card">
+        <div class="card-header">
+            <h4>게시글 정보</h4>
+        </div>
+
+        <div class="card-body">
+            <!-- board-new.html 과 동일한 폼 구조 / 클래스 -->
+            <form class="board-new-form" ng-submit="savePost()">
+                <!-- 제목 -->
+                <div class="form-group">
+                    <label for="bigPostTitle">제목</label>
+                    <input
+                        id="bigPostTitle"
+                        type="text"
+                        class="form-control"
+                        ng-model="post.title"
+                        placeholder="제목을 입력하세요"
+                        required
+                    />
+                </div>
+
+                <!-- 내용 -->
+                <div class="form-group">
+                    <label for="bigPostContent">내용</label>
+                    <textarea
+                        id="bigPostContent"
+                        class="form-control"
+                        rows="10"
+                        ng-model="post.content"
+                        placeholder="내용을 입력하세요"
+                    ></textarea>
+                </div>
+
+                <!-- 버튼 그룹 -->
+                <div class="button-group">
+                    <button type="submit" class="submit-btn-full">
+                        등록
+                    </button>
+                    <button
+                        type="button"
+                        class="secondary-btn"
+                        ng-click="goBack()"
+                    >
+                        취소
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
