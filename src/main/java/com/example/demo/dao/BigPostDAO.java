@@ -77,8 +77,8 @@ public class BigPostDAO {
     // ----------------------------------------------------
 
     // 첫 페이지: 가장 최신글부터 limit 개수
-    public List<Map<String, Object>> findFirstPage(int limit) {  // 수정됨
-        String sql = SqlLoader.getSql("bigpost.select.first");   // 수정됨
+    public List<Map<String, Object>> findFirstPage(int limit) {  
+        String sql = SqlLoader.getSql("bigpost.select.first");  
         List<Map<String, Object>> list = new ArrayList<>();
 
         try (Connection conn = getConnection();
@@ -103,8 +103,8 @@ public class BigPostDAO {
     }
 
     // 다음 페이지: 마지막으로 본 post_id 보다 작은 것들 중에서 최신부터 limit 개수
-    public List<Map<String, Object>> findNextPage(long lastPostId, int limit) {  // 수정됨
-        String sql = SqlLoader.getSql("bigpost.select.next");                   // 수정됨
+    public List<Map<String, Object>> findNextPage(long lastPostId, int limit) {  
+        String sql = SqlLoader.getSql("bigpost.select.next");                  
         List<Map<String, Object>> list = new ArrayList<>();
 
         try (Connection conn = getConnection();
