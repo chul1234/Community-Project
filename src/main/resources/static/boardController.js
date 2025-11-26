@@ -189,17 +189,17 @@ app.controller('BoardController', function ($scope, $http, $rootScope) {
     fetchPosts($scope.currentPage); // 1페이지 로드
 }); // BoardController 정의 끝
 
-// 'BoardNewController' (새 글 작성) - 파일 업로드 처리
-// 새 글 작성 화면에서 제목/내용/첨부파일을 등록하는 컨트롤러
-// 드래그 앤 드롭, 본문 이미지 업로드 등도 포함
+// 'BoardNewController' (새 글 작성) - 파일 업로드 처리 + Summernote 에디터 적용
 app.controller('BoardNewController', function ($scope, $http, $location) {
     // BoardNewController 정의 시작
     $scope.post = { title: '', content: '' }; // 새 게시글 제목/내용 모델
 
-    $scope.uploadFiles = []; // 일반 파일/이미지 업로드 목록
-    $scope.uploadFolderFiles = []; // 폴더 업로드로 들어온 파일 목록
+    $scope.uploadFiles = [];        // 일반 파일/이미지 업로드 목록
+    $scope.uploadFolderFiles = [];  // 폴더 업로드로 들어온 파일 목록
 
-    // 드래그 앤 드롭으로 추가된 파일을 uploadFiles 배열에 넣는 헬퍼
+    // ─────────────────────────────
+    // 1. 드래그 앤 드롭으로 추가된 파일을 uploadFiles 배열에 넣는 헬퍼
+    // ─────────────────────────────
     function addFilesToUpload(fileList) {
         if (!fileList || !fileList.length) return;
 
@@ -210,48 +210,56 @@ app.controller('BoardNewController', function ($scope, $http, $location) {
         }
     }
 
-    // 본문 이미지 input이 채워줄 FileList (새 글 작성용)
-    $scope.inlineImageFilesNew = null;
+    // ─────────────────────────────
+    // 2. Summernote 에디터 초기화 (board-new.html의 ng-init="initEditor()"에서 호출)
+    // ─────────────────────────────
+    $scope.initEditor = function () {
+        // DOM 렌더링 직후에 실행되도록 약간 지연
+        setTimeout(function () {
+            var $editor = $('#postEditor');
+            if (!$editor.length) {
+                return;
+            }
+            // 중복 초기화 방지
+            if ($editor.data('summernote-initialized')) {
+                return;
+            }
 
-    // ★★★ 본문 이미지 max-width % 값 (기본 100) ★★★
-    $scope.inlineImageWidthNew = 100; // 사용자가 %로 입력할 값
+            $editor.summernote({
+                height: 400,
+                lang: 'ko-KR',
+                callbacks: {
+                    // 에디터 내용 변경 시 post.content에 반영
+                    onChange: function (contents) {
+                        $scope.$applyAsync(function () {
+                            $scope.post.content = contents;
+                        });
+                    },
+                    // 에디터에서 이미지 업로드가 발생했을 때
+                    onImageUpload: function (files) {
+                        if (files && files.length > 0) {
+                            $scope.uploadEditorImage(files[0]);
+                        }
+                    },
+                },
+            });
 
-    // textarea 커서 위치에 text 삽입하는 헬퍼
-    function insertAtCursor(textareaId, text) {
-        var textarea = document.getElementById(textareaId);
-        if (!textarea) return;
+            // 초기 내용이 있다면 에디터에 채워 넣기
+            $editor.summernote('code', $scope.post.content || '');
 
-        var start = textarea.selectionStart || 0;
-        var end = textarea.selectionEnd || 0;
+            $editor.data('summernote-initialized', true);
+        }, 0);
+    };
 
-        var before = textarea.value.substring(0, start);
-        var after = textarea.value.substring(end);
+    // ─────────────────────────────
+    // 3. 에디터 내부 이미지 업로드 → /api/editor-images 사용
+    // ─────────────────────────────
+    $scope.uploadEditorImage = function (file) {
+        if (!file) return;
 
-        var newValue = before + text + after;
-        textarea.value = newValue;
-
-        // ng-model 동기화
-        $scope.post.content = newValue;
-
-        // 커서를 삽입된 텍스트 뒤로 이동
-        var newPos = (before + text).length;
-        textarea.focus();
-        textarea.selectionStart = textarea.selectionEnd = newPos;
-    }
-
-    // 본문 이미지 업로드 + textarea에 <img> 삽입 (새 글 작성용)
-    $scope.uploadInlineImageForNew = function () {
-        // 업로드할 이미지가 선택되었는지 확인
-        if (!$scope.inlineImageFilesNew || $scope.inlineImageFilesNew.length === 0) {
-            alert('먼저 이미지를 선택하세요.');
-            return;
-        }
-
-        var file = $scope.inlineImageFilesNew[0];
         var formData = new FormData();
         formData.append('file', file);
 
-        // /api/editor-images 로 파일 업로드 요청
         $http
             .post('/api/editor-images', formData, {
                 transformRequest: angular.identity,
@@ -260,32 +268,21 @@ app.controller('BoardNewController', function ($scope, $http, $location) {
             .then(function (response) {
                 var data = response.data || {};
                 if (data.success && data.url) {
-                    // 입력한 %값을 이용해 max-width 설정
-                    var width = parseInt($scope.inlineImageWidthNew, 10);
-                    if (isNaN(width) || width <= 0) {
-                        width = 100;
-                    }
-                    if (width > 100) {
-                        width = 100;
-                    }
-                    var styleText = 'max-width:' + width + '%;';
-
-                    // 스타일이 적용된 img 태그 생성
-                    var imgTag = '\n<p><img src="' + data.url + '" style="' + styleText + '"></p>\n';
-
-                    // postEditor textarea 커서 위치에 삽입
-                    insertAtCursor('postEditor', imgTag);
+                    // 업로드 성공 시 에디터에 이미지 삽입
+                    $('#postEditor').summernote('insertImage', data.url);
                 } else {
                     alert('이미지 업로드에 실패했습니다.');
                 }
             })
             .catch(function (error) {
-                console.error('본문 이미지 업로드 실패:', error);
+                console.error('에디터 이미지 업로드 실패:', error);
                 alert('이미지 업로드 중 오류가 발생했습니다.');
             });
     };
 
-    // 업로드 대상 파일 전체를 하나의 리스트로 합치는 함수
+    // ─────────────────────────────
+    // 4. 업로드 대상 파일 전체를 하나의 리스트로 합치는 함수 (기존 유지)
+    // ─────────────────────────────
     $scope.getAllUploadFiles = function () {
         var list = [];
         var uploadFilesArray = Array.from($scope.uploadFiles || []);
@@ -309,10 +306,14 @@ app.controller('BoardNewController', function ($scope, $http, $location) {
 
     // 화면에 보여줄 파일 이름 결정 (폴더 경로 또는 파일 이름)
     $scope.getDisplayName = function (file) {
-        return file.webkitRelativePath && file.webkitRelativePath.length > 0 ? file.webkitRelativePath : file.name;
+        return file.webkitRelativePath && file.webkitRelativePath.length > 0
+            ? file.webkitRelativePath
+            : file.name;
     };
 
-    // 드래그 앤 드롭 업로드 영역 초기화 함수
+    // ─────────────────────────────
+    // 5. 드래그 앤 드롭 업로드 영역 초기화 함수 (기존 유지)
+    // ─────────────────────────────
     function initFileDropZone() {
         var dropZone = document.getElementById('fileDropZone');
         if (!dropZone) {
@@ -361,10 +362,25 @@ app.controller('BoardNewController', function ($scope, $http, $location) {
         initFileDropZone();
     });
 
-    // 게시글 등록 함수
+    // ─────────────────────────────
+    // 6. 게시글 등록 함수 (Summernote 내용 사용하도록 수정)
+    // ─────────────────────────────
     $scope.submitPost = function () {
+        // 에디터에서 최신 HTML을 가져와서 post.content에 반영
+        var editorHtml;
+        if (typeof $('#postEditor').summernote === 'function') {
+            editorHtml = $('#postEditor').summernote('code');
+        } else {
+            editorHtml = $scope.post.content || '';
+        }
+        $scope.post.content = editorHtml;
+
         // 제목 또는 내용이 비어 있으면 경고
-        if ($scope.post.content === '' || $scope.post.content === '<p><br></p>' || !$scope.post.title) {
+        if (
+            !$scope.post.title ||
+            !editorHtml ||
+            editorHtml === '<p><br></p>'
+        ) {
             alert('제목과 내용을 모두 입력해주세요.');
             return;
         }
@@ -446,11 +462,18 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
 
     // --- 데이터 로드 ---
 
-    // 게시글 상세 정보 로드 함수
+    // 게시글 상세 정보 로드 함수 (수정에서 돌아온 경우 조회수 증가 방지)
     function fetchPostDetails() {
-        // /api/posts/{postId} 로 게시글 상세 정보 요청
+        // 쿼리 스트링에서 fromEdit 값 확인 (예: #!/board/1?fromEdit=true)
+        var fromEdit = $location.search().fromEdit === 'true';
+
+        // 수정 화면에서 돌아온 경우 → 조회수 올리지 않는 /edit API 사용
+        var url = fromEdit
+            ? '/api/posts/' + postId + '/edit'
+            : '/api/posts/' + postId;
+
         $http
-            .get('/api/posts/' + postId)
+            .get(url)
             .then(function (response) {
                 $scope.post = response.data; // 게시글 데이터 저장
 
@@ -466,6 +489,11 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
 
                 // 게시글 데이터가 로드된 후 권한 체크
                 checkPermissions();
+
+                // fromEdit=true는 한 번만 쓰고 제거 → 이후 새로 진입하면 정상적으로 조회수 +1
+                if (fromEdit) {
+                    $location.search('fromEdit', null);
+                }
             })
             .catch(function () {
                 alert('게시글을 불러오는데 실패했습니다.');
@@ -533,7 +561,6 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
     });
 
     // --- 게시글 고정 관련 함수들 (관리자 전용) ---
-
     /**
      * 게시글 고정 함수. HTML의 '고정하기' 버튼 클릭 시 호출됨 (ng-click="pinPost()")
      * order 값은 1로 고정 (우선순위 정책 단순화)
@@ -741,23 +768,19 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
 }); // BoardDetailController 정의 끝
 
 // BoardEditController (수정 전용)
-// 기존 게시글 수정, 첨부파일 추가/삭제, 본문 이미지 업로드를 담당
+// 기존 게시글 수정, 첨부파일 추가/삭제를 담당 + Summernote 에디터 사용
 app.controller('BoardEditController', function ($scope, $http, $routeParams, $location) {
     const postId = $routeParams.postId; // URL에서 수정할 게시글 ID 추출
 
     // 1. $scope 변수 초기화
-    $scope.post = {}; // 게시글(제목, 내용) 데이터
-    $scope.fileList = []; // 기존 첨부 파일 목록
-    $scope.newFiles = []; // 새로 추가할 파일 목록
-    $scope.deletedFileIds = []; // 삭제할 파일 ID 목록
+    $scope.post = {};            // 게시글(제목, 내용) 데이터
+    $scope.fileList = [];        // 기존 첨부 파일 목록
+    $scope.newFiles = [];        // 새로 추가할 파일 목록
+    $scope.deletedFileIds = [];  // 삭제할 파일 ID 목록
 
-    // 수정 화면용 본문 이미지 FileList
-    $scope.inlineImageFilesEdit = null;
-
-    // ★★★ 수정 화면에서도 본문 이미지 max-width % 값 (기본 100) ★★★
-    $scope.inlineImageWidthEdit = 100; // 수정 화면용 % 값
-
-    // 드래그 앤 드롭으로 들어온 파일을 newFiles 배열에 넣는 함수
+    // ─────────────────────────────
+    // 1-1. 드래그 앤 드롭으로 들어온 파일을 newFiles 배열에 넣는 함수
+    // ─────────────────────────────
     function addFilesToNewFiles(fileList) {
         if (!fileList || !fileList.length) return;
 
@@ -767,37 +790,53 @@ app.controller('BoardEditController', function ($scope, $http, $routeParams, $lo
         }
     }
 
-    // textarea 커서 위치에 text 삽입 헬퍼 함수
-    function insertAtCursor(textareaId, text) {
-        var textarea = document.getElementById(textareaId);
-        if (!textarea) return;
+    // ─────────────────────────────
+    // 2. Summernote 에디터 초기화 (board-edit.html의 ng-init="initEditor()"에서 호출)
+    // ─────────────────────────────
+    $scope.initEditor = function () {
+        setTimeout(function () {
+            var $editor = $('#postContent');
+            if (!$editor.length) return;
 
-        var start = textarea.selectionStart || 0;
-        var end = textarea.selectionEnd || 0;
+            // 이미 초기화된 경우 중복 실행 방지
+            if ($editor.data('summernote-initialized')) {
+                return;
+            }
 
-        var before = textarea.value.substring(0, start);
-        var after = textarea.value.substring(end);
+            $editor.summernote({
+                height: 400,
+                lang: 'ko-KR',
+                callbacks: {
+                    // 에디터 내용 변경 시 post.content에 반영
+                    onChange: function (contents) {
+                        $scope.$applyAsync(function () {
+                            $scope.post.content = contents;
+                        });
+                    },
+                    // 에디터에서 이미지 업로드가 발생했을 때
+                    onImageUpload: function (files) {
+                        if (files && files.length > 0) {
+                            $scope.uploadEditorImage(files[0]);
+                        }
+                    },
+                },
+            });
 
-        var newValue = before + text + after;
-        textarea.value = newValue;
+            // 이미 post.content가 채워져 있으면 에디터에 반영
+            if ($scope.post && $scope.post.content) {
+                $editor.summernote('code', $scope.post.content);
+            }
 
-        // ng-model 동기화
-        $scope.post.content = newValue;
+            $editor.data('summernote-initialized', true);
+        }, 0);
+    };
 
-        // 커서를 삽입된 텍스트 뒤로 이동
-        var newPos = (before + text).length;
-        textarea.focus();
-        textarea.selectionStart = textarea.selectionEnd = newPos;
-    }
+    // ─────────────────────────────
+    // 3. 에디터 내부 이미지 업로드 → /api/editor-images 사용
+    // ─────────────────────────────
+    $scope.uploadEditorImage = function (file) {
+        if (!file) return;
 
-    // 본문 이미지 업로드 + textarea에 <img> 삽입 (수정 화면용)
-    $scope.uploadInlineImageForEdit = function () {
-        if (!$scope.inlineImageFilesEdit || $scope.inlineImageFilesEdit.length === 0) {
-            alert('먼저 이미지를 선택하세요.');
-            return;
-        }
-
-        var file = $scope.inlineImageFilesEdit[0];
         var formData = new FormData();
         formData.append('file', file);
 
@@ -809,43 +848,42 @@ app.controller('BoardEditController', function ($scope, $http, $routeParams, $lo
             .then(function (response) {
                 var data = response.data || {};
                 if (data.success && data.url) {
-                    // 수정 화면에서도 %값으로 max-width 설정
-                    var width = parseInt($scope.inlineImageWidthEdit, 10);
-                    if (isNaN(width) || width <= 0) {
-                        width = 100;
-                    }
-                    if (width > 100) {
-                        width = 100;
-                    }
-                    var styleText = 'max-width:' + width + '%;';
-
-                    var imgTag = '\n<p><img src="' + data.url + '" style="' + styleText + '"></p>\n';
-
-                    // postContent textarea 커서 위치에 삽입
-                    insertAtCursor('postContent', imgTag);
+                    // 업로드 성공 시 에디터에 이미지 삽입
+                    $('#postContent').summernote('insertImage', data.url);
                 } else {
                     alert('이미지 업로드에 실패했습니다.');
                 }
             })
             .catch(function (error) {
-                console.error('본문 이미지 업로드 실패:', error);
+                console.error('에디터 이미지 업로드 실패:', error);
                 alert('이미지 업로드 중 오류가 발생했습니다.');
             });
     };
 
-    // 2. (로딩) 게시글 상세 정보 가져오기 (제목, 내용 채우기) - 수정용 API 사용
+    // ─────────────────────────────
+    // 4. (로딩) 게시글 상세 정보 가져오기 (제목, 내용 채우기) - 수정용 API 사용
+    // ─────────────────────────────
     $http
         .get('/api/posts/' + postId + '/edit') // 조회수 증가 없는 수정용 API
         .then(function (response) {
-            $scope.post = response.data;
-            // textarea + ng-model 로 자동 표시되므로 별도 에디터 처리 없음
+            $scope.post = response.data || {};
+
+            // 에디터가 이미 초기화되어 있다면 내용 채워 넣기
+            var $editor = $('#postContent');
+            if ($editor.length && typeof $editor.summernote === 'function') {
+                if ($editor.data('summernote-initialized')) {
+                    $editor.summernote('code', $scope.post.content || '');
+                }
+            }
         })
         .catch(function () {
             alert('게시글 정보를 불러오는데 실패했습니다.');
             $location.path('/board');
         });
 
-    // 3. (로딩) 기존 첨부파일 목록 가져오기
+    // ─────────────────────────────
+    // 5. (로딩) 기존 첨부파일 목록 가져오기
+    // ─────────────────────────────
     $http.get('/api/posts/' + postId + '/files').then(function (response) {
         $scope.fileList = response.data || [];
         // 삭제 체크박스 초기화
@@ -854,7 +892,9 @@ app.controller('BoardEditController', function ($scope, $http, $routeParams, $lo
         });
     });
 
-    // 수정 화면용 드래그 앤 드롭 DropZone 초기화 함수
+    // ─────────────────────────────
+    // 6. 수정 화면용 드래그 앤 드롭 DropZone 초기화 함수
+    // ─────────────────────────────
     function initFileDropZoneEdit() {
         var dropZone = document.getElementById('fileDropZoneEdit');
         if (!dropZone) {
@@ -904,61 +944,71 @@ app.controller('BoardEditController', function ($scope, $http, $routeParams, $lo
         initFileDropZoneEdit();
     });
 
-    // 4. (액션) 수정 완료 버튼 클릭
+    // ─────────────────────────────
+    // 7. (액션) 수정 완료 버튼 클릭
+    // ─────────────────────────────
     $scope.saveChanges = function () {
-        if (confirm('수정하시겠습니까?')) {
-            // textarea 값과 $scope.post.content 동기화 (안전용)
-            var textarea = document.getElementById('postContent');
-            if (textarea) {
-                $scope.post.content = textarea.value;
-            }
-
-            var formData = new FormData();
-
-            // 1) 수정된 제목, 내용
-            formData.append('title', $scope.post.title || '');
-            formData.append('content', $scope.post.content || '');
-
-            // 2) 삭제 체크된 기존 파일 ID 수집
-            $scope.deletedFileIds = [];
-            angular.forEach($scope.fileList, function (f) {
-                if (f._delete) {
-                    $scope.deletedFileIds.push(f.file_id);
-                }
-            });
-            angular.forEach($scope.deletedFileIds, function (id) {
-                formData.append('deleteFileIds', id);
-            });
-
-            // 3) 새로 추가한 파일들
-            if ($scope.newFiles && $scope.newFiles.length > 0) {
-                for (var i = 0; i < $scope.newFiles.length; i++) {
-                    formData.append('files', $scope.newFiles[i]);
-                }
-            }
-
-            // 4) PUT 전송으로 게시글 수정
-            $http
-                .put('/api/posts/' + postId, formData, {
-                    transformRequest: angular.identity,
-                    headers: { 'Content-Type': undefined },
-                })
-                .then(function () {
-                    alert('게시글이 수정되었습니다.');
-                    // 성공 시 상세보기 페이지로 이동
-                    $location.path('/board/' + postId);
-                })
-                .catch(function (error) {
-                    alert('게시글 수정 중 오류가 발생했습니다.');
-                    console.error('Post update failed:', error);
-                });
+        if (!confirm('수정하시겠습니까?')) {
+            return;
         }
+
+        // 에디터의 최신 내용을 content에 반영
+        var editorHtml;
+        var $editor = $('#postContent');
+        if ($editor.length && typeof $editor.summernote === 'function') {
+            editorHtml = $editor.summernote('code');
+        } else {
+            editorHtml = $scope.post.content || '';
+        }
+        $scope.post.content = editorHtml || '';
+
+        var formData = new FormData();
+
+        // 1) 수정된 제목, 내용
+        formData.append('title', $scope.post.title || '');
+        formData.append('content', $scope.post.content || '');
+
+        // 2) 삭제 체크된 기존 파일 ID 수집
+        $scope.deletedFileIds = [];
+        angular.forEach($scope.fileList, function (f) {
+            if (f._delete) {
+                $scope.deletedFileIds.push(f.file_id);
+            }
+        });
+        angular.forEach($scope.deletedFileIds, function (id) {
+            formData.append('deleteFileIds', id);
+        });
+
+        // 3) 새로 추가한 파일들
+        if ($scope.newFiles && $scope.newFiles.length > 0) {
+            for (var i = 0; i < $scope.newFiles.length; i++) {
+                formData.append('files', $scope.newFiles[i]);
+            }
+        }
+
+        // 4) PUT 전송으로 게시글 수정
+        $http
+            .put('/api/posts/' + postId, formData, {
+                transformRequest: angular.identity,
+                headers: { 'Content-Type': undefined },
+            })
+            .then(function () {
+                alert('게시글이 수정되었습니다.');
+                // ✅ 수정 후 상세보기 페이지로 이동하되, 조회수는 증가시키지 않도록 fromEdit=true 전달
+                $location.path('/board/' + postId).search({ fromEdit: 'true' });
+            })
+            .catch(function (error) {
+                alert('게시글 수정 중 오류가 발생했습니다.');
+                console.error('Post update failed:', error);
+            });
     }; // saveChanges 끝
 
-    // 5. (액션) 취소 버튼 클릭
+    // ─────────────────────────────
+    // 8. (액션) 취소 버튼 클릭
+    // ─────────────────────────────
     $scope.cancelEdit = function () {
-        // 수정 취소 후 상세보기 페이지로 이동
-        $location.path('/board/' + postId);
+        // 수정 취소 후 상세보기 페이지로 이동 (이때도 조회수 증가 없이 보기)
+        $location.path('/board/' + postId).search({ fromEdit: 'true' });
     };
 }); // BoardEditController 정의 끝
 
@@ -1023,3 +1073,5 @@ app.controller('FileViewController', function ($scope, $routeParams, $http, $win
         $window.history.back();
     };
 });
+
+// 수정됨 끝

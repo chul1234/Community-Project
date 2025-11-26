@@ -1,5 +1,8 @@
+<!-- 수정됨: 게시글 수정 화면에서 Summernote 에디터 사용 (본문 이미지 업로드 UI 제거) -->
+
 <div
     class="container"
+    ng-init="initEditor()"
 >
     <div class="page-header">
         <h1>게시글 수정</h1>
@@ -28,6 +31,7 @@
 
         <div class="form-group">
             <label for="postContent">내용</label>
+            <!-- Summernote가 덮어쓸 textarea -->
             <textarea
                 id="postContent"
                 ng-model="post.content"
@@ -35,51 +39,7 @@
                 rows="10"
                 class="form-control"
                 style="width: 100%"
-            >
-            </textarea>
-
-            <!-- ★★★ 본문 이미지 업로드 (수정 화면용) + 너비% 입력  ★★★ -->
-            <div
-                class="form-group"
-                style="margin-top: 12px"
-            >
-                <label>본문 이미지 업로드</label>
-
-                <!-- flex 정렬 영역 -->
-                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
-                    <!-- 이미지 파일 선택 -->
-                    <input
-                        type="file"
-                        accept="image/*"
-                        file-model="inlineImageFilesEdit"
-                    />
-
-                    <!-- ★ : 이미지 너비 % 입력 -->
-                    <div style="display: flex; align-items: center; gap: 4px">
-                        <input
-                            type="number"
-                            min="1"
-                            max="100"
-                            ng-model="inlineImageWidthEdit"
-                            class="form-control"
-                            style="width: 80px; padding: 4px 8px"
-                            placeholder="100"
-                        />
-                        <span style="font-size: 13px">%</span>
-                    </div>
-
-                    <!-- 본문 삽입 버튼 -->
-                    <button
-                        type="button"
-                        class="secondary-btn"
-                        ng-click="uploadInlineImageForEdit()"
-                    >
-                        본문에 삽입
-                    </button>
-                </div>
-
-                <div style="font-size: 12px; color: #6c757d; margin-top: 4px">이미지 선택 → 크기(%) 입력 → "본문에 삽입" 버튼을 누르면, 해당 크기로 이미지 태그가 본문에 들어갑니다.</div>
-            </div>
+            ></textarea>
         </div>
     </form>
 
@@ -123,11 +83,11 @@
             file-model="newFiles"
         />
         <!-- 드래그 앤 드롭 업로드 영역 -->
-<div id="fileDropZoneEdit"
-     class="file-drop-zone"
-     style="margin-top:10px; padding:12px; border:2px dashed #ccc; border-radius:4px; text-align:center; color:#666;">
-     각 영역에 파일을 끌어다 놓으면 새 첨부파일로 추가됩니다.
-</div>
+        <div id="fileDropZoneEdit"
+            class="file-drop-zone"
+            style="margin-top:10px; padding:12px; border:2px dashed #ccc; border-radius:4px; text-align:center; color:#666;">
+            각 영역에 파일을 끌어다 놓으면 새 첨부파일로 추가됩니다.
+        </div>
 
         <div
             ng-if="newFiles.length > 0"
@@ -154,3 +114,5 @@
         수정 완료
     </button>
 </div>
+
+<!-- 수정됨 끝 -->

@@ -1,4 +1,4 @@
-// 수정됨: pageSize에 맞게 한 페이지 최대 표시 개수 동적 적용 + 10000개일 때 로딩중 표시
+// 수정됨: 대용량 게시판 목록(pageSize + Lazy-loading) + 등록 + 상세/수정/삭제(trustedHtml 적용)
 
 app.controller('BigPostController', function ($scope, $http, $window, $timeout) {
 
@@ -318,6 +318,123 @@ app.controller('BigPostController', function ($scope, $http, $window, $timeout) 
     // ------------------------------------------
     loadTotalInfo();
     loadFirstPage();
+});
+
+
+// 대용량 게시판 새 글 작성 컨트롤러
+app.controller('BigPostNewController', function ($scope, $http, $location) {
+    $scope.post = { title: '', content: '' };
+
+    // 등록
+    $scope.submitPost = function () {
+        if (!$scope.post.title || !$scope.post.content) {
+            alert('제목과 내용을 모두 입력해주세요.');
+            return;
+        }
+
+        $http
+            .post('/api/big-posts', $scope.post)
+            .then(function () {
+                alert('대용량 게시글이 등록되었습니다.');
+                $location.path('/big-posts');
+            })
+            .catch(function (err) {
+                console.error('대용량 게시글 등록 실패:', err);
+                alert('등록 중 오류가 발생했습니다.');
+            });
+    };
+
+    // 취소
+    $scope.cancel = function () {
+        $location.path('/big-posts');
+    };
+});
+
+
+// 대용량 게시판 상세/수정/삭제 컨트롤러
+app.controller('BigPostDetailController', function ($scope, $http, $routeParams, $sce, $location) {
+    const postId = $routeParams.postId;
+
+    $scope.post = {};
+    $scope.editMode = false;
+    $scope.editPost = {};
+
+    // HTML 출력용 헬퍼 (big-post-detail.html 의 ng-bind-html 에서 사용)
+    $scope.trustedHtml = function (content) {
+        if (!content) return '';
+        var withBr = String(content).replace(/\n/g, '<br/>');
+        return $sce.trustAsHtml(withBr);
+    };
+
+    // 상세 조회
+    function loadPost() {
+        $http
+            .get('/api/big-posts/' + postId)
+            .then(function (res) {
+                $scope.post = res.data || {};
+            })
+            .catch(function (err) {
+                console.error('대용량 게시글 조회 실패:', err);
+                alert('게시글을 불러오지 못했습니다.');
+                $location.path('/big-posts');
+            });
+    }
+
+    // 수정 모드 진입
+    $scope.startEdit = function () {
+        $scope.editMode = true;
+        $scope.editPost = {
+            title: $scope.post.title,
+            content: $scope.post.content,
+        };
+    };
+
+    // 수정 저장
+    $scope.saveEdit = function () {
+        if (!$scope.editPost.title || !$scope.editPost.content) {
+            alert('제목과 내용을 입력해주세요.');
+            return;
+        }
+
+        $http
+            .put('/api/big-posts/' + postId, $scope.editPost)
+            .then(function () {
+                alert('게시글이 수정되었습니다.');
+                $scope.post.title = $scope.editPost.title;
+                $scope.post.content = $scope.editPost.content;
+                $scope.editMode = false;
+            })
+            .catch(function (err) {
+                console.error('대용량 게시글 수정 실패:', err);
+                alert('수정 중 오류가 발생했습니다.');
+            });
+    };
+
+    // 수정 취소
+    $scope.cancelEdit = function () {
+        $scope.editMode = false;
+    };
+
+    // 삭제
+    $scope.deletePost = function () {
+        if (!confirm('게시글을 삭제하시겠습니까?')) {
+            return;
+        }
+
+        $http
+            .delete('/api/big-posts/' + postId)
+            .then(function () {
+                alert('게시글이 삭제되었습니다.');
+                $location.path('/big-posts');
+            })
+            .catch(function (err) {
+                console.error('대용량 게시글 삭제 실패:', err);
+                alert('삭제 중 오류가 발생했습니다.');
+            });
+    };
+
+    // 초기 로드
+    loadPost();
 });
 
 // 수정됨 끝
