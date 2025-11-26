@@ -1,6 +1,6 @@
-<!-- 수정됨: 대용량 게시판 총 개수 하단 표시 + pageSize 입력/적용 기능 추가 -->
+<!-- 수정됨: 대용량 게시판에 pageSize 설정 + Lazy-loading(100개씩, 최대 1000개) + 다음 페이지 버튼 제어 -->
 
-<div class="container" ng-controller="BigPostController">
+<div class="container">
     <div class="action-bar">
         <h1>대용량 게시판</h1>
 
@@ -53,7 +53,8 @@
             </tr>
         </thead>
         <tbody>
-            <tr ng-repeat="post in postList">
+            <!-- ▼ Lazy-loading: visibleCount 만큼만 렌더링 -->
+            <tr ng-repeat="post in postList | limitTo: visibleCount">
                 <!-- 표시용 연속 번호 -->
                 <td>{{ getRowNumber($index) | number }}</td>
 
@@ -89,9 +90,13 @@
             Page {{ currentPage }} / {{ totalPages }}
         </span>
 
+        <!-- 다음 버튼:
+             - 마지막 페이지이면 비활성
+             - 이 페이지에서 최대 1000개(또는 pageSize/데이터수)까지
+               다 Lazy-loading 된 후에만 활성 -->
         <button
             ng-click="goToPage(currentPage + 1)"
-            ng-disabled="currentPage >= totalPages"
+            ng-disabled="!canGoNextPage()"
             class="action-btn"
         >
             다음 &gt;

@@ -1,19 +1,46 @@
-// 수정됨: 대용량 게시글 리스트 pageSize 설정 + 상세 HTML 본문 $sce.trustAsHtml 적용
-
-app.controller('BigPostController', function ($scope, $http) {
+app.controller('BigPostController', function ($scope, $http, $window) {
 
     $scope.postList = [];              // 현재 화면에 보여줄 게시글 목록
     $scope.currentPage = 1;            // 현재 페이지 번호(키셋 페이징에서 UI용)
     $scope.totalPages = 0;             // 전체 페이지 수 (총 개수 / pageSize)
     $scope.totalItems = 0;             // 전체 게시글 수
-    $scope.pageSize = 1000;            // 한 번에 로드할 게시글 수 (기본 1000)
+    $scope.pageSize = 1000;            // 한 번에 로드할 게시글 수 (서버 요청 기준, 기본 1000)
 
     // ▼ 사용자가 입력창에서 조정할 pageSize 값 (초기값 1000)
     $scope.pageSizeInput = $scope.pageSize;
 
+    // ▼ Lazy-loading 표시용: 화면에 실제로 렌더링할 개수
+    $scope.lazyChunk = 100;           // 한 번 스크롤할 때마다 늘릴 개수
+    $scope.maxVisiblePerPage = 1000;  // 한 페이지에서 최대 1000개까지만 보여주고 그 이후는 다음 페이지
+    $scope.visibleCount = 0;          // 현재 화면에 표시 중인 개수
+
     // ▼ 키셋 페이징을 위한 캐싱 구조
     $scope.pagesCache = {};            // 페이지별 데이터 캐시 (1페이지 → 데이터)
     $scope.lastIdForPage = {};         // 각 페이지의 마지막 post_id 저장 (키셋 이동용)
+
+    // ------------------------------------------
+    // 페이지 변경 시 화면 맨 위로 스크롤
+    // ------------------------------------------
+    function scrollToTop() {
+        $window.scrollTo(0, 0);
+    }
+
+    // ------------------------------------------
+    // 현재 페이지에서 보여줄 개수 리셋 (처음 100개만, 최대 1000개까지)
+    // ------------------------------------------
+    function resetVisibleCount() {
+        var maxForThisPage = Math.min(
+            $scope.maxVisiblePerPage,
+            $scope.pageSize || 0,
+            $scope.postList.length || 0
+        );
+
+        if (!maxForThisPage) {
+            $scope.visibleCount = 0;
+        } else {
+            $scope.visibleCount = Math.min($scope.lazyChunk, maxForThisPage); // 처음엔 100개만
+        }
+    }
 
     // ------------------------------------------
     // pageSize 변경 적용 (입력값 검증 + 캐시 초기화 + 첫 페이지 재조회)
@@ -26,7 +53,7 @@ app.controller('BigPostController', function ($scope, $http) {
             return;
         }
 
-        // 너무 큰 값 제한 (향후 10000개 로딩 로직과 연계 가능)
+        // 너무 큰 값 제한 (향후 10000개 로딩중 표시 기능과 연계 예정)
         if (size > 10000) {
             alert('최대 10000까지만 허용합니다.');
             size = 10000;
@@ -77,16 +104,21 @@ app.controller('BigPostController', function ($scope, $http) {
                 params: { size: $scope.pageSize },                // pageSize 개수 요청
             })
             .then(function (response) {
-                $scope.postList = response.data;                  // 첫 페이지 데이터 목록 저장
+                $scope.postList = response.data || [];            // 첫 페이지 데이터 목록 저장
                 $scope.currentPage = 1;                           // 현재 페이지 = 1
 
-                $scope.pagesCache[1] = response.data;             // 첫 페이지를 캐시에 저장
+                $scope.pagesCache[1] = $scope.postList;           // 첫 페이지를 캐시에 저장
 
                 // 현재 페이지 마지막 post_id 저장
-                if ($scope.postList && $scope.postList.length > 0) {
+                if ($scope.postList.length > 0) {
                     var lastPost = $scope.postList[$scope.postList.length - 1]; // 배열 마지막 요소
                     $scope.lastIdForPage[1] = lastPost.post_id;                 // 첫 페이지 마지막 ID 저장
                 }
+
+                // Lazy-loading 표시 개수 리셋 (처음 100개만)
+                resetVisibleCount();
+                // 첫 페이지 로드시도 맨 위로
+                scrollToTop();
             })
             .catch(function (err) {
                 console.error('첫 페이지 로드 실패:', err);       // 에러 출력
@@ -116,6 +148,8 @@ app.controller('BigPostController', function ($scope, $http) {
             if (cachedPrev) {
                 $scope.postList = cachedPrev;                    // 캐시된 데이터 화면에 표시
                 $scope.currentPage = page;                       // 현재 페이지 업데이트
+                resetVisibleCount();                             // 새 페이지에서 다시 100개부터 시작
+                scrollToTop();                                   // 이전 페이지로 가도 맨 위로
             }
             return;
         }
@@ -130,6 +164,8 @@ app.controller('BigPostController', function ($scope, $http) {
             if (cachedNext) {
                 $scope.postList = cachedNext;                    // 캐시 데이터 표시
                 $scope.currentPage = page;                       // 페이지 번호 변경
+                resetVisibleCount();                             // 새 페이지에서 다시 100개부터 시작
+                scrollToTop();                                   // 다음 페이지로 갈 때 맨 위로
                 return;
             }
 
@@ -161,6 +197,11 @@ app.controller('BigPostController', function ($scope, $http) {
                     // 이 페이지의 마지막 post_id 기록
                     var lastPost = data[data.length - 1];
                     $scope.lastIdForPage[page] = lastPost.post_id;
+
+                    // 새 페이지에서도 처음은 100개만 보이도록
+                    resetVisibleCount();
+                    // 다음 페이지로 갈 때도 맨 위로
+                    scrollToTop();
                 })
                 .catch(function (err) {
                     console.error('다음 페이지 로드 실패:', err); // 에러 출력
@@ -174,6 +215,82 @@ app.controller('BigPostController', function ($scope, $http) {
         // 키셋 페이징 특성: 이전/다음만 이동 가능
         // ------------------------------
     };
+
+    // ------------------------------------------
+    // 다음 페이지 버튼 활성화 여부
+    //  - 현재 페이지가 마지막 페이지면 비활성
+    //  - 한 페이지에서 최대 보여줄 개수(최대 1000개)를
+    //    다 보여주기 전까지는 비활성
+    // ------------------------------------------
+    $scope.canGoNextPage = function () {
+        if ($scope.currentPage >= $scope.totalPages) {
+            return false;
+        }
+        var maxForThisPage = Math.min(
+            $scope.maxVisiblePerPage,
+            $scope.pageSize || 0,
+            $scope.postList.length || 0
+        );
+        if (!maxForThisPage) {
+            return false;
+        }
+        return $scope.visibleCount >= maxForThisPage;
+    };
+
+    // ------------------------------------------
+    // 스크롤 이벤트로 Lazy-loading (100개씩 추가)
+    // ------------------------------------------
+    function handleScroll() {
+        if (!$scope.postList || $scope.postList.length === 0) {
+            return;
+        }
+
+        var maxForThisPage = Math.min(
+            $scope.maxVisiblePerPage,
+            $scope.pageSize || 0,
+            $scope.postList.length || 0
+        );
+
+        // 이미 이 페이지에서 보여줄 수 있는 최대치(최대 1000개)를 다 보여줬으면 종료
+        if ($scope.visibleCount >= maxForThisPage) {
+            return;
+        }
+
+        var scrollTop =
+            $window.pageYOffset ||
+            document.documentElement.scrollTop ||
+            document.body.scrollTop ||
+            0;
+        var windowHeight =
+            $window.innerHeight ||
+            document.documentElement.clientHeight ||
+            document.body.clientHeight ||
+            0;
+        var docHeight = Math.max(
+            document.body.scrollHeight,
+            document.documentElement.scrollHeight,
+            document.body.offsetHeight,
+            document.documentElement.offsetHeight,
+            document.body.clientHeight,
+            document.documentElement.clientHeight
+        );
+
+        // 화면 하단 근처까지 스크롤된 경우 (여유 50px)
+        if (scrollTop + windowHeight + 50 >= docHeight) {
+            $scope.$applyAsync(function () {
+                $scope.visibleCount = Math.min(
+                    $scope.visibleCount + $scope.lazyChunk, // 100개 추가
+                    maxForThisPage                         // 이 페이지 최대치(최대 1000개)를 넘지 않도록
+                );
+            });
+        }
+    }
+
+    angular.element($window).on('scroll', handleScroll);
+
+    $scope.$on('$destroy', function () {
+        angular.element($window).off('scroll', handleScroll);
+    });
 
     // ------------------------------------------
     // 화면 표시용 연속 번호 계산 함수
@@ -195,132 +312,3 @@ app.controller('BigPostController', function ($scope, $http) {
     loadTotalInfo();   // 총 개수/전체 페이지 계산
     loadFirstPage();   // 실제 첫 페이지 데이터 로드
 });
-
-// 새 글 작성 컨트롤러
-app.controller('BigPostNewController', function ($scope, $http, $location, $rootScope) {
-    $scope.post = { title: '', content: '' };
-
-    $scope.savePost = function () {
-        if (!$scope.post.title) {
-            alert('제목을 입력하세요.');
-            return;
-        }
-
-        // 로그인 사용자 ID (/api/me 응답: user_id)
-        var userId =
-            $rootScope.currentUser && $rootScope.currentUser.user_id
-                ? $rootScope.currentUser.user_id
-                : 'anonymous';
-
-        var payload = {
-            title: $scope.post.title,
-            content: $scope.post.content || '',
-            user_id: userId,
-        };
-
-        $http
-            .post('/api/big-posts', payload)
-            .then(function (response) {
-                var created = response.data;
-                if (created && created.post_id) {
-                    $location.path('/big-posts/' + created.post_id);
-                } else {
-                    $location.path('/big-posts');
-                }
-            })
-            .catch(function (error) {
-                console.error('대용량 게시글 등록 실패', error);
-                alert('등록 중 오류가 발생했습니다.');
-            });
-    };
-
-    $scope.goBack = function () {
-        $location.path('/big-posts');
-    };
-});
-
-// 상세 + 수정/삭제 컨트롤러
-app.controller(
-    'BigPostDetailController',
-    function ($scope, $http, $routeParams, $location, $window, $sce) { // ★ $sce 주입
-        var postId = $routeParams.postId;
-
-        $scope.post = {};
-        $scope.editMode = false;
-        $scope.editPost = {};
-
-        // ★ HTML 본문을 신뢰 가능한 형태로 변환하여 ng-bind-html에서 사용
-        $scope.trustedHtml = function (html) {
-            return $sce.trustAsHtml(html || '');
-        };
-
-        function loadPost() {
-            $http
-                .get('/api/big-posts/' + postId)
-                .then(function (response) {
-                    $scope.post = response.data || {};
-                })
-                .catch(function (error) {
-                    console.error('대용량 게시글 조회 실패', error);
-                    alert('게시글을 불러오지 못했습니다.');
-                    $location.path('/big-posts');
-                });
-        }
-
-        $scope.startEdit = function () {
-            $scope.editMode = true;
-            $scope.editPost = {
-                title: $scope.post.title,
-                content: $scope.post.content,
-            };
-        };
-
-        $scope.cancelEdit = function () {
-            $scope.editMode = false;
-        };
-
-        $scope.saveEdit = function () {
-            if (!$scope.editPost.title) {
-                alert('제목을 입력하세요.');
-                return;
-            }
-
-            var payload = {
-                title: $scope.editPost.title,
-                content: $scope.editPost.content,
-            };
-
-            $http
-                .put('/api/big-posts/' + postId, payload)
-                .then(function (response) {
-                    $scope.post = response.data || $scope.post;
-                    $scope.editMode = false;
-                })
-                .catch(function (error) {
-                    console.error('대용량 게시글 수정 실패', error);
-                    alert('수정 중 오류가 발생했습니다.');
-                });
-        };
-
-        $scope.deletePost = function () {
-            if (!$window.confirm('정말 삭제하시겠습니까?')) {
-                return;
-            }
-
-            $http
-                .delete('/api/big-posts/' + postId)
-                .then(function () {
-                    alert('삭제되었습니다.');
-                    $location.path('/big-posts');
-                })
-                .catch(function (error) {
-                    console.error('대용량 게시글 삭제 실패', error);
-                    alert('삭제 중 오류가 발생했습니다.');
-                });
-        };
-
-        loadPost();
-    }
-);
-
-// 수정됨 끝
