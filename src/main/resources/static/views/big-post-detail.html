@@ -1,3 +1,5 @@
+<!-- 수정됨: HTML 출력 방식 변경 (ng-bind-html + trustedHtml 적용) -->
+
 <div class="container" ng-controller="BigPostDetailController">
     <div class="page-header">
         <h1>{{ post.title }}</h1>
@@ -22,9 +24,9 @@
     <div
         class="user-entry-card"
         ng-if="!editMode"
-        style="white-space: pre-wrap; min-height: 200px"
+        style="min-height: 200px"
+        ng-bind-html="trustedHtml(post.content)"
     >
-        {{ post.content }}
     </div>
 
     <!-- 수정 모드 -->
@@ -92,3 +94,5 @@
         </button>
     </div>
 </div>
+
+<!-- 수정됨 끝 -->

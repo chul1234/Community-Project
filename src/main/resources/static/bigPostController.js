@@ -1,3 +1,5 @@
+// 수정됨: 대용량 게시글 상세에서 HTML 본문이 깨지지 않도록 $sce.trustAsHtml 적용
+
 app.controller('BigPostController', function ($scope, $http) {
 
     $scope.postList = [];              // 현재 화면에 보여줄 게시글 목록
@@ -202,12 +204,17 @@ app.controller('BigPostNewController', function ($scope, $http, $location, $root
 // 상세 + 수정/삭제 컨트롤러
 app.controller(
     'BigPostDetailController',
-    function ($scope, $http, $routeParams, $location, $window) {
+    function ($scope, $http, $routeParams, $location, $window, $sce) { // ★ $sce 주입
         var postId = $routeParams.postId;
 
         $scope.post = {};
         $scope.editMode = false;
         $scope.editPost = {};
+
+        // ★ HTML 본문을 신뢰 가능한 형태로 변환하여 ng-bind-html에서 사용
+        $scope.trustedHtml = function (html) {
+            return $sce.trustAsHtml(html || '');
+        };
 
         function loadPost() {
             $http
@@ -277,3 +284,5 @@ app.controller(
         loadPost();
     }
 );
+
+// 수정됨 끝
