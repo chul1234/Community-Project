@@ -1,4 +1,4 @@
-// 수정됨: 대용량 게시글 상세에서 HTML 본문이 깨지지 않도록 $sce.trustAsHtml 적용
+// 수정됨: 대용량 게시글 리스트 pageSize 설정 + 상세 HTML 본문 $sce.trustAsHtml 적용
 
 app.controller('BigPostController', function ($scope, $http) {
 
@@ -8,9 +8,47 @@ app.controller('BigPostController', function ($scope, $http) {
     $scope.totalItems = 0;             // 전체 게시글 수
     $scope.pageSize = 1000;            // 한 번에 로드할 게시글 수 (기본 1000)
 
+    // ▼ 사용자가 입력창에서 조정할 pageSize 값 (초기값 1000)
+    $scope.pageSizeInput = $scope.pageSize;
+
     // ▼ 키셋 페이징을 위한 캐싱 구조
     $scope.pagesCache = {};            // 페이지별 데이터 캐시 (1페이지 → 데이터)
     $scope.lastIdForPage = {};         // 각 페이지의 마지막 post_id 저장 (키셋 이동용)
+
+    // ------------------------------------------
+    // pageSize 변경 적용 (입력값 검증 + 캐시 초기화 + 첫 페이지 재조회)
+    // ------------------------------------------
+    $scope.applyPageSize = function () {
+        var size = parseInt($scope.pageSizeInput, 10);
+
+        if (isNaN(size) || size <= 0) {
+            alert('1 이상의 숫자를 입력하세요.');
+            return;
+        }
+
+        // 너무 큰 값 제한 (향후 10000개 로딩 로직과 연계 가능)
+        if (size > 10000) {
+            alert('최대 10000까지만 허용합니다.');
+            size = 10000;
+        }
+
+        $scope.pageSize = size;
+
+        // 캐시/상태 초기화
+        $scope.pagesCache = {};
+        $scope.lastIdForPage = {};
+        $scope.currentPage = 1;
+
+        // 총 페이지 수 다시 계산 (totalItems는 서버에서 이미 받아온 값 사용)
+        if ($scope.totalItems && $scope.pageSize) {
+            $scope.totalPages = Math.ceil($scope.totalItems / $scope.pageSize);
+        } else {
+            $scope.totalPages = 0;
+        }
+
+        // 첫 페이지 다시 로드
+        loadFirstPage();
+    };
 
     // ------------------------------------------
     // 총 게시글 수 / 총 페이지 수 조회 (COUNT(*)는 여기에서만 1번 사용)
@@ -36,7 +74,7 @@ app.controller('BigPostController', function ($scope, $http) {
     function loadFirstPage() {
         $http
             .get('/api/big-posts/first', {
-                params: { size: $scope.pageSize },                // 1,000개 요청
+                params: { size: $scope.pageSize },                // pageSize 개수 요청
             })
             .then(function (response) {
                 $scope.postList = response.data;                  // 첫 페이지 데이터 목록 저장
@@ -105,7 +143,7 @@ app.controller('BigPostController', function ($scope, $http) {
                 .get('/api/big-posts/next', {
                     params: {
                         lastId: lastId,                           // 키셋 기준점
-                        size: $scope.pageSize,                    // 1000개 요청
+                        size: $scope.pageSize,                    // pageSize 개수 요청
                     },
                 })
                 .then(function (response) {

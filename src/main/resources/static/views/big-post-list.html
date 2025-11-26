@@ -1,4 +1,6 @@
-<div class="container">
+<!-- 수정됨: 대용량 게시판 총 개수 하단 표시 + pageSize 입력/적용 기능 추가 -->
+
+<div class="container" ng-controller="BigPostController">
     <div class="action-bar">
         <h1>대용량 게시판</h1>
 
@@ -11,6 +13,35 @@
             <a href="#!/big-posts/new" class="action-btn create-btn">글쓰기</a>
         </div>
     </div>
+
+    <!-- ▼ 총 개수 아래: pageSize 정보 + 변경 입력 영역 ▼ -->
+    <div style="margin-top: 10px; display: flex; align-items: center; gap: 20px;">
+        <div style="color: #666;">
+            총 <strong>{{ totalItems | number }}</strong> 건 중
+            한 번에 <strong>{{ pageSize | number }}</strong> 개씩 불러오는 중
+        </div>
+
+        <div>
+            <label for="pageSizeInput">한 번에 가져올 개수:</label>
+            <input
+                id="pageSizeInput"
+                type="number"
+                min="1"
+                max="10000"
+                ng-model="pageSizeInput"
+                style="width: 100px; margin-left: 5px; text-align: right;"
+            />
+            <button
+                type="button"
+                class="action-btn"
+                ng-click="applyPageSize()"
+                style="margin-left: 5px;"
+            >
+                적용
+            </button>
+        </div>
+    </div>
+    <!-- ▲ 총 개수 아래 영역 끝 ▲ -->
 
     <table class="user-table">
         <thead>
@@ -67,3 +98,5 @@
         </button>
     </div>
 </div>
+
+<!-- 수정됨 끝 -->
