@@ -1,9 +1,12 @@
+// 수정됨: 대용량 게시글 생성 시 로그인 사용자 user_id 주입
+
 package com.example.demo.controller;
 
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;  // ★ POST/PUT/DELETE 위해 추가
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,7 +25,7 @@ public class BigPostController {
     private IBigPostService bigPostService;
 
     // ----------------------------------------------------
-    // ① 기존 OFFSET 방식 (기능 유지) 
+    // ① 기존 OFFSET 방식 (기능 유지)
     // ----------------------------------------------------
     @GetMapping("/api/big-posts")
     public Map<String, Object> getBigPosts(
@@ -73,7 +76,18 @@ public class BigPostController {
      * Body: { "title": "...", "content": "...", "user_id": "admin" }
      */
     @PostMapping("/api/big-posts")
-    public Map<String, Object> createPost(@RequestBody Map<String, Object> post) {
+    public Map<String, Object> createPost(
+            @RequestBody Map<String, Object> post,
+            Authentication authentication
+    ) {
+
+        // 로그인 사용자 ID를 user_id에 주입 (일반 게시판과 동일 패턴)
+        if (authentication != null) {
+            String userId = authentication.getName();
+            if (userId != null && !userId.isEmpty() && post.get("user_id") == null) {
+                post.put("user_id", userId);
+            }
+        }
 
         int affected = bigPostService.createPost(post);
 
@@ -112,3 +126,5 @@ public class BigPostController {
         return bigPostService.deletePost(postId) > 0;
     }
 }
+
+// 수정됨 끝
