@@ -1,4 +1,35 @@
-<!-- 수정됨: 대용량 게시판에 pageSize 설정 + Lazy-loading(100개씩, 최대 1000개) + 다음 페이지 버튼 제어 -->
+<!-- 수정됨: 대용량 게시판 로딩중 오버레이 + pageSize 설정 + Lazy-loading -->
+
+<!-- ▼▼▼ 여기 추가한다 ▼▼▼ -->
+<div
+    ng-if="isLoadingPage && pageSize >= 10000"
+    style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    "
+>
+    <div
+        style="
+            background: #ffffff;
+            padding: 20px 30px;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+            font-size: 16px;
+        "
+    >
+        10,000개 데이터를 로딩 중입니다. 잠시만 기다려 주세요...
+    </div>
+</div>
+<!-- ▲▲▲ 여기까지 추가 ▲▲▲ -->
+
 
 <div class="container">
     <div class="action-bar">
@@ -9,12 +40,11 @@
                 ※ 총 게시글 수: <strong>{{ totalItems | number }}</strong> 건
             </div>
 
-            <!-- 새 글 쓰기 버튼 -->
             <a href="#!/big-posts/new" class="action-btn create-btn">글쓰기</a>
         </div>
     </div>
 
-    <!-- ▼ 총 개수 아래: pageSize 정보 + 변경 입력 영역 ▼ -->
+    <!-- ▼ 총 개수 아래: pageSize 설정 영역 -->
     <div style="margin-top: 10px; display: flex; align-items: center; gap: 20px;">
         <div style="color: #666;">
             총 <strong>{{ totalItems | number }}</strong> 건 중
@@ -31,17 +61,11 @@
                 ng-model="pageSizeInput"
                 style="width: 100px; margin-left: 5px; text-align: right;"
             />
-            <button
-                type="button"
-                class="action-btn"
-                ng-click="applyPageSize()"
-                style="margin-left: 5px;"
-            >
+            <button type="button" class="action-btn" ng-click="applyPageSize()" style="margin-left: 5px;">
                 적용
             </button>
         </div>
     </div>
-    <!-- ▲ 총 개수 아래 영역 끝 ▲ -->
 
     <table class="user-table">
         <thead>
@@ -53,36 +77,21 @@
             </tr>
         </thead>
         <tbody>
-            <!-- ▼ Lazy-loading: visibleCount 만큼만 렌더링 -->
             <tr ng-repeat="post in postList | limitTo: visibleCount">
-                <!-- 표시용 연속 번호 -->
                 <td>{{ getRowNumber($index) | number }}</td>
-
-                <!-- 제목 클릭 → 상세 페이지 -->
-                <td>
-                    <a href="#!/big-posts/{{ post.post_id }}">
-                        {{ post.title }}
-                    </a>
-                </td>
-
+                <td><a href="#!/big-posts/{{ post.post_id }}">{{ post.title }}</a></td>
                 <td>{{ post.user_id }}</td>
                 <td>{{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</td>
             </tr>
 
             <tr ng-if="!postList.length">
-                <td colspan="4" style="text-align: center; color: #999;">
-                    등록된 게시글이 없습니다.
-                </td>
+                <td colspan="4" style="text-align: center; color: #999;">등록된 게시글이 없습니다.</td>
             </tr>
         </tbody>
     </table>
 
     <div style="margin-top: 15px; text-align: center;">
-        <button
-            ng-click="goToPage(currentPage - 1)"
-            ng-disabled="currentPage <= 1"
-            class="action-btn"
-        >
+        <button ng-click="goToPage(currentPage - 1)" ng-disabled="currentPage <= 1" class="action-btn">
             &lt; 이전
         </button>
 
@@ -90,15 +99,7 @@
             Page {{ currentPage }} / {{ totalPages }}
         </span>
 
-        <!-- 다음 버튼:
-             - 마지막 페이지이면 비활성
-             - 이 페이지에서 최대 1000개(또는 pageSize/데이터수)까지
-               다 Lazy-loading 된 후에만 활성 -->
-        <button
-            ng-click="goToPage(currentPage + 1)"
-            ng-disabled="!canGoNextPage()"
-            class="action-btn"
-        >
+        <button ng-click="goToPage(currentPage + 1)" ng-disabled="!canGoNextPage()" class="action-btn">
             다음 &gt;
         </button>
     </div>
