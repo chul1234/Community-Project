@@ -34,6 +34,14 @@
         <script src="/bigPostController.js"></script>
     </head>
     <body ng-controller="MainController">
+        <!-- 전역 로딩 오버레이 -->
+        <div class="loading-overlay" ng-show="isLoading">
+            <div class="loading-box">
+                <div class="spinner"></div>
+                <p>로딩중입니다...</p>
+            </div>
+        </div>
+
         <div class="main-container">
             <header>
                 <h1>실습프로젝트</h1>

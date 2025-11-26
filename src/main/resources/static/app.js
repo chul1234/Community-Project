@@ -160,3 +160,44 @@ app.directive('fileModel', [
         };
     },
 ]);
+
+// 전역 로딩 상태 플래그
+app.run(function ($rootScope) {
+    $rootScope.isLoading = false;
+});
+
+// 모든 $http 요청에 대해 로딩 표시 인터셉터
+app.config(function ($httpProvider) {
+    $httpProvider.interceptors.push(function ($q, $rootScope) {
+        let activeRequests = 0;
+
+        function startLoading() {
+            activeRequests++;
+            $rootScope.isLoading = true;
+        }
+
+        function stopLoading() {
+            activeRequests--;
+            if (activeRequests <= 0) {
+                activeRequests = 0;
+                $rootScope.isLoading = false;
+            }
+        }
+
+        return {
+            request: function (config) {
+                startLoading();
+                return config;
+            },
+            response: function (response) {
+                stopLoading();
+                return response;
+            },
+            responseError: function (rejection) {
+                stopLoading();
+                return $q.reject(rejection);
+            },
+        };
+    });
+});
+
