@@ -1,5 +1,3 @@
-// 수정됨: 대용량 게시판 목록(pageSize + Lazy-loading) + 등록 + 상세/수정/삭제(trustedHtml 적용)
-
 app.controller('BigPostController', function ($scope, $http, $window, $timeout) {
 
     $scope.postList = [];              // 현재 화면에 보여줄 게시글 목록
@@ -222,20 +220,36 @@ app.controller('BigPostController', function ($scope, $http, $window, $timeout) 
     // 다음 페이지 버튼 활성화 여부
     //  - 이 페이지에서 pageSize(또는 실제 데이터 수)만큼
     //    전부 Lazy-loading 된 경우에만 true
+    //  - 실제 로드된 개수가 pageSize보다 작으면 마지막 페이지로 판단하여 비활성화
     // ------------------------------------------
     $scope.canGoNextPage = function () {
+        var pageSizeNum = Number($scope.pageSize) || 0;
+
+        // 로드된 데이터가 없으면 비활성화
+        if (!$scope.postList || $scope.postList.length === 0) {
+            return false;
+        }
+
+        // 마지막 페이지 판정:
+        // 서버에서 받아온 게시글 수가 pageSize보다 작으면 더 이상 다음 페이지 없음
+        if (pageSizeNum > 0 && $scope.postList.length < pageSizeNum) {
+            return false;
+        }
+
+        // 계산된 totalPages 기준으로도 마지막 페이지면 비활성화
         if ($scope.currentPage >= $scope.totalPages) {
             return false;
         }
 
         var maxForThisPage = Math.min(
-            $scope.pageSize || 0,
+            pageSizeNum,
             $scope.postList.length || 0
         );
         if (!maxForThisPage) {
             return false;
         }
 
+        // Lazy-loading으로 이 페이지에서 보여줄 수 있는 만큼 다 보여줬을 때만 true
         return $scope.visibleCount >= maxForThisPage;
     };
 
@@ -436,5 +450,3 @@ app.controller('BigPostDetailController', function ($scope, $http, $routeParams,
     // 초기 로드
     loadPost();
 });
-
-// 수정됨 끝
