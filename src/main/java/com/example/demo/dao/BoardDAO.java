@@ -46,7 +46,7 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
         // [유지] 동적 SQL 조립을 위한 StringBuilder 사용
         // [유지] 기본 SELECT SQL문 (FROM posts p, LEFT JOIN users u)
         StringBuilder sql = new StringBuilder(
-            "SELECT p.post_id, p.title, p.user_id, u.name as author_name, p.created_at, p.view_count, p.pinned_order " +
+            "SELECT p.post_id, p.title, p.content, p.user_id, u.name as author_name, p.created_at, p.view_count, p.pinned_order " +
             "FROM posts p LEFT JOIN users u ON p.user_id = u.user_id "
         );
 
@@ -143,6 +143,7 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
                     // rs.getXXX("컬럼명") 메소드 호출하여 데이터 추출 후 post 맵에 .put() 메소드로 저장 시작
                     post.put("post_id", rs.getInt("post_id")); // post_id 컬럼 (int)
                     post.put("title", rs.getString("title")); // title 컬럼 (String)
+                    post.put("content", rs.getString("content")); // content 컬럼 (String) - 썸네일 추출용
                     post.put("user_id", rs.getString("user_id")); // user_id 컬럼 (String)
                     post.put("author_name", rs.getString("author_name")); // author_name 별명 컬럼 (String)
                     post.put("created_at", rs.getTimestamp("created_at")); // created_at 컬럼 (Timestamp)
@@ -271,38 +272,39 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
      */
     public int save(Map<String, Object> post) { // save 메소드 정의 시작
 
-    // SqlLoader.getSql() 호출하여 "post.insert" SQL 문자열 로드
-    String sql = SqlLoader.getSql("post.insert");
+        // SqlLoader.getSql() 호출하여 "post.insert" SQL 문자열 로드
+        String sql = SqlLoader.getSql("post.insert");
 
-    // try-with-resources: conn, pstmt 자동 자원 해제
-    try (Connection conn = getConnection();
+        // try-with-resources: conn, pstmt 자동 자원 해제
+        try (Connection conn = getConnection();
 
-         // 자동 생성된 post_id 를 얻기 위해 RETURN_GENERATED_KEYS 사용
-         PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+             // 자동 생성된 post_id 를 얻기 위해 RETURN_GENERATED_KEYS 사용
+             PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-        // SQL ? 파라미터 설정
-        pstmt.setString(1, (String) post.get("title"));
-        pstmt.setString(2, (String) post.get("content"));
-        pstmt.setString(3, (String) post.get("user_id"));
+            // SQL ? 파라미터 설정
+            pstmt.setString(1, (String) post.get("title"));
+            pstmt.setString(2, (String) post.get("content"));
+            pstmt.setString(3, (String) post.get("user_id"));
 
-        // INSERT 실행
-        int rows = pstmt.executeUpdate();  // 영향받은 행 수
+            // INSERT 실행
+            int rows = pstmt.executeUpdate();  // 영향받은 행 수
 
-        // 자동 생성된 post_id 읽어오기
-        try (ResultSet rs = pstmt.getGeneratedKeys()) {
-            if (rs.next()) {
-                int generatedId = rs.getInt(1);
-                post.put("post_id", generatedId); // post Map에 post_id 저장
+            // 자동 생성된 post_id 읽어오기
+            try (ResultSet rs = pstmt.getGeneratedKeys()) {
+                if (rs.next()) {
+                    int generatedId = rs.getInt(1);
+                    post.put("post_id", generatedId); // post Map에 post_id 저장
+                }
             }
+
+            return rows;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0;
         }
-
-        return rows;
-
-    } catch (SQLException e) {
-        e.printStackTrace();
-        return 0;
     }
-}
+
     /**
      * post_id로 특정 게시글 하나 조회 메소드 정의 시작
      * @param postId 조회할 게시글 ID (int) - 파라미터 설명
@@ -476,7 +478,7 @@ public class BoardDAO { // BoardDAO 클래스 정의 시작
         String likePattern = "%/api/editor-images/view/" + savedName + "%"; 
         // try-with-resources: conn, pstmt, rs 자동 자원 해제 시작 
         try (Connection conn = getConnection(); // getconnection() DB연결을 하나 비려온다.
-            PreparedStatement pstmt = conn.prepareStatement(sql)) { // 미리 준비된 SQL을 실행할 준비
+             PreparedStatement pstmt = conn.prepareStatement(sql)) { // 미리 준비된 SQL을 실행할 준비
             pstmt.setString(1, likePattern); // SQL 안 첫번째 ? 자리에 likePattern 값을 넣는다.
 
             try (ResultSet rs = pstmt.executeQuery()) { //DB에 전달해서 조회 실행

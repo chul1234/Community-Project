@@ -1,5 +1,3 @@
-// 수정됨: BoardServiceImpl 전체 라인별 설명 주석 추가
-
 package com.example.demo.service.board.impl; // 게시판 서비스 구현 클래스가 속한 패키지
 
 // 필요한 클래스 import
@@ -63,11 +61,30 @@ public class BoardServiceImpl implements IBoardService { // IBoardService를 구
             // 첨부파일 목록 조회 (post_files 테이블 기준)
             List<Map<String, Object>> files = fileService.getFilesByPostId(postId);
 
+            // ==========================
+            // 1) 첨부파일이 전혀 없을 때
+            //    → 에디터(본문) 이미지가 있으면 그걸 썸네일로 사용
+            //    → 그마저도 없으면 기존처럼 'NONE' 처리
+            // ==========================
             if (files == null || files.isEmpty()) { // 첨부파일이 하나도 없는 경우
-                post.put("fileType", "NONE");  // 파일 타입 없음
-                post.put("thumbUrl", null);    // 썸네일 URL 없음
-                post.put("fileCount", 0);      // 첨부파일 수 0
-                continue;                      // 다음 게시글로 넘어감
+                post.put("fileCount", 0); // 첨부파일 수 0
+
+                // 본문(content)에 들어있는 에디터 이미지(<img src="/api/editor-images/view/...">) 추출
+                String content = (String) post.get("content");
+                List<String> editorImages = extractEditorImageFileNames(content);
+
+                if (editorImages != null && !editorImages.isEmpty()) {
+                    // 첫 번째 에디터 이미지를 썸네일로 사용
+                    String savedName = editorImages.get(0); // UUID_원본명 형태
+                    post.put("fileType", "IMAGE"); // 목록에서는 IMAGE로 취급
+                    post.put("thumbUrl", "/api/editor-images/view/" + savedName); // 에디터 이미지 뷰 URL
+                } else {
+                    // 에디터 이미지도 없으면 기존 로직 유지 (NONE → board-list 에서 '-')
+                    post.put("fileType", "NONE");  // 파일 타입 없음
+                    post.put("thumbUrl", null);    // 썸네일 URL 없음
+                }
+
+                continue; // 다음 게시글로 넘어감
             }
 
             // 첨부파일이 1개 이상이면 개수 저장
@@ -76,6 +93,7 @@ public class BoardServiceImpl implements IBoardService { // IBoardService를 구
             // ----------------------------------------------------------------
             // 폴더 업로드인지 여부 확인 (file_path 기준)
             //   - file_path가 비어있지 않은 파일이 하나라도 있으면 "폴더 첨부"로 간주
+            //   - 폴더가 하나라도 있으면 기존처럼 폴더 아이콘 우선
             // ----------------------------------------------------------------
             boolean hasFolder = false;   // 폴더 업로드 여부 플래그
             String topFolderName = null; // 최상위 폴더 이름 (목록에 표시할 이름)
@@ -116,6 +134,7 @@ public class BoardServiceImpl implements IBoardService { // IBoardService를 구
 
             // ----------------------------------------------------------------
             // 여기부터는 기존 "첫 번째 파일 기준으로 IMAGE / FILE 판단" 로직
+            // (첨부가 있는 경우에는 기존 규칙 유지: 이미지 첨부 있으면 그걸 썸네일로, 아니면 파일 아이콘)
             // ----------------------------------------------------------------
 
             // 첫 번째 첨부파일 기준으로 타입 판단
@@ -468,5 +487,3 @@ public class BoardServiceImpl implements IBoardService { // IBoardService를 구
     // ======================================================================
 
 } // BoardServiceImpl 클래스 정의 끝
-
-// 수정됨 끝
