@@ -1,3 +1,5 @@
+// 수정됨: 대용량 게시판 검색 기능 + user_id 검색 시 인덱스 활용 (= 비교로 변경)
+
 package com.example.demo.dao;
 
 import java.sql.Connection;
@@ -32,17 +34,69 @@ public class BigPostDAO {
 
     // ------------------------------------------------------
     // 1) 기존 OFFSET 방식 (page, size)로 조회할 때 사용 가능
-    //    (지금은 키셋 페이징 위주로 쓰고, 필요하면 사용)
+    //    → 검색 조건이 없는 단순 버전: 내부적으로 검색 버전 호출
     // ------------------------------------------------------
     public List<Map<String, Object>> findAll(int size, int offset) {
-        String query = sql("bigpost.select.page");
+        return findAll(size, offset, null, null);
+    }
+
+    // ------------------------------------------------------
+    // 1-2) OFFSET + 검색 조건 버전
+    //      searchType: title, content, title_content, user_id, time
+    // ------------------------------------------------------
+    public List<Map<String, Object>> findAll(int size, int offset, String searchType, String searchKeyword) {
         List<Map<String, Object>> list = new ArrayList<>();
 
-        try (Connection conn = getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(query)) {
+        // 기본 SELECT
+        StringBuilder sql = new StringBuilder(
+                "SELECT post_id, title, user_id, created_at " +
+                "FROM big_posts "
+        );
 
-            pstmt.setInt(1, offset);
-            pstmt.setInt(2, size);
+        // WHERE 동적 생성
+        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        List<Object> params = new ArrayList<>();
+
+        if (searchKeyword != null && !searchKeyword.isEmpty()) {
+            // searchType이 없으면 기본을 'title_content'로
+            if (searchType == null || searchType.isEmpty()) {
+                searchType = "title_content";
+            }
+
+            if ("title".equals(searchType)) {
+                where.append(" AND title LIKE ? ");
+                params.add("%" + searchKeyword + "%");
+            } else if ("content".equals(searchType)) {
+                where.append(" AND content LIKE ? ");
+                params.add("%" + searchKeyword + "%");
+            } else if ("title_content".equals(searchType)) {
+                where.append(" AND (title LIKE ? OR content LIKE ?) ");
+                params.add("%" + searchKeyword + "%");
+                params.add("%" + searchKeyword + "%");
+            } else if ("user_id".equals(searchType)) {
+                // 🔸 수정 포인트 1: user_id LIKE '%키워드%' → '=' 비교로 변경 (인덱스 활용)
+                where.append(" AND user_id = ? ");
+                params.add(searchKeyword);
+            } else if ("time".equals(searchType)) {
+                // 0~23 시 기준 (문자열 그대로 바인딩, DB에서 숫자로 변환됨)
+                where.append(" AND HOUR(created_at) = ? ");
+                params.add(searchKeyword);
+            }
+        }
+
+        sql.append(where);
+        sql.append(" ORDER BY post_id DESC ");
+        sql.append(" LIMIT ? OFFSET ? ");
+
+        params.add(size);
+        params.add(offset);
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
+
+            for (int i = 0; i < params.size(); i++) {
+                pstmt.setObject(i + 1, params.get(i));
+            }
 
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
@@ -62,24 +116,83 @@ public class BigPostDAO {
     }
 
     // ------------------------------------------------------
-    // 2) 전체 개수 조회 (이제는 카운터 테이블 사용)
+    // 2) 전체 개수 조회
+    //    - 검색어 없으면: 카운터 테이블 사용 (기존 로직)
+    //    - 검색어 있으면: big_posts에서 조건 COUNT(*)
     // ------------------------------------------------------
     public int countAll() {
-        String query = sql("bigpost.count.all"); // SELECT total_count FROM big_posts_counter WHERE id = 1
+        return countAll(null, null);
+    }
+
+    public int countAll(String searchType, String searchKeyword) {
+        // 검색어 없으면 기존 카운터 테이블 사용 (매우 빠름)
+        if (searchKeyword == null || searchKeyword.isEmpty()) {
+            String query = sql("bigpost.count.all"); // SELECT total_count FROM big_posts_counter WHERE id = 1
+
+            try (Connection conn = getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(query);
+                 ResultSet rs = pstmt.executeQuery()) {
+
+                if (rs.next()) {
+                    long total = rs.getLong(1);   // total_count
+                    return (int) total;           // int로 캐스팅
+                }
+                return 0;
+            } catch (SQLException e) {
+                e.printStackTrace();
+                return 0;
+            }
+        }
+
+        // 검색어가 있는 경우: big_posts 에서 조건 COUNT(*)
+        StringBuilder sql = new StringBuilder(
+                "SELECT COUNT(*) FROM big_posts "
+        );
+        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        List<Object> params = new ArrayList<>();
+
+        if (searchType == null || searchType.isEmpty()) {
+            searchType = "title_content";
+        }
+
+        if ("title".equals(searchType)) {
+            where.append(" AND title LIKE ? ");
+            params.add("%" + searchKeyword + "%");
+        } else if ("content".equals(searchType)) {
+            where.append(" AND content LIKE ? ");
+            params.add("%" + searchKeyword + "%");
+        } else if ("title_content".equals(searchType)) {
+            where.append(" AND (title LIKE ? OR content LIKE ?) ");
+            params.add("%" + searchKeyword + "%");
+            params.add("%" + searchKeyword + "%");
+        } else if ("user_id".equals(searchType)) {
+            // 🔸 수정 포인트 2: COUNT 쿼리에서도 user_id = ? 로 통일 (인덱스 활용)
+            where.append(" AND user_id = ? ");
+            params.add(searchKeyword);
+        } else if ("time".equals(searchType)) {
+            where.append(" AND HOUR(created_at) = ? ");
+            params.add(searchKeyword);
+        }
+
+        sql.append(where);
 
         try (Connection conn = getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(query);
-             ResultSet rs = pstmt.executeQuery()) {
+             PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
 
-            if (rs.next()) {
-                long total = rs.getLong(1);   // total_count
-                return (int) total;           // int로 캐스팅 (필요하면 long으로 바꿔도 됨)
+            for (int i = 0; i < params.size(); i++) {
+                pstmt.setObject(i + 1, params.get(i));
             }
-            return 0;
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
         } catch (SQLException e) {
             e.printStackTrace();
-            return 0;
         }
+
+        return 0;
     }
 
     // ------------------------------------------------------
@@ -273,3 +386,5 @@ public class BigPostDAO {
         }
     }
 }
+
+// 수정됨 끝

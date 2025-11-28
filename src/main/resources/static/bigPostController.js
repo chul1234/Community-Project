@@ -1,3 +1,5 @@
+// 수정됨: 대용량 게시판 검색 기능 추가 (검색 모드에서는 /api/big-posts OFFSET 방식 사용)
+
 app.controller('BigPostController', function ($scope, $http, $window, $timeout) {
 
     $scope.postList = [];              // 현재 화면에 보여줄 게시글 목록
@@ -19,6 +21,11 @@ app.controller('BigPostController', function ($scope, $http, $window, $timeout) 
 
     // 10000개 모드에서 로딩중 표시용
     $scope.isLoadingPage = false;
+
+    // 검색 상태
+    $scope.searchType = 'title';
+    $scope.searchKeyword = '';
+    $scope.isSearchMode = false;      // true면 /api/big-posts (OFFSET + 검색) 사용
 
     // ------------------------------------------
     // 페이지 변경 시 화면 맨 위로 스크롤
@@ -74,11 +81,16 @@ app.controller('BigPostController', function ($scope, $http, $window, $timeout) 
             $scope.totalPages = 0;
         }
 
-        loadFirstPage();
+        // 검색 모드인지에 따라 호출 분기
+        if ($scope.isSearchMode) {
+            loadSearchPage(1);
+        } else {
+            loadFirstPage();
+        }
     };
 
     // ------------------------------------------
-    // 총 게시글 수 조회
+    // 총 게시글 수 조회 (전체 기준)
     // ------------------------------------------
     function loadTotalInfo() {
         $http
@@ -97,7 +109,77 @@ app.controller('BigPostController', function ($scope, $http, $window, $timeout) 
     }
 
     // ------------------------------------------
-    // 첫 페이지 로드
+    // 검색 모드용 페이지 로드 (OFFSET + 검색)
+    // ------------------------------------------
+    function loadSearchPage(page) {
+        var params = {
+            page: page,
+            size: $scope.pageSize || 1000
+        };
+
+        if ($scope.searchKeyword) {
+            params.searchType = $scope.searchType;
+            params.searchKeyword = $scope.searchKeyword;
+        }
+
+        $scope.isLoadingPage = ($scope.pageSize >= 10000);
+
+        $http
+            .get('/api/big-posts', { params: params })
+            .then(function (response) {
+                var data = response.data || {};
+                $scope.postList = data.posts || [];
+                $scope.totalItems = data.totalItems || 0;
+                $scope.totalPages = data.totalPages || 0;
+                $scope.currentPage = data.currentPage || page;
+
+                resetVisibleCount();
+                scrollToTop();
+            })
+            .catch(function (err) {
+                console.error('검색 결과 로드 실패:', err);
+            })
+            .finally(function () {
+                if ($scope.pageSize >= 10000) {
+                    $timeout(function () {
+                        $scope.isLoadingPage = false;
+                    }, 300);
+                } else {
+                    $scope.isLoadingPage = false;
+                }
+            });
+    }
+
+    // ------------------------------------------
+    // 검색 버튼 클릭
+    // ------------------------------------------
+    $scope.searchPosts = function () {
+        if (!$scope.searchKeyword) {
+            alert('검색어를 입력하세요.');
+            return;
+        }
+
+        $scope.isSearchMode = true;
+        $scope.currentPage = 1;
+
+        loadSearchPage(1);
+    };
+
+    // ------------------------------------------
+    // 검색 초기화
+    // ------------------------------------------
+    $scope.clearSearch = function () {
+        $scope.searchKeyword = '';
+        $scope.isSearchMode = false;
+        $scope.currentPage = 1;
+
+        // 전체 기준 총 개수 다시 불러오고, 키셋 첫 페이지 로드
+        loadTotalInfo();
+        loadFirstPage();
+    };
+
+    // ------------------------------------------
+    // 첫 페이지 로드 (키셋 페이징용)
     // ------------------------------------------
     function loadFirstPage() {
         $scope.isLoadingPage = ($scope.pageSize >= 10000);
@@ -135,10 +217,27 @@ app.controller('BigPostController', function ($scope, $http, $window, $timeout) 
     }
 
     // ------------------------------------------
-    // 페이지 이동 (이전/다음만)
+    // 페이지 이동 (이전/다음)
     // ------------------------------------------
     $scope.goToPage = function (page) {
-        if (page < 1 || ($scope.totalPages > 0 && page > $scope.totalPages)) {
+        if (page < 1) {
+            return;
+        }
+
+        // 검색 모드: OFFSET 기반 API로 페이징
+        if ($scope.isSearchMode) {
+            if ($scope.totalPages > 0 && page > $scope.totalPages) {
+                return;
+            }
+            if (page === $scope.currentPage) {
+                return;
+            }
+            loadSearchPage(page);
+            return;
+        }
+
+        // ▼▼▼ 기존 키셋 페이징 로직 ▼▼▼
+        if ($scope.totalPages > 0 && page > $scope.totalPages) {
             return;
         }
         if (page === $scope.currentPage) {
@@ -218,12 +317,19 @@ app.controller('BigPostController', function ($scope, $http, $window, $timeout) 
 
     // ------------------------------------------
     // 다음 페이지 버튼 활성화 여부
-    //  - 이 페이지에서 pageSize(또는 실제 데이터 수)만큼
-    //    전부 Lazy-loading 된 경우에만 true
-    //  - 실제 로드된 개수가 pageSize보다 작으면 마지막 페이지로 판단하여 비활성화
     // ------------------------------------------
     $scope.canGoNextPage = function () {
         var pageSizeNum = Number($scope.pageSize) || 0;
+
+        // 검색 모드인 경우: currentPage < totalPages 이면 다음 버튼 활성
+        if ($scope.isSearchMode) {
+            if (!$scope.totalPages || !$scope.currentPage) {
+                return false;
+            }
+            return $scope.currentPage < $scope.totalPages;
+        }
+
+        // ▼▼▼ 기존 키셋 페이징 기준 ▼▼▼
 
         // 로드된 데이터가 없으면 비활성화
         if (!$scope.postList || $scope.postList.length === 0) {
@@ -450,3 +556,5 @@ app.controller('BigPostDetailController', function ($scope, $http, $routeParams,
     // 초기 로드
     loadPost();
 });
+
+// 수정됨 끝

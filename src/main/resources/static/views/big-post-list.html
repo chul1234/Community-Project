@@ -1,6 +1,6 @@
-<!-- 수정됨: 대용량 게시판 로딩중 오버레이 + pageSize 설정 + Lazy-loading -->
+<!-- 수정됨: 대용량 게시판 검색 UI 추가 + 기존 pageSize/키셋 구조 유지 -->
 
-<!-- ▼▼▼ 여기 추가한다 ▼▼▼ -->
+<!-- 로딩 오버레이 -->
 <div
     ng-if="isLoadingPage && pageSize >= 10000"
     style="
@@ -28,8 +28,6 @@
         10,000개 데이터를 로딩 중입니다. 잠시만 기다려 주세요...
     </div>
 </div>
-<!-- ▲▲▲ 여기까지 추가 ▲▲▲ -->
-
 
 <div class="container">
     <div class="action-bar">
@@ -43,6 +41,50 @@
             <a href="#!/big-posts/new" class="action-btn create-btn">글쓰기</a>
         </div>
     </div>
+
+    <!-- ▼ 검색 영역 -->
+    <div style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
+        <select
+            ng-model="searchType"
+            style="height: 35px; border-radius: 4px; border: 1px solid #ccc; padding: 0 6px;"
+        >
+            <option value="title">제목</option>
+            <option value="content">내용</option>
+            <option value="title_content">제목+내용</option>
+            <option value="user_id">작성자(ID)</option>
+            <option value="time">작성된 시간(0-23시)</option>
+        </select>
+
+        <input
+            type="text"
+            ng-model="searchKeyword"
+            placeholder="검색어 (time은 0~23 입력)"
+            style="height: 33px; border: 1px solid #ccc; border-radius: 4px; padding: 0 8px; min-width: 220px;"
+        />
+
+        <button
+            type="button"
+            class="action-btn"
+            ng-click="searchPosts()"
+        >
+            검색
+        </button>
+
+        <button
+            type="button"
+            class="action-btn"
+            ng-click="clearSearch()"
+            ng-disabled="!isSearchMode && !searchKeyword"
+            style="background-color: #6c757d; color: white;"
+        >
+            검색 초기화
+        </button>
+
+        <span ng-if="isSearchMode" style="color:#dc3545; margin-left:10px;">
+            ※ 검색 모드 (키셋 대신 페이지 기반 조회 중)
+        </span>
+    </div>
+    <!-- ▲ 검색 영역 끝 -->
 
     <!-- ▼ 총 개수 아래: pageSize 설정 영역 -->
     <div style="margin-top: 10px; display: flex; align-items: center; gap: 20px;">

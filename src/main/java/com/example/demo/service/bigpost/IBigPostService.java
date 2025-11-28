@@ -1,4 +1,4 @@
-// 수정됨: 대용량 게시판 CRUD 메서드 추가
+// 수정됨: 대용량 게시판 검색 기능 추가 (getBigPosts에 검색 파라미터 추가)
 
 package com.example.demo.service.bigpost;
 
@@ -8,7 +8,8 @@ import java.util.Map;
 public interface IBigPostService {
 
     // 기존 OFFSET 페이징 (page / size 기반 목록 조회)
-    Map<String, Object> getBigPosts(int page, int size);
+    // → 검색 타입 / 검색어 추가
+    Map<String, Object> getBigPosts(int page, int size, String searchType, String searchKeyword);
 
     // ▼▼▼ 초고속 키셋 페이징용 ▼▼▼
     // 첫 페이지(가장 최신 글 기준) 조회

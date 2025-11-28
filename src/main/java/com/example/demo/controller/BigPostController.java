@@ -1,7 +1,8 @@
-// 수정됨: 대용량 게시글 생성 시 로그인 사용자 user_id 주입
+// 수정됨: 대용량 게시판 목록 API에 검색 파라미터(searchType, searchKeyword) 추가
 
 package com.example.demo.controller;
 
+// 필요한 클래스 import
 import java.util.List;
 import java.util.Map;
 
@@ -25,14 +26,16 @@ public class BigPostController {
     private IBigPostService bigPostService;
 
     // ----------------------------------------------------
-    // ① 기존 OFFSET 방식 (기능 유지)
+    // ① 기존 OFFSET 방식 (기능 유지) + 검색 지원
     // ----------------------------------------------------
     @GetMapping("/api/big-posts")
     public Map<String, Object> getBigPosts(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String searchType,
+            @RequestParam(required = false) String searchKeyword
     ) {
-        return bigPostService.getBigPosts(page, size);
+        return bigPostService.getBigPosts(page, size, searchType, searchKeyword);
     }
 
     // ----------------------------------------------------

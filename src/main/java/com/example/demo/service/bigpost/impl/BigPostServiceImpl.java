@@ -1,4 +1,4 @@
-// 수정됨: 대용량 게시판 CRUD 서비스 메서드 추가
+// 수정됨: 대용량 게시판 검색 기능 추가 (getBigPosts에서 검색 처리 분기)
 
 package com.example.demo.service.bigpost.impl; // 서비스 구현 클래스가 속한 패키지 선언
 
@@ -20,26 +20,35 @@ public class BigPostServiceImpl implements IBigPostService {
     private BigPostDAO bigPostDAO;
 
     // --------------------------------------------
-    // 기존 OFFSET 기반 페이징 방식
+    // 기존 OFFSET 기반 페이징 방식 + 검색
     // --------------------------------------------
     @Override
-    public Map<String, Object> getBigPosts(int page, int size) { // OFFSET 방식 조회 메서드
+    public Map<String, Object> getBigPosts(int page, int size, String searchType, String searchKeyword) { // OFFSET 방식 조회 메서드
         // 1. OFFSET 계산: (현재 페이지 - 1) * size
         int offset = (page - 1) * size;
 
-        // 2. OFFSET + LIMIT 방식으로 데이터 조회
-        List<Map<String, Object>> posts = bigPostDAO.findAll(size, offset);
+        // 2. OFFSET + LIMIT 방식으로 데이터 조회 (검색 조건 함께 전달)
+        List<Map<String, Object>> posts = bigPostDAO.findAll(size, offset, searchType, searchKeyword);
 
-        // 3. 전체 게시글 수 조회 (이제는 카운터 테이블을 사용하는 countAll())
-        int totalItems = bigPostDAO.countAll();
+        // 3. 전체 게시글 수 조회
+        //    - 검색어가 없으면: 카운터 테이블(total_count) 사용 (매우 빠름)
+        //    - 검색어가 있으면: 조건이 걸린 COUNT(*) 실행
+        int totalItems;
+        if (searchKeyword == null || searchKeyword.isEmpty()) {
+            totalItems = bigPostDAO.countAll(null, null);   // 카운터 테이블 사용
+        } else {
+            totalItems = bigPostDAO.countAll(searchType, searchKeyword); // 조건 COUNT
+        }
 
         // 4. 페이지 총 개수 계산 (올림)
-        int totalPages = (int) Math.ceil((double) totalItems / size);
+        int totalPages = (size > 0)
+                ? (int) Math.ceil((double) totalItems / size)
+                : 0;
 
         // 5. 결과 Map 구성
         Map<String, Object> result = new HashMap<>();
         result.put("posts", posts);           // 현재 페이지 게시글 목록
-        result.put("totalItems", totalItems); // 전체 게시글 수
+        result.put("totalItems", totalItems); // 전체(또는 검색 결과) 게시글 수
         result.put("totalPages", totalPages); // 전체 페이지 개수
         result.put("currentPage", page);      // 현재 페이지 번호
 
