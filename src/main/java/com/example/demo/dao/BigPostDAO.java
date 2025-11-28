@@ -1,4 +1,4 @@
-// 수정됨: 대용량 게시판 검색 기능 + user_id 검색 시 인덱스 활용 (= 비교로 변경)
+// 수정됨: 대용량 게시판 검색 기능 (제목/내용 접두(prefix) 검색 + user_id 인덱스 활용)
 
 package com.example.demo.dao;
 
@@ -43,6 +43,12 @@ public class BigPostDAO {
     // ------------------------------------------------------
     // 1-2) OFFSET + 검색 조건 버전
     //      searchType: title, content, title_content, user_id, time
+    //      - title / content / title_content:
+    //          · LIKE '키워드%' (접두 검색) 사용 → title 인덱스, content(255) 인덱스 활용 가능
+    //      - user_id:
+    //          · '=' 비교 → (user_id, post_id) 인덱스 활용
+    //      - time:
+    //          · HOUR(created_at) = ? (함수 사용이라 인덱스는 못 타지만 사용 빈도 낮다고 가정)
     // ------------------------------------------------------
     public List<Map<String, Object>> findAll(int size, int offset, String searchType, String searchKeyword) {
         List<Map<String, Object>> list = new ArrayList<>();
@@ -63,18 +69,20 @@ public class BigPostDAO {
                 searchType = "title_content";
             }
 
+            // ⚠ 여기서부터는 반드시 '키워드%' 형태로만 사용 → 인덱스 활용
             if ("title".equals(searchType)) {
                 where.append(" AND title LIKE ? ");
-                params.add("%" + searchKeyword + "%");
+                // '%키워드%' → '키워드%' (접두 검색)
+                params.add(searchKeyword + "%");
             } else if ("content".equals(searchType)) {
                 where.append(" AND content LIKE ? ");
-                params.add("%" + searchKeyword + "%");
+                params.add(searchKeyword + "%");
             } else if ("title_content".equals(searchType)) {
                 where.append(" AND (title LIKE ? OR content LIKE ?) ");
-                params.add("%" + searchKeyword + "%");
-                params.add("%" + searchKeyword + "%");
+                params.add(searchKeyword + "%");
+                params.add(searchKeyword + "%");
             } else if ("user_id".equals(searchType)) {
-                // 🔸 수정 포인트 1: user_id LIKE '%키워드%' → '=' 비교로 변경 (인덱스 활용)
+                // user_id 인덱스를 활용하기 위해 '=' 비교 사용
                 where.append(" AND user_id = ? ");
                 params.add(searchKeyword);
             } else if ("time".equals(searchType)) {
@@ -117,8 +125,10 @@ public class BigPostDAO {
 
     // ------------------------------------------------------
     // 2) 전체 개수 조회
-    //    - 검색어 없으면: 카운터 테이블 사용 (기존 로직)
+    //    - 검색어 없으면: 카운터 테이블 사용 (기존 로직, 매우 빠름)
     //    - 검색어 있으면: big_posts에서 조건 COUNT(*)
+    //      · title/content/title_content: LIKE '키워드%' 기준
+    //      · user_id/time: '=' / HOUR(created_at) 그대로
     // ------------------------------------------------------
     public int countAll() {
         return countAll(null, null);
@@ -155,18 +165,19 @@ public class BigPostDAO {
             searchType = "title_content";
         }
 
+        // 여기서도 findAll과 동일하게 '키워드%' 접두 검색 사용
         if ("title".equals(searchType)) {
             where.append(" AND title LIKE ? ");
-            params.add("%" + searchKeyword + "%");
+            params.add(searchKeyword + "%");
         } else if ("content".equals(searchType)) {
             where.append(" AND content LIKE ? ");
-            params.add("%" + searchKeyword + "%");
+            params.add(searchKeyword + "%");
         } else if ("title_content".equals(searchType)) {
             where.append(" AND (title LIKE ? OR content LIKE ?) ");
-            params.add("%" + searchKeyword + "%");
-            params.add("%" + searchKeyword + "%");
+            params.add(searchKeyword + "%");
+            params.add(searchKeyword + "%");
         } else if ("user_id".equals(searchType)) {
-            // 🔸 수정 포인트 2: COUNT 쿼리에서도 user_id = ? 로 통일 (인덱스 활용)
+            // COUNT 쿼리에서도 user_id = ? 로 통일 (인덱스 활용)
             where.append(" AND user_id = ? ");
             params.add(searchKeyword);
         } else if ("time".equals(searchType)) {
