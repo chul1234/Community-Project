@@ -1,13 +1,15 @@
-package com.example.demo.secutiry;
+package com.example.demo.security;
 
-import com.example.demo.dao.UserDAO; // DB의 users 테이블과 통하는 UserDAO
+import java.util.Map; // DB의 users 테이블과 통하는 UserDAO
+
 import org.springframework.beans.factory.annotation.Autowired; // Spring의 의존성 주입 기능을 사용하기 위한 도구
 import org.springframework.security.core.userdetails.User; // Spring Security가 제공하는 UserDetails의 표준 구현체
 import org.springframework.security.core.userdetails.UserDetails; // 사용자의 핵심 정보(ID, PW, 권한)를 담는 설계도
 import org.springframework.security.core.userdetails.UserDetailsService; // '사용자 정보를 찾아오는 기능'의 설계도
 import org.springframework.security.core.userdetails.UsernameNotFoundException; // 사용자를 찾지 못했을 때 발생시키는 예외
 import org.springframework.stereotype.Service; // 이 클래스가 서비스 부품임을 알리는 도구
-import java.util.Map; // 데이터를 '이름표-값' 쌍으로 다루기 위한 도구
+
+import com.example.demo.dao.UserDAO; // 데이터를 '이름표-값' 쌍으로 다루기 위한 도구
 
 @Service
 //// 'UserDetailsServiceImpl'이라는 클래스를 선언하고, Spring Security의 'UserDetailsService' 설계도를 구현(implements)
