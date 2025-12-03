@@ -1,21 +1,14 @@
-<div
-    ng-controller="BusController"
-    class="container"
->
-    <h1>대구 버스 정류장 정보 조회</h1>
+<div class="container">
+    <h1>버스 노선 정보</h1>
     <hr />
-    <div>
-        <button
-            type="button"
-            ng-click="fetchData()"
-        >
-            데이터 요청하기
-        </button>
+
+    <!-- 입력란 + 검색 버튼 (요구대로 유지) -->
+    <div style="margin-bottom: 10px">
         <input
             type="text"
             ng-model="searchTerm"
-            placeholder="정류장 이름 검색"
-            style="margin-left: 10px"
+            placeholder="검색어를 입력하세요"
+            style="margin-right: 10px; width: 250px"
         />
         <button
             type="button"
@@ -24,11 +17,12 @@
             검색
         </button>
     </div>
+
     <hr />
-    <h2>조회 결과</h2>
-    <textarea
-        style="width: 100%; height: 300px; white-space: pre"
-        ng-model="resultText"
-        readonly
-    ></textarea>
+
+    <!-- 여기부터 지도 들어가는 영역 -->
+    <div
+        id="map1"
+        style="width: 100%; height: 600px; border: 1px solid #ccc"
+    ></div>
 </div>

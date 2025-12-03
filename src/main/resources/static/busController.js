@@ -1,61 +1,48 @@
 /**
- * 3-3. BusController: 버스 정보 조회 영역을 제어합니다.
- * 이 컨트롤러는 어떤 페이지로 이동하든 항상 활성화 상태를 유지합니다.
+ * 3-3. BusController: 버스 정보(지도 + 검색 입력란) 화면 제어
  */
-app.controller('BusController', function ($scope, $http) {
-    $scope.allBusStops = [];
-    $scope.searchTerm = '';
-    $scope.resultText = '버튼을 눌러 데이터를 불러오세요.';
+app.controller('BusController', function ($scope, $timeout) {
 
-    $scope.fetchData = function () {
-        $scope.resultText = '데이터를 불러오는 중...';
-        var url = `http://localhost:8080/api/bus-stops`;
-        $http
-            .get(url)
-            .then(function (response) {
-                const data = response.data;
-                if (typeof data === 'string' && data.trim().startsWith('<')) {
-                    const errorCodeMatch = data.match(/<returnReasonCode>(\d+)<\/returnReasonCode>/);
-                    const errorMsgMatch = data.match(/<returnAuthMsg>(.*?)<\/returnAuthMsg>/);
-                    let errorMessage = '외부 API에서 오류가 발생했습니다.';
-                    if (errorCodeMatch && errorMsgMatch) {
-                        errorMessage = `API 오류: ${errorMsgMatch[1]} (코드: ${errorCodeMatch[1]})`;
-                    }
-                    $scope.resultText = errorMessage;
-                } else if (data && data.body && data.body.items) {
-                    $scope.allBusStops = data.body.items.bs;
-                    $scope.resultText = `총 ${$scope.allBusStops.length}개 정류장 데이터 로딩 완료!`;
-                } else {
-                    $scope.resultText = '데이터를 받았지만 형식이 올바르지 않습니다.';
-                }
-            })
-            .catch(function (errorResponse) {
-                $scope.resultText = `API 요청 실패: (상태: ${errorResponse.status})`;
-            });
+    // 검색어 (입력칸에 바인딩)
+    $scope.searchTerm = '';
+
+    // NGII 지도 객체
+    $scope.map1 = null;
+
+    /**
+     * 지도 초기화
+     * - bus-info.html 의 <div id="map1"> 안에 지도를 띄운다.
+     */
+    $scope.initMap = function () {
+        var mapDiv = document.getElementById('map1');
+
+        if (!window.ngii_wmts || !mapDiv) {
+            console.error('NGII 지도 스크립트 또는 map1 요소를 찾을 수 없습니다.');
+            return;
+        }
+
+        // NGII WMTS 지도 생성
+        $scope.map1 = new ngii_wmts.map('map1', {
+            zoom: 2  // 기본 줌 레벨 (필요하면 조절)
+        });
     };
 
-    $scope.searchBusStops = function () {
-        if ($scope.allBusStops.length == 0) {
-            $scope.resultText = '먼저 "데이터 요청하기" 버튼을 눌러주세요.';
-            return;
-        }
-        if (!$scope.searchTerm) {
-            $scope.resultText = '검색할 정류장 이름을 입력해주세요.';
-            return;
-        }
-        const filteredStops = $scope.allBusStops.filter(function (stop) {
-            return stop.bsNm.includes($scope.searchTerm);
-        });
+    // Angular에서 뷰가 로드된 후 지도 초기화
+    $timeout($scope.initMap, 0);
 
-        if (filteredStops.length > 0) {
-            const formattedResult = filteredStops
-                .map(function (stop) {
-                    return `정류장 이름: ${stop.bsNm}\n정류장 ID: ${stop.bsId}\n좌표: (${stop.xPos}, ${stop.yPos})\n`;
-                })
-                .join('\n');
-            $scope.resultText = formattedResult;
-        } else {
-            $scope.resultText = `'${$scope.searchTerm}' 이름이 포함된 정류장을 찾을 수 없습니다.`;
+    /**
+     * 검색 버튼 클릭 시 호출되는 함수
+     * - 1단계에서는 실제 검색 기능 없이, 형태만 유지
+     * - 2단계(대전 실시간 버스)에서 실제 동작을 붙일 예정
+     */
+    $scope.searchBusStops = function () {
+        if (!$scope.searchTerm) {
+            alert('검색어를 입력해주세요.');
+            return;
         }
+
+        // 1단계에서는 아직 지도 이동/검색 기능 없음
+        // 나중에: 대전 버스 실시간 위치 / 좌표 연동 시 여기 구현
+        console.log('검색 요청:', $scope.searchTerm);
     };
 });

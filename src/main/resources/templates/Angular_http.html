@@ -26,6 +26,23 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.20/summernote-lite.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.20/lang/summernote-ko-KR.min.js"></script>
 
+        <!-- ★★★★★ 여기부터 수정된 부분 (지도 API) ★★★★★ -->
+        <!-- OpenLayers 6.4.3 (NGII 샘플과 동일 경로) -->
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.4.3/css/ol.css"
+            type="text/css"
+        />
+        <script src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.4.3/build/ol.js"></script>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4.js"></script>
+
+        <script
+            type="text/javascript"
+            src="https://map.ngii.go.kr/openapi/wmts_ngiiMap_v6.4.3.js?apikey=518BD309EE343709E6FF861BEE6F05D2"
+        ></script>
+        <!-- ★★★★★ 지도 API 추가 끝 ★★★★★ -->
+
         <script src="/app.js"></script>
         <script src="/busController.js"></script>
         <script src="/userController.js"></script>
