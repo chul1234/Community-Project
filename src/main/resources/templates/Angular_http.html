@@ -64,6 +64,7 @@
                     ng-repeat="mainMenu in menuItems"
                     ng-class="{ active: $location.path().startsWith(mainMenu.pathPrefix) }"
                 >
+                    <!-- (1) 소메뉴 있는 대메뉴 → 기존 로직 유지 -->
                     <a
                         ng-if="mainMenu.subMenus.length > 0"
                         ng-href="{{ mainMenu.subMenus[0].path }}"
@@ -71,7 +72,13 @@
                         {{ mainMenu.menu_name }}
                     </a>
 
-                    <span ng-if="!mainMenu.subMenus.length"> {{ mainMenu.menu_name }} </span>
+                    <!-- (2) 소메뉴 없는 대메뉴 → 클릭 가능하게 변경 -->
+                    <a
+                        ng-if="!mainMenu.subMenus.length"
+                        ng-href="{{ mainMenu.path }}"
+                    >
+                        {{ mainMenu.menu_name }}
+                    </a>
 
                     <div class="dropdown-content">
                         <a
