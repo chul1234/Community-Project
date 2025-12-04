@@ -580,3 +580,51 @@ header h1 {
         transform: rotate(360deg);
     }
 }
+
+/* --- 버스 노선 정보 검색 영역 --- */
+.bus-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 400px;         /* 입력 영역 최대 폭 */
+    margin: 10px 0 15px 0;
+}
+
+.bus-search-input {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.bus-search-input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.15);
+}
+
+.bus-search-btn {
+    padding: 8px 16px;
+    border-radius: 4px;
+    background-color: #007bff;
+    color: #ffffff;
+    border: 1px solid #007bff;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.bus-search-btn:hover {
+    background-color: #0069d9;
+}
+
+/* 버스 지도 영역 테두리만 살짝 정리 */
+.bus-map {
+    width: 100%;
+    height: 600px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    overflow: hidden;
+}
