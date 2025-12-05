@@ -628,3 +628,10 @@ header h1 {
     border-radius: 4px;
     overflow: hidden;
 }
+
+.post-content::after {
+    content: "";
+    display: block;
+    clear: both;   /* 본문 안에서 떠 있는 이미지(float)를 아래에서 정리 */
+}
+
