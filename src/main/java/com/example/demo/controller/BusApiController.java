@@ -1,25 +1,92 @@
-package com.example.demo.controller; //ipp.demo에 속해있다.
-import org.springframework.web.bind.annotation.CrossOrigin; //데이터 요청을 허용
-import org.springframework.web.bind.annotation.GetMapping; //get요청 주소와 특정 자바 메소드 연결
-import org.springframework.web.bind.annotation.RestController; //데이터 반환하는 API
-import org.springframework.web.client.RestTemplate; //스프링 HTTP 통 도구
+// 수정됨: TAGO 노선 + 정류장 + 버스 위치(JSON) 전용 컨트롤러 (route-stops에 numOfRows 추가)
 
-@RestController //데이터 자체를 HTTP 응답 전송
-public class BusApiController { //클래스 정의
-    //CORS(Cross-origin-Resource-Sharing)보안 정책 문제를 해결해주는 어노테이션-> 도메인에서도 API 호출 허용
+package com.example.demo.controller;
+
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+/**
+ * TAGO (국토교통부) 버스 노선 정보 + 정류장 목록 + 버스 위치 조회 컨트롤러
+ * - 도시 코드는 대전(25) 고정
+ * - 응답은 TAGO JSON 문자열 그대로 프록시해서 반환
+ */
+@RestController
+public class BusApiController {
+
+    // TAGO 공공데이터 서비스키 (URL 인코딩된 형태 그대로 사용)
+    private static final String SERVICE_KEY =
+            "ff623cef3aa0e011104003d8973105076b9f4ce098a93e4b6de36a9f2560529c";
+
+    // 대전 도시코드
+    private static final String CITY_CODE = "25";
+
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    /**
+     * 1) 버스 번호 → 노선 목록 조회 (getRouteNoList)
+     *
+     * 예: /api/bus/routes?routeNo=202
+     */
     @CrossOrigin
-    //api/but-stops라는 경로로 요청을 보내면 바로 getBusStops() 메서드 실행
-    @GetMapping("/api/bus-stops")
-    public String getBusStops() { //문자열 변환
-        // RestTemplate -> 외부 API와 통하기 위한 도구(다른 서버에 데이터 요청)
-        RestTemplate restTemplate = new RestTemplate();
-        
-        // API 요청을 위한 URL
-        String baseUrl = "https://apis.data.go.kr/6270000/dbmsapi02/getBasic02";
-        String serviceKey = "5cedc5eab7543fd67b6d3bcc0d35d2851975c4577afae580e32f0ac0d391b255";
-        String url = baseUrl + "?serviceKey=" + serviceKey + "&type=json";
-        
-        // API 서버에 GET 요청을 보내고, 응답을 문자열(JSON) 형태로 받음
-        return restTemplate.getForObject(url, String.class); //getForObject -> 특정 자바 객체 형태로 변환
+    @GetMapping("/api/bus/routes")
+    public String getRoutesByNumber(@RequestParam("routeNo") String routeNo) {
+
+        String url = "http://apis.data.go.kr/1613000/BusRouteInfoInqireService/getRouteNoList"
+                + "?serviceKey=" + SERVICE_KEY
+                + "&_type=json"
+                + "&cityCode=" + CITY_CODE
+                + "&routeNo=" + routeNo;
+
+        return restTemplate.getForObject(url, String.class);
     }
-} 
+
+    /**
+     * 2) 노선ID → 노선 경유 정류장 목록 조회 (getRouteAcctoThrghSttnList)
+     *    → 한 번에 최대 100개까지 조회
+     *
+     * 예: /api/bus/route-stops?routeId=DJB30300052
+     */
+    @CrossOrigin
+    @GetMapping("/api/bus/route-stops")
+    public String getRouteStops(@RequestParam("routeId") String routeId) {
+
+        String url = "http://apis.data.go.kr/1613000/BusRouteInfoInqireService/getRouteAcctoThrghSttnList"
+                + "?serviceKey=" + SERVICE_KEY
+                + "&_type=json"
+                + "&cityCode=" + CITY_CODE
+                + "&routeId=" + routeId
+                + "&pageNo=1"          // ★ 추가
+                + "&numOfRows=150";    // ★ 추가
+
+        return restTemplate.getForObject(url, String.class);
+    }
+
+    /**
+     * 3) 노선ID 기준 버스 위치 조회 (getRouteAcctoBusLcList)
+     *
+     * 예: /api/bus/locations?routeId=DJB30300052&pageNo=1&numOfRows=100
+     */
+    @CrossOrigin
+    @GetMapping("/api/bus/locations")
+    public String getBusLocations(
+            @RequestParam("routeId") String routeId,
+            @RequestParam(value = "pageNo", defaultValue = "1") String pageNo,
+            @RequestParam(value = "numOfRows", defaultValue = "100") String numOfRows
+    ) {
+
+        String url = "http://apis.data.go.kr/1613000/BusLcInfoInqireService/getRouteAcctoBusLcList"
+                + "?serviceKey=" + SERVICE_KEY
+                + "&_type=json"
+                + "&cityCode=" + CITY_CODE
+                + "&routeId=" + routeId
+                + "&pageNo=" + pageNo
+                + "&numOfRows=" + numOfRows;
+
+        return restTemplate.getForObject(url, String.class);
+    }
+}
+
+// 수정됨 끝
