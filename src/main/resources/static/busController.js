@@ -1,8 +1,6 @@
-// 수정됨: TAGO(WGS84, EPSG:4326) → NGII 지도(EPSG:5179) 좌표 변환 + OpenLayers 벡터 레이어로 정류장/버스 마커 표시 + 자동 새로고침
+// 수정됨: 지도 내부 전용 로딩 플래그(isMapLoading) 추가
 
-// =========================
-// EPSG:5179(UTM-K, GRS80) 좌표계 정의 + proj4 등록
-// =========================
+// EPSG:5179 정의 + proj4 등록 (기존 코드 그대로라고 가정)
 proj4.defs(
     'EPSG:5179',
     '+proj=tmerc +lat_0=38 +lon_0=127.5 +k=0.9996 ' +
@@ -10,56 +8,36 @@ proj4.defs(
 );
 ol.proj.proj4.register(proj4);
 
-// AngularJS 컨트롤러 정의 및 의존성 서비스 주입
 app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
-    // 대전광역시 도시 코드 상수 선언
-    const CITY_CODE = '25'; // 대전 (현재는 백엔드에서만 사용)
+    const CITY_CODE = '25';
 
-    // 검색어 (버스 번호)
     $scope.searchTerm = '';
 
-    // NGII 지도 래퍼 객체 (ngii_wmts.map 인스턴스)
-    $scope.map1 = null;
+    $scope.map1 = null;   // NGII 래퍼
+    var olMap = null;      // 실제 OpenLayers 지도
 
-    // 실제 OpenLayers 지도 객체(ol.Map)
-    var olMap = null;
+    $scope.routeResultJson    = '';
+    $scope.stopsResultJson    = '';
+    $scope.locationResultJson = '';
 
-    // JSON 디버깅용 텍스트박스 바인딩
-    $scope.routeResultJson    = '';   // 노선 조회 결과
-    $scope.stopsResultJson    = '';   // 정류장 목록
-    $scope.locationResultJson = '';   // 버스 위치 정보
-
-    // 현재 선택된 노선ID
     $scope.currentRouteId = null;
-
-    // 정류장 리스트 (파싱된 배열)
     $scope.stops = [];
 
-    // 자동 갱신 타이머 핸들
     var autoRefreshPromise = null;
-
-    // 자동 새로고침 상태 (버튼 disabled 표시용)
     $scope.isAutoRefreshOn = false;
 
-    // -------------------------
-    // OpenLayers 벡터 레이어 준비
-    // -------------------------
-    // 정류장 마커용 벡터 소스/레이어
+    // ⭐ 지도 전용 로딩 플래그 (지도 안 ●●● 표시용)
+    $scope.isMapLoading = false;
+
+    // 벡터 레이어 준비
     var stopSource = new ol.source.Vector();
-    var stopLayer  = new ol.layer.Vector({
-        source: stopSource
-    });
+    var stopLayer  = new ol.layer.Vector({ source: stopSource });
 
-    // 버스 마커용 벡터 소스/레이어
     var busSource = new ol.source.Vector();
-    var busLayer  = new ol.layer.Vector({
-        source: busSource
-    });
+    var busLayer  = new ol.layer.Vector({ source: busSource });
 
-    // -------------------------
-    // 공통: JSON 문자열 → 객체 변환
-    // -------------------------
+    // JSON 파서
     function parseMaybeJson(data) {
         if (angular.isObject(data)) return data;
         if (!data) return null;
@@ -71,9 +49,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         }
     }
 
-    // -------------------------
     // 지도 초기화
-    // -------------------------
     $scope.initMap = function () {
         var mapDiv = document.getElementById('map1');
 
@@ -82,12 +58,10 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             return;
         }
 
-        // NGII WMTS 지도 생성 (래퍼 객체)
         $scope.map1 = new ngii_wmts.map('map1', {
-            zoom: 3
+            zoom: 3,
         });
 
-        // 내부 OpenLayers ol.Map 객체 얻기 (_getMap 은 공식 API)
         if (typeof $scope.map1._getMap === 'function') {
             olMap = $scope.map1._getMap();
         } else {
@@ -95,7 +69,6 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             olMap = null;
         }
 
-        // 실제 ol.Map 이 있으면, 벡터 레이어 추가
         if (olMap && typeof olMap.addLayer === 'function') {
             olMap.addLayer(stopLayer);
             olMap.addLayer(busLayer);
@@ -107,44 +80,36 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         console.log('NGII map 초기화 완료:', $scope.map1, olMap);
     };
 
-    // Angular 뷰 로딩 후 지도 초기화
     $timeout($scope.initMap, 0);
 
-    // -------------------------
-    // 정류장 마커 (벡터 레이어)
-    // -------------------------
-
-    // 정류장 마커 전체 제거
+    // 정류장 마커
     function clearStopMarkers() {
         stopSource.clear();
     }
 
-    // 정류장 마커 1개 추가
     function addStopMarker(lat, lon, title) {
         if (!olMap) return;
         if (isNaN(lat) || isNaN(lon)) return;
 
         try {
-            // TAGO(WGS84) → NGII(UTM-K) 좌표 변환
             var xy5179 = ol.proj.transform(
-                [lon, lat],      // [경도, 위도]
-                'EPSG:4326',     // 입력 좌표계 (TAGO)
-                'EPSG:5179'      // NGII 지도 좌표계
+                [lon, lat],
+                'EPSG:4326',
+                'EPSG:5179'
             );
 
             var feature = new ol.Feature({
                 geometry: new ol.geom.Point(xy5179),
-                name: title || ''
+                name: title || '',
             });
 
-            // 정류장용 스타일 (빨간 점)
             feature.setStyle(
                 new ol.style.Style({
                     image: new ol.style.Circle({
                         radius: 4,
                         fill: new ol.style.Fill({ color: '#ff0000' }),
-                        stroke: new ol.style.Stroke({ color: '#ffffff', width: 1 })
-                    })
+                        stroke: new ol.style.Stroke({ color: '#ffffff', width: 1 }),
+                    }),
                 })
             );
 
@@ -154,7 +119,6 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         }
     }
 
-    // 정류장 배열을 지도에 표시
     function drawStopsOnMap(stops) {
         clearStopMarkers();
         if (!stops || !stops.length) return;
@@ -169,10 +133,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         });
     }
 
-    // -------------------------
-    // 버스 위치 마커 (벡터 레이어)
-    // -------------------------
-
+    // 버스 마커
     function clearBusMarkers() {
         busSource.clear();
     }
@@ -190,17 +151,16 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
             var feature = new ol.Feature({
                 geometry: new ol.geom.Point(xy5179),
-                name: title || ''
+                name: title || '',
             });
 
-            // 버스용 스타일 (파란 점)
             feature.setStyle(
                 new ol.style.Style({
                     image: new ol.style.Circle({
                         radius: 5,
                         fill: new ol.style.Fill({ color: '#0000ff' }),
-                        stroke: new ol.style.Stroke({ color: '#ffffff', width: 1 })
-                    })
+                        stroke: new ol.style.Stroke({ color: '#ffffff', width: 1 }),
+                    }),
                 })
             );
 
@@ -210,7 +170,6 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         }
     }
 
-    // 버스 배열을 지도에 표시
     function drawBusLocationsOnMap(busItems) {
         clearBusMarkers();
         if (!busItems || !busItems.length) return;
@@ -226,9 +185,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         });
     }
 
-    // -------------------------
-    // 30초 자동 갱신 (버스 위치만)
-    // -------------------------
+    // 자동 갱신 (버스 위치)
     function cancelAutoRefresh() {
         if (autoRefreshPromise) {
             $interval.cancel(autoRefreshPromise);
@@ -243,7 +200,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
         autoRefreshPromise = $interval(function () {
             $scope.fetchBusLocations();
-        }, 30000); // 30초
+        }, 10000); // 10초
 
         $scope.isAutoRefreshOn = true;
     }
@@ -252,9 +209,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         cancelAutoRefresh();
     });
 
-    // -------------------------
     // 버튼용 공개 함수
-    // -------------------------
     $scope.enableAutoRefresh = function () {
         if (!$scope.currentRouteId) {
             alert('먼저 버스 번호를 검색해서 노선을 선택하세요.');
@@ -267,9 +222,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         cancelAutoRefresh();
     };
 
-    // =========================
-    // 1단계: 버스 번호 → 노선 조회
-    // =========================
+    // 1단계: 노선 검색
     $scope.searchBus = function () {
         if (!$scope.searchTerm) {
             alert('버스 번호를 입력하세요.');
@@ -279,9 +232,8 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         var routeNo = $scope.searchTerm;
 
         $http.get('/api/bus/routes', {
-            params: { routeNo: routeNo }
+            params: { routeNo: routeNo },
         }).then(function (res) {
-
             if (angular.isString(res.data)) {
                 $scope.routeResultJson = res.data;
             } else {
@@ -310,15 +262,12 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
             $scope.currentRouteId = routeId;
 
-            // 2단계: 정류장 목록 조회
+            // 정류장 + 버스 위치 조회
             $scope.fetchRouteStops(routeId);
-
-            // 3단계: 버스 위치 조회
             $scope.fetchBusLocations();
 
             // 검색과 동시에 자동 새로고침 시작
             startAutoRefresh();
-
         }).catch(function (err) {
             console.error('노선 조회 실패:', err);
 
@@ -331,16 +280,13 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         });
     };
 
-    // =========================
-    // 2단계: 노선ID → 경유 정류장 목록 조회
-    // =========================
+    // 2단계: 정류장 목록
     $scope.fetchRouteStops = function (routeId) {
         if (!routeId) return;
 
         $http.get('/api/bus/route-stops', {
-            params: { routeId: routeId }
+            params: { routeId: routeId },
         }).then(function (res) {
-
             if (angular.isString(res.data)) {
                 $scope.stopsResultJson = res.data;
             } else {
@@ -363,9 +309,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             var stopsArray = angular.isArray(items) ? items : [items];
             $scope.stops = stopsArray;
 
-            // 지도에 정류장 마커 찍기
             drawStopsOnMap(stopsArray);
-
         }).catch(function (err) {
             console.error('정류장 목록 조회 실패:', err);
 
@@ -378,22 +322,22 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         });
     };
 
-    // =========================
-    // 3단계: 현재 routeId 기준 버스 위치 조회
-    // =========================
+    // 3단계: 버스 위치
     $scope.fetchBusLocations = function () {
         if (!$scope.currentRouteId) {
             return;
         }
 
+        // ⭐ 지도 전용 로딩 ON
+        $scope.isMapLoading = true;
+
         $http.get('/api/bus/locations', {
             params: {
                 routeId: $scope.currentRouteId,
                 pageNo: 1,
-                numOfRows: 100
-            }
+                numOfRows: 100,
+            },
         }).then(function (res) {
-
             if (angular.isString(res.data)) {
                 $scope.locationResultJson = res.data;
             } else {
@@ -416,9 +360,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
             var busArray = angular.isArray(items) ? items : [items];
 
-            // 지도에 버스 위치 마커 찍기
             drawBusLocationsOnMap(busArray);
-
         }).catch(function (err) {
             console.error('버스 위치 조회 실패:', err);
 
@@ -426,6 +368,9 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 ? (angular.isString(err.data) ? err.data : JSON.stringify(err.data, null, 2))
                 : (err.status + ' ' + err.statusText);
             $scope.locationResultJson = 'ERROR: ' + msg;
+        }).finally(function () {
+            // ⭐ 무조건 지도 로딩 OFF
+            $scope.isMapLoading = false;
         });
     };
 

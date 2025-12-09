@@ -52,7 +52,10 @@
     </head>
     <body ng-controller="MainController">
         <!-- 전역 로딩 오버레이 -->
-        <div class="loading-overlay" ng-show="isLoading">
+        <div
+            class="loading-overlay"
+            ng-show="isLoading && currentPath.indexOf('/bus') !== 0"
+        >
             <div class="loading-box">
                 <div class="spinner"></div>
                 <p>로딩중입니다...</p>

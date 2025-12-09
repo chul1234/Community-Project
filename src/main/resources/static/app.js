@@ -1,12 +1,9 @@
-/**
- * 1. AngularJS 애플리케이션 모듈을 정의합니다.
- * 'ngRoute' 모듈을 의존성으로 추가하여 라우팅 기능을 활성화합니다.
- */
+// 수정됨: /bus 페이지에서 전역 로딩 오버레이 숨기기(currentPath 사용) + 기존 인터셉터 유지
+
 var app = angular.module('busApp', ['ngRoute', 'ngSanitize']);
 
 /**
- * 2. 애플리케이션의 라우팅 칙을 설정합니다.
- * URL 경로에 따라 어떤 HTML 템플릿과 컨트롤러를 사용할지 정의합니다.
+ * 라우팅 설정
  */
 app.config(function ($routeProvider) {
     $routeProvider
@@ -29,12 +26,10 @@ app.config(function ($routeProvider) {
             controller: 'BoardDetailController',
         })
 
-        // ▼▼▼ [수정됨] 이 부분의 주석(//)을 제거하여 경로를 활성화합니다. ▼▼▼
         .when('/board/edit/:postId', {
             templateUrl: 'views/board-edit.html',
             controller: 'BoardEditController',
         })
-        // ▲▲▲ [수정됨] ▲▲▲
 
         .when('/users', {
             templateUrl: 'views/user-list.html',
@@ -44,7 +39,6 @@ app.config(function ($routeProvider) {
             templateUrl: 'views/user-create.html',
             controller: 'UserCreateController',
         })
-        // [수정] URL 파라미터를 :id에서 :userId로 변경하여 의미를 명확히 합니다.
         .when('/users/edit/:userId', {
             templateUrl: 'views/user-edit.html',
             controller: 'UserEditController',
@@ -79,39 +73,34 @@ app.config(function ($routeProvider) {
         })
 
         .otherwise({
-            redirectTo: '/welcome', // 기본 경로 설정
+            redirectTo: '/welcome',
         });
 });
 
 /**
- * 3. MainController: 헤더와 같이 공통 레이아웃을 제어합니다.
+ * MainController: 헤더, 메뉴, 공통 레이아웃 제어
  */
 app.controller('MainController', function ($scope, $http, $location, $rootScope) {
-    $scope.$location = $location; // 뷰에서 $location 접근 가능하도록 설정
-    $rootScope.currentUser = {}; // 전역 사용자 정보 객체 초기화
+    $scope.$location = $location;     // 템플릿에서 현재 경로 체크용
+    $rootScope.currentUser = {};      // 전역 사용자 정보
+    $rootScope.menuItems = [];        // 전역 메뉴
 
-    // 메뉴 목록을 저장할 전역 변수 초기화
-    $rootScope.menuItems = [];
-
+    // 로그인한 사용자 정보 조회
     $http
         .get('/api/me')
         .then(function (response) {
-            // 현재 로그인한 사용자 정보 요청
-            $rootScope.currentUser = response.data; // 응답 데이터를 전역 변수에 저장
+            $rootScope.currentUser = response.data;
         })
         .catch(function (error) {
-            // 오류 처리
-            $rootScope.currentUser.username = '정보 없음'; // 기본값 설정
-            console.error('사용자 정보를 불러오는 데 실패했습니다.', error); // 오류 로그 출력
+            $rootScope.currentUser.username = '정보 없음';
+            console.error('사용자 정보를 불러오는 데 실패했습니다.', error);
         });
 
-    // 백엔드에서 계층화된 메뉴 목록을 가져오는 함수
+    // 메뉴 정보 조회
     function fetchMenus() {
         $http
             .get('/api/menus')
             .then(function (response) {
-                //
-                // 백엔드 MenuServiceImpl에서 가공한 계층 구조의 메뉴 데이터를 menuItems에 저장
                 $rootScope.menuItems = response.data;
             })
             .catch(function (error) {
@@ -119,30 +108,28 @@ app.controller('MainController', function ($scope, $http, $location, $rootScope)
             });
     }
 
-    // 컨트롤러가 로드될 때 메뉴 목록을 즉시 불러옴
     fetchMenus();
 
+    // 회원 탈퇴
     $scope.deleteMyAccount = function () {
-        // 회원 탈퇴 함수
         if (confirm('정말 탈퇴하시겠습니까? 모든 정보는 영구적으로 삭제됩니다.')) {
-            // 사용자 확인
             $http
                 .delete('/api/users/me')
                 .then(function () {
-                    // HTTP DELETE 요청을 보내 회원 탈퇴를 요청
-                    alert('회원 탈퇴가 완료되었습니다.'); // 완료 알림
-                    window.location.href = '/logout'; // 로그아웃 및 메인 페이지로 이동
+                    alert('회원 탈퇴가 완료되었습니다.');
+                    window.location.href = '/logout';
                 })
                 .catch(function (error) {
-                    // 오류 처리
-                    alert('회원 탈퇴 중 오류가 발생했습니다.'); // 오류 알림
+                    alert('회원 탈퇴 중 오류가 발생했습니다.');
                     console.error('Delete account failed:', error);
                 });
         }
     };
 });
 
-// : 파일 업로드용 디렉티브
+/**
+ * 파일 업로드용 디렉티브
+ */
 app.directive('fileModel', [
     '$parse',
     function ($parse) {
@@ -161,12 +148,23 @@ app.directive('fileModel', [
     },
 ]);
 
-// 전역 로딩 상태 플래그
-app.run(function ($rootScope) {
-    $rootScope.isLoading = false;
+/**
+ * 전역 run 블록: 로딩 플래그 + 현재 경로(currentPath) 관리
+ */
+app.run(function ($rootScope, $location) {
+    $rootScope.isLoading = false;           // 전체 앱 공용 로딩 플래그
+    $rootScope.currentPath = $location.path(); // 현재 라우트 경로 문자열
+
+    // 라우트 변경 시마다 currentPath 갱신
+    $rootScope.$on('$routeChangeSuccess', function () {
+        $rootScope.currentPath = $location.path();
+        // console.log('currentPath =', $rootScope.currentPath);
+    });
 });
 
-// 모든 $http 요청에 대해 로딩 표시 인터셉터
+/**
+ * 모든 HTTP 요청에 대해 전역 로딩 오버레이를 제어하는 인터셉터
+ */
 app.config(function ($httpProvider) {
     $httpProvider.interceptors.push(function ($q, $rootScope) {
         let activeRequests = 0;
@@ -201,3 +199,4 @@ app.config(function ($httpProvider) {
     });
 });
 
+// 수정됨 끝

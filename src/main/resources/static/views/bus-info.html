@@ -1,5 +1,4 @@
-<!-- 수정됨: 버스 노선 + 정류장 + 실시간 위치 JSON + 자동 새로고침 ON/OFF 버튼 -->
-
+<!-- 버스 노선 정보 페이지 -->
 <div class="container">
     <h1>버스 노선 정보</h1>
     <hr />
@@ -9,82 +8,78 @@
         <input
             type="text"
             ng-model="searchTerm"
-            placeholder="버스 번호를 입력하세요 예) 201"
+            placeholder="버스 번호 입력 예) 201"
             class="bus-search-input"
         />
-        <button
-            type="button"
-            ng-click="searchBus()"
-            class="bus-search-btn"
-        >
+        <button type="button" ng-click="searchBus()" class="bus-search-btn">
             검색
         </button>
     </div>
 
-    <!-- 자동 새로고침 제어 버튼 영역 -->
-    <div
-        style="
-            margin-top: 10px;
-            margin-bottom: 10px;
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        "
-    >
+    <!-- 자동 새로고침 버튼 -->
+    <div style="margin-top: 10px; margin-bottom: 10px; display: flex; gap: 8px; align-items: center;">
         <button
             type="button"
             ng-click="enableAutoRefresh()"
             ng-disabled="isAutoRefreshOn"
-            style="padding: 5px 10px; background-color: #28a745; color: #fff; border: none; border-radius: 4px; cursor: pointer;"
+            style="padding: 5px 10px; background-color: #28a745; color: #fff; border-radius: 4px;"
         >
-            🔄 30초마다 자동 새로고침 시작
+            🔄 10초마다 자동 새로고침 시작
         </button>
+
         <button
             type="button"
             ng-click="disableAutoRefresh()"
             ng-disabled="!isAutoRefreshOn"
-            style="padding: 5px 10px; background-color: #dc3545; color: #fff; border: none; border-radius: 4px; cursor: pointer;"
+            style="padding: 5px 10px; background-color: #dc3545; color: #fff; border-radius: 4px;"
         >
             ⏸ 자동 새로고침 멈추기
         </button>
 
         <span style="margin-left: 10px; color: #555;">
             상태:
-            <strong ng-show="isAutoRefreshOn" style="color: #28a745;">ON (30초마다 갱신)</strong>
-            <strong ng-show="!isAutoRefreshOn" style="color: #dc3545;">OFF</strong>
+            <strong ng-show="isAutoRefreshOn" style="color:#28a745;">ON</strong>
+            <strong ng-show="!isAutoRefreshOn" style="color:#dc3545;">OFF</strong>
         </span>
     </div>
 
     <hr />
 
-    <!-- 지도 -->
-    <div id="map1" class="bus-map"></div>
+    <!-- ⭐ 지도 + 지도 전용 로딩 오버레이를 같은 래퍼에 묶기 ⭐ -->
+    <div style="position: relative;">
+        <!-- 지도 -->
+        <div id="map1" class="bus-map"></div>
+
+        <!-- 지도 내부 중앙 로딩 오버레이 -->
+        <div
+            id="map-loading-indicator"
+            ng-show="isMapLoading"
+            style="
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0,0,0,0.55);
+                color: #fff;
+                padding: 12px 20px;
+                border-radius: 10px;
+                font-size: 18px;
+                z-index: 9999;
+                pointer-events: none;
+            ">
+            ●●● 로딩중...
+        </div>
+    </div>
 
     <hr />
 
-    <!-- 노선 조회 결과 JSON -->
+    <!-- JSON 출력 -->
     <h3>노선 조회 결과 JSON</h3>
-    <textarea
-        ng-model="routeResultJson"
-        style="width: 100%; height: 200px; font-family: monospace"
-        readonly
-    ></textarea>
+    <textarea ng-model="routeResultJson" style="width:100%; height:180px; font-family:monospace;" readonly></textarea>
 
-    <!-- 정류장 목록 JSON -->
     <h3 style="margin-top: 20px">정류장 목록 JSON</h3>
-    <textarea
-        ng-model="stopsResultJson"
-        style="width: 100%; height: 200px; font-family: monospace"
-        readonly
-    ></textarea>
+    <textarea ng-model="stopsResultJson" style="width:100%; height:180px; font-family:monospace;" readonly></textarea>
 
-    <!-- 실시간 버스 위치 JSON -->
     <h3 style="margin-top: 20px">실시간 버스 위치 JSON</h3>
-    <textarea
-        ng-model="locationResultJson"
-        style="width: 100%; height: 200px; font-family: monospace"
-        readonly
-    ></textarea>
+    <textarea ng-model="locationResultJson" style="width:100%; height:180px; font-family:monospace;" readonly></textarea>
 </div>
-
-<!-- 수정됨 끝 -->
