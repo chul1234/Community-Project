@@ -635,3 +635,17 @@ header h1 {
     clear: both;   /* 본문 안에서 떠 있는 이미지(float)를 아래에서 정리 */
 }
 
+/* 버스 대표 차량/정류장 정보 패널 */
+.bus-representative-panel {
+    margin: 10px 0 15px 0;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+    font-size: 14px;
+    line-height: 1.5;
+}
+.bus-representative-panel strong {
+    display: inline-block;
+    min-width: 90px;
+}
