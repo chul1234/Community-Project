@@ -1,3 +1,5 @@
+<!-- 수정됨: 버스/정류장 JSON 디버그 textarea 제거 + 지도 하단 정보 패널(정류장 목록 + 도착 예정 버스) 추가 -->
+
 <!-- 버스 노선 정보 페이지 -->
 <div class="container">
     <h1>버스 노선 정보</h1>
@@ -99,25 +101,106 @@
 
     <hr />
 
-    <!-- JSON 출력 -->
-    <h3>노선 조회 결과 JSON</h3>
-    <textarea
-        ng-model="routeResultJson"
-        style="width:100%; height:180px; font-family:monospace;"
-        readonly
-    ></textarea>
+    <!-- ⭐ 지도 하단 통합 정보 패널 (정류장 목록 + 현재 정류장 도착 예정 버스) -->
+    <div
+        class="bus-bottom-panel"
+        style="
+            margin-top: 10px;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+            background-color: #f8f9fa;
+            font-size: 14px;
+            line-height: 1.5;
+        "
+    >
+        <div style="display:flex; gap:16px; flex-wrap:wrap;">
+            <!-- 정류장 목록 -->
+            <div style="flex:1 1 260px; min-width:260px;">
+                <h3 style="margin-top:0; margin-bottom:8px;">경유 정류장 목록</h3>
+                <div ng-if="stops && stops.length">
+                    <ul style="max-height:220px; overflow-y:auto; padding-left:18px; margin:0;">
+                        <li ng-repeat="s in stops track by $index">
+                            {{$index + 1}}.
+                            {{ s.nodenm || s.stationName || '정류장명 없음' }}
+                            <span style="color:#868e96;" ng-if="s.nodeid || s.nodeId">
+                                ({{ s.nodeid || s.nodeId }})
+                            </span>
+                        </li>
+                    </ul>
+                </div>
+                <div ng-if="!stops || !stops.length">
+                    아직 정류장 정보를 불러오지 못했습니다.
+                </div>
+            </div>
 
-    <h3 style="margin-top: 20px">정류장 목록 JSON</h3>
-    <textarea
-        ng-model="stopsResultJson"
-        style="width:100%; height:180px; font-family:monospace;"
-        readonly
-    ></textarea>
+            <!-- 현재 정류장 도착 예정 버스 -->
+            <div style="flex:1 1 260px; min-width:260px;">
+                <h3 style="margin-top:0; margin-bottom:8px;">현재 정류장 도착 예정 버스</h3>
 
-    <h3 style="margin-top: 20px">실시간 버스 위치 JSON</h3>
-    <textarea
-        ng-model="locationResultJson"
-        style="width:100%; height:180px; font-family:monospace;"
-        readonly
-    ></textarea>
+                <p style="margin-top:0; margin-bottom:8px;" ng-if="currentStop">
+                    기준 정류장 :
+                    <strong>{{ currentStop.nodenm || currentStop.stationName || '정류장명 없음' }}</strong>
+                    <span style="color:#868e96;" ng-if="currentStop.nodeid || currentStop.nodeId">
+                        ({{ currentStop.nodeid || currentStop.nodeId }})
+                    </span>
+                </p>
+                <p style="margin-top:0; margin-bottom:8px;" ng-if="!currentStop">
+                    대표 버스의 현재 정류장을 파악할 수 없어 도착 정보를 표시할 수 없습니다.
+                </p>
+
+                <table
+                    ng-if="arrivalList && arrivalList.length && currentStop"
+                    style="width:100%; border-collapse:collapse; margin-top:5px;"
+                >
+                    <thead>
+                        <tr style="background-color:#e9ecef;">
+                            <th style="padding:6px 8px; border:1px solid #dee2e6; text-align:left;">
+                                노선
+                            </th>
+                            <th style="padding:6px 8px; border:1px solid #dee2e6; text-align:left;">
+                                남은 정류장 수
+                            </th>
+                            <th style="padding:6px 8px; border:1px solid #dee2e6; text-align:left;">
+                                도착까지
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="a in arrivalList">
+                            <td style="padding:6px 8px; border:1px solid #dee2e6;">
+                                {{ a.routeno || a.routenm || '노선번호 없음' }}
+                            </td>
+                            <td style="padding:6px 8px; border:1px solid #dee2e6;">
+                                <span ng-if="a.remainStops != null">
+                                    {{ a.remainStops }} 정거장 전
+                                </span>
+                                <span ng-if="a.remainStops == null">
+                                    정보 없음
+                                </span>
+                            </td>
+                            <td style="padding:6px 8px; border:1px solid #dee2e6;">
+                                <span ng-if="a.remainMinutes != null">
+                                    약 {{ a.remainMinutes }}분 후
+                                    <span style="color:#868e96;">
+                                        ({{ a.arrtime }}초 기준)
+                                    </span>
+                                </span>
+                                <span ng-if="a.remainMinutes == null">
+                                    {{ a.arrtime ? (a.arrtime + '초 후') : '정보 없음' }}
+                                </span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div ng-if="arrivalList && !arrivalList.length && currentStop">
+                    현재 도착 예정 버스 정보가 없습니다.
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- 수정됨 끝 -->

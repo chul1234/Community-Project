@@ -1,4 +1,4 @@
-// 수정됨: TAGO 노선 + 정류장 + 버스 위치(JSON) 전용 컨트롤러 (route-stops에 numOfRows 추가)
+// 수정됨: TAGO 노선 + 정류장 + 버스 위치(JSON) + 정류장 도착정보 API 추가
 
 package com.example.demo.controller;
 
@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
 /**
- * TAGO (국토교통부) 버스 노선 정보 + 정류장 목록 + 버스 위치 조회 컨트롤러
+ * TAGO (국토교통부) 버스 노선 정보 + 정류장 목록 + 버스 위치 + 도착정보 조회 컨트롤러
  * - 도시 코드는 대전(25) 고정
  * - 응답은 TAGO JSON 문자열 그대로 프록시해서 반환
  */
@@ -45,7 +45,6 @@ public class BusApiController {
 
     /**
      * 2) 노선ID → 노선 경유 정류장 목록 조회 (getRouteAcctoThrghSttnList)
-     *    → 한 번에 최대 100개까지 조회
      *
      * 예: /api/bus/route-stops?routeId=DJB30300052
      */
@@ -58,8 +57,8 @@ public class BusApiController {
                 + "&_type=json"
                 + "&cityCode=" + CITY_CODE
                 + "&routeId=" + routeId
-                + "&pageNo=1"          // ★ 추가
-                + "&numOfRows=150";    // ★ 추가
+                + "&pageNo=1"
+                + "&numOfRows=150";
 
         return restTemplate.getForObject(url, String.class);
     }
@@ -82,6 +81,31 @@ public class BusApiController {
                 + "&_type=json"
                 + "&cityCode=" + CITY_CODE
                 + "&routeId=" + routeId
+                + "&pageNo=" + pageNo
+                + "&numOfRows=" + numOfRows;
+
+        return restTemplate.getForObject(url, String.class);
+    }
+
+    /**
+     * 4) 정류소별 도착 예정 버스 목록 조회
+     *    (getSttnAcctoArvlPrearngeInfoList)
+     *
+     * 예: /api/bus/arrivals?nodeId=DJB8001793
+     */
+    @CrossOrigin
+    @GetMapping("/api/bus/arrivals")
+    public String getArrivalsByStop(
+            @RequestParam("nodeId") String nodeId,
+            @RequestParam(value = "pageNo", defaultValue = "1") String pageNo,
+            @RequestParam(value = "numOfRows", defaultValue = "20") String numOfRows
+    ) {
+
+        String url = "http://apis.data.go.kr/1613000/ArvlInfoInqireService/getSttnAcctoArvlPrearngeInfoList"
+                + "?serviceKey=" + SERVICE_KEY
+                + "&_type=json"
+                + "&cityCode=" + CITY_CODE
+                + "&nodeId=" + nodeId
                 + "&pageNo=" + pageNo
                 + "&numOfRows=" + numOfRows;
 

@@ -1,4 +1,6 @@
-// 수정됨: TAGO 좌표 → NGII 변환 + 정류장/버스 마커 표시 + 자동 새로고침 + 정류장 영역으로 지도 자동 이동 + 대표 버스 유지 + 이전/현재/다음 정류장 계산
+// 수정됨: TAGO 좌표 → NGII 변환 + 정류장/버스 마커 표시 + 자동 새로고침
+//       + 정류장 영역으로 지도 자동 이동 + 대표 버스 유지
+//       + 현재 정류장 기준 도착 예정 버스 목록(arrivalList) 조회/표시
 
 // =========================
 // EPSG:5179(UTM-K, GRS80) 좌표계 정의 + proj4 등록
@@ -24,7 +26,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     // 실제 OpenLayers 지도 객체
     var olMap = null;
 
-    // JSON 디버그용 바인딩
+    // JSON 디버그용 바인딩 (지금은 화면에 안 쓰지만, 디버깅용으로 유지)
     $scope.routeResultJson    = ''; // 노선 JSON
     $scope.stopsResultJson    = ''; // 정류장 JSON
     $scope.locationResultJson = ''; // 버스 위치 JSON
@@ -51,6 +53,9 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     $scope.prevStop    = null;
     $scope.currentStop = null;
     $scope.nextStop    = null;
+
+    // 현재 정류장 기준 도착 예정 버스 목록
+    $scope.arrivalList = [];
 
     // -------------------------
     // OpenLayers 벡터 레이어 준비
@@ -333,6 +338,66 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     }
 
     // -------------------------
+    // 현재 정류장 기준 도착 예정 버스 조회
+    // -------------------------
+    function fetchArrivalsForCurrentStop() {
+        $scope.arrivalList = [];
+
+        if (!$scope.currentStop) {
+            return;
+        }
+
+        var nodeId = $scope.currentStop.nodeid || $scope.currentStop.nodeId;
+        if (!nodeId) {
+            return;
+        }
+
+        $http.get('/api/bus/arrivals', {
+            params: {
+                nodeId: nodeId,
+                numOfRows: 20
+            }
+        }).then(function (res) {
+            var data = parseMaybeJson(res.data);
+            if (!data || !data.response || !data.response.body) {
+                console.warn('도착정보 응답 구조가 예상과 다름:', data);
+                $scope.arrivalList = [];
+                return;
+            }
+
+            var items = data.response.body.items && data.response.body.items.item;
+            if (!items) {
+                $scope.arrivalList = [];
+                return;
+            }
+
+            var list = angular.isArray(items) ? items : [items];
+
+            // arrtime(초) → 분으로 변환해서 remainMinutes 추가
+            $scope.arrivalList = list.map(function (a) {
+                var remainStops = (a.arrprevstationcnt != null)
+                    ? parseInt(a.arrprevstationcnt, 10)
+                    : null;
+
+                var sec = (a.arrtime != null) ? parseInt(a.arrtime, 10) : null;
+                var minutes = null;
+                if (!isNaN(sec) && sec != null) {
+                    minutes = Math.round(sec / 60.0);
+                }
+
+                return angular.extend({}, a, {
+                    remainStops: isNaN(remainStops) ? null : remainStops,
+                    remainMinutes: minutes
+                });
+            });
+
+        }).catch(function (err) {
+            console.error('도착 예정 버스 조회 실패:', err);
+            $scope.arrivalList = [];
+        });
+    }
+
+    // -------------------------
     // 자동 갱신(폴링) 관련
     // -------------------------
     function cancelAutoRefresh() {
@@ -381,6 +446,9 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
         var routeNo = $scope.searchTerm;
 
+        // 자동 새로고침 초기화
+        cancelAutoRefresh();
+
         $http.get('/api/bus/routes', {
             params: { routeNo: routeNo }
         }).then(function (res) {
@@ -415,6 +483,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             $scope.prevStop          = null;
             $scope.currentStop       = null;
             $scope.nextStop          = null;
+            $scope.arrivalList       = [];
 
             $scope.fetchRouteStops(routeId);
             $scope.fetchBusLocations();
@@ -463,13 +532,19 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             var stopsArray = angular.isArray(items) ? items : [items];
             $scope.stops   = stopsArray;
 
+            // 정류장 마커 + 영역 맞추기
             drawStopsOnMap(stopsArray);
 
+            // 정류장 정보를 새로 받았으니, 이미 대표 버스가 있으면
+            // 그 버스 기준으로 이전/현재/다음 다시 계산
             if ($scope.representativeBus) {
                 var calc = computePrevCurrentNextForBus($scope.representativeBus, $scope.stops);
                 $scope.prevStop    = calc.prev;
                 $scope.currentStop = calc.current;
                 $scope.nextStop    = calc.next;
+
+                // 현재 정류장 기준 도착 예정 버스도 갱신
+                fetchArrivalsForCurrentStop();
             }
         }).catch(function (err) {
             console.error('정류장 목록 조회 실패:', err);
@@ -514,6 +589,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 $scope.prevStop    = null;
                 $scope.currentStop = null;
                 $scope.nextStop    = null;
+                $scope.arrivalList = [];
                 return;
             }
 
@@ -525,6 +601,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 $scope.prevStop    = null;
                 $scope.currentStop = null;
                 $scope.nextStop    = null;
+                $scope.arrivalList = [];
                 return;
             }
 
@@ -553,17 +630,23 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
             $scope.representativeBus = newRepresentative || null;
 
+            // 대표 버스 기준 이전/현재/다음 정류장 계산
             if ($scope.representativeBus && $scope.stops && $scope.stops.length > 0) {
                 var calc2 = computePrevCurrentNextForBus($scope.representativeBus, $scope.stops);
                 $scope.prevStop    = calc2.prev;
                 $scope.currentStop = calc2.current;
                 $scope.nextStop    = calc2.next;
+
+                // 현재 정류장 기준 도착 예정 버스 갱신
+                fetchArrivalsForCurrentStop();
             } else {
                 $scope.prevStop    = null;
                 $scope.currentStop = null;
                 $scope.nextStop    = null;
+                $scope.arrivalList = [];
             }
 
+            // 버스 위치 마커 찍기 (대표 버스 노란색 강조)
             drawBusLocationsOnMap(busArray);
         }).catch(function (err) {
             console.error('버스 위치 조회 실패:', err);
@@ -577,6 +660,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             $scope.prevStop    = null;
             $scope.currentStop = null;
             $scope.nextStop    = null;
+            $scope.arrivalList = [];
         }).finally(function () {
             $scope.isMapLoading = false;
         });
