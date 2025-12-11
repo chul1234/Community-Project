@@ -1,6 +1,7 @@
 // 수정됨: TAGO 좌표 → NGII 변환 + 정류장/버스 마커 표시 + 자동 새로고침
 //       + 정류장 영역으로 지도 자동 이동 + 대표 버스 유지
 //       + 현재 정류장 기준 도착 예정 버스 목록(arrivalList) 조회/표시
+//       + 버스/정류장 통합 검색 + 정류장 이름 검색 + 정류장 클릭 시 도착정보 조회
 
 // =========================
 // EPSG:5179(UTM-K, GRS80) 좌표계 정의 + proj4 등록
@@ -17,7 +18,12 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     // 대전 도시 코드 (현재는 백엔드에서만 사용)
     const CITY_CODE = '25';
 
-    // 검색어(버스 번호)
+    // 통합 검색 타입 및 공통 검색어
+    // 'route' = 버스(노선), 'stop' = 정류장
+    $scope.searchType    = 'route';
+    $scope.searchKeyword = '';
+
+    // 기존 버스 검색용(노선 API에 넘길 값)
     $scope.searchTerm = '';
 
     // NGII 지도 래퍼 객체 (ngii_wmts.map 인스턴스)
@@ -26,7 +32,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     // 실제 OpenLayers 지도 객체
     var olMap = null;
 
-    // JSON 디버그용 바인딩 (지금은 화면에 안 쓰지만, 디버깅용으로 유지)
+    // JSON 디버그용 바인딩
     $scope.routeResultJson    = ''; // 노선 JSON
     $scope.stopsResultJson    = ''; // 정류장 JSON
     $scope.locationResultJson = ''; // 버스 위치 JSON
@@ -36,6 +42,9 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
     // 정류장 배열 (TAGO 응답 파싱 결과)
     $scope.stops = [];
+
+    // 정류장 목록에서 사용자가 클릭한 정류장
+    $scope.selectedStop = null;
 
     // 자동 새로고침 타이머 핸들
     var autoRefreshPromise = null;
@@ -398,6 +407,18 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     }
 
     // -------------------------
+    // 정류장 목록 클릭 시: 기준 정류장 설정 + 도착정보 조회
+    // -------------------------
+    $scope.selectStop = function (stop) {
+        if (!stop) return;
+
+        $scope.selectedStop = stop;
+        $scope.currentStop  = stop;
+
+        fetchArrivalsForCurrentStop();
+    };
+
+    // -------------------------
     // 자동 갱신(폴링) 관련
     // -------------------------
     function cancelAutoRefresh() {
@@ -433,6 +454,29 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
     $scope.disableAutoRefresh = function () {
         cancelAutoRefresh();
+    };
+
+    // =========================
+    // 공통 검색: 버스/정류장 모드 분기
+    // =========================
+    $scope.doSearch = function () {
+        if (!$scope.searchKeyword) {
+            alert('검색어를 입력하세요.');
+            return;
+        }
+
+        if ($scope.searchType === 'route') {
+            // 버스 번호(노선) 검색
+            $scope.searchTerm = $scope.searchKeyword;
+            $scope.searchBus();
+        } else if ($scope.searchType === 'stop') {
+            // 정류장 이름 검색
+            $scope.searchStops();
+        } else {
+            // 예외적으로 이상한 값이면 기본 버스 검색
+            $scope.searchTerm = $scope.searchKeyword;
+            $scope.searchBus();
+        }
     };
 
     // =========================
@@ -484,6 +528,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             $scope.currentStop       = null;
             $scope.nextStop          = null;
             $scope.arrivalList       = [];
+            $scope.selectedStop      = null;
 
             $scope.fetchRouteStops(routeId);
             $scope.fetchBusLocations();
@@ -530,7 +575,8 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             }
 
             var stopsArray = angular.isArray(items) ? items : [items];
-            $scope.stops   = stopsArray;
+            $scope.stops        = stopsArray;
+            $scope.selectedStop = null;
 
             // 정류장 마커 + 영역 맞추기
             drawStopsOnMap(stopsArray);
@@ -555,6 +601,100 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             $scope.stopsResultJson = 'ERROR: ' + msg;
 
             alert('정류장 정보를 가져오지 못했습니다.');
+        });
+    };
+
+    // =========================
+    // 정류장 이름으로 정류장 목록 검색 (getSttnNoList 응답 구조 기준)
+    // =========================
+    $scope.searchStops = function () {
+        if (!$scope.searchKeyword) {
+            alert('정류장 이름을 입력하세요.');
+            return;
+        }
+
+        var keyword = $scope.searchKeyword;
+
+        // 버스 위치 자동 새로고침 중지
+        cancelAutoRefresh();
+
+        // 버스 관련 상태 초기화
+        $scope.currentRouteId    = null;
+        $scope.representativeBus = null;
+        $scope.prevStop          = null;
+        $scope.currentStop       = null;
+        $scope.nextStop          = null;
+        $scope.arrivalList       = [];
+        $scope.selectedStop      = null;
+
+        // 버스 마커 제거(정류장만 보이게)
+        clearBusMarkers();
+
+        $scope.isMapLoading = true;
+
+        $http.get('/api/bus/stops-by-name', {
+            params: {
+                nodeName: keyword,
+                pageNo:   1,
+                numOfRows: 100
+            }
+        }).then(function (res) {
+            if (angular.isString(res.data)) {
+                $scope.stopsResultJson = res.data;
+            } else {
+                $scope.stopsResultJson = JSON.stringify(res.data, null, 2);
+            }
+
+            var data = parseMaybeJson(res.data);
+            if (!data || !data.response || !data.response.body) {
+                console.warn('정류장 검색 응답 구조가 예상과 다름:', data);
+                $scope.stops        = [];
+                $scope.selectedStop = null;
+                return;
+            }
+
+            // getSttnNoList 기준: body.items.item 에 단일 객체 또는 배열로 있음
+            var itemsRoot = data.response.body.items;
+            if (!itemsRoot || !itemsRoot.item) {
+                $scope.stops        = [];
+                $scope.selectedStop = null;
+                alert('검색된 정류장이 없습니다.');
+                return;
+            }
+
+            var items = itemsRoot.item;
+            var rawStopsArray = angular.isArray(items) ? items : [items];
+
+            // nodeid 필드 강제 통일(혹시 다른 이름으로 올 경우 대비)
+            var stopsArray = rawStopsArray.map(function (s) {
+                var id =
+                    s.nodeid ||
+                    s.nodeId ||
+                    s.node_id ||
+                    s.nodeno ||
+                    s.sttnId ||
+                    s.stationId;
+
+                return angular.extend({}, s, { nodeid: id });
+            });
+
+            $scope.stops        = stopsArray;
+            $scope.selectedStop = null;
+
+            // 정류장만 지도에 마커로 표시
+            drawStopsOnMap(stopsArray);
+
+        }).catch(function (err) {
+            console.error('정류장 검색 실패:', err);
+
+            var msg = err && err.data
+                ? (angular.isString(err.data) ? err.data : JSON.stringify(err.data, null, 2))
+                : (err.status + ' ' + err.statusText);
+            $scope.stopsResultJson = 'ERROR: ' + msg;
+
+            alert('정류장 정보를 가져오지 못했습니다.');
+        }).finally(function () {
+            $scope.isMapLoading = false;
         });
     };
 
@@ -590,6 +730,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 $scope.currentStop = null;
                 $scope.nextStop    = null;
                 $scope.arrivalList = [];
+                $scope.selectedStop = null;
                 return;
             }
 
@@ -602,12 +743,13 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 $scope.currentStop = null;
                 $scope.nextStop    = null;
                 $scope.arrivalList = [];
+                $scope.selectedStop = null;
                 return;
             }
 
             var busArray = angular.isArray(items) ? items : [items];
 
-            // 🔸 대표 버스 유지 로직
+            // 대표 버스 유지 로직
             var newRepresentative = null;
             var oldRep = $scope.representativeBus;
 
@@ -644,6 +786,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 $scope.currentStop = null;
                 $scope.nextStop    = null;
                 $scope.arrivalList = [];
+                $scope.selectedStop = null;
             }
 
             // 버스 위치 마커 찍기 (대표 버스 노란색 강조)
@@ -661,6 +804,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             $scope.currentStop = null;
             $scope.nextStop    = null;
             $scope.arrivalList = [];
+            $scope.selectedStop = null;
         }).finally(function () {
             $scope.isMapLoading = false;
         });

@@ -1,4 +1,4 @@
-// 수정됨: TAGO 노선 + 정류장 + 버스 위치(JSON) + 정류장 도착정보 API 추가
+// 수정됨: TAGO 노선 + 정류장 + 버스 위치(JSON) + 정류장 도착정보 API + 정류장 이름 검색 API 추가
 
 package com.example.demo.controller;
 
@@ -111,6 +111,39 @@ public class BusApiController {
 
         return restTemplate.getForObject(url, String.class);
     }
+
+    /**
+     * 5) 정류장 이름으로 정류장 목록 조회
+     *    BusSttnInfoInqireService/getSttnNoList
+     *
+     * 예: /api/bus/stops-by-name?nodeName=정부청사
+     */
+    // 수정됨: 정류장 이름 검색 시 URLEncoder 제거하여 원본 문자열 그대로 전달
+
+@CrossOrigin
+@GetMapping("/api/bus/stops-by-name")
+public String getStopsByName(
+        @RequestParam("nodeName") String nodeName,
+        @RequestParam(value = "pageNo", defaultValue = "1") String pageNo,
+        @RequestParam(value = "numOfRows", defaultValue = "100") String numOfRows
+) {
+
+    // ※ 기존: String encodedName = URLEncoder.encode(nodeName, StandardCharsets.UTF_8);
+    // TAGO API가 실제로 URL 인코딩을 이중으로 기대하지 않을 가능성이 있어 제거함
+
+    String url = "http://apis.data.go.kr/1613000/BusSttnInfoInqireService/getSttnNoList"
+            + "?serviceKey=" + SERVICE_KEY
+            + "&_type=json"
+            + "&cityCode=" + CITY_CODE
+            + "&nodeNm=" + nodeName   // ★ 인코딩 제거!
+            + "&pageNo=" + pageNo
+            + "&numOfRows=" + numOfRows;
+
+    System.out.println("DEBUG GET URL = " + url);
+
+    return restTemplate.getForObject(url, String.class);
+}
+
 }
 
 // 수정됨 끝

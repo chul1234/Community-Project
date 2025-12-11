@@ -1,19 +1,68 @@
-<!-- 수정됨: 버스/정류장 JSON 디버그 textarea 제거 + 지도 하단 정보 패널(정류장 목록 + 도착 예정 버스) 추가 -->
+<!-- 수정됨: 버스/정류장 JSON 디버그 textarea 제거 + 지도 하단 정보 패널(정류장 목록 + 도착 예정 버스) + 통합 검색 UI(버스/정류장 선택) -->
 
 <!-- 버스 노선 정보 페이지 -->
 <div class="container">
     <h1>버스 노선 정보</h1>
     <hr />
 
-    <!-- 검색 영역 -->
-    <div class="bus-search-bar">
+    <!-- 검색 영역: 공통 입력란 + 버스/정류장 선택 + 검색 버튼 1개 -->
+    <div
+        class="bus-search-bar"
+        style="
+            display:flex;
+            align-items:center;
+            gap:12px;
+            margin-bottom:12px;
+            padding:6px 0;
+            flex-wrap:nowrap;
+        "
+    >
+        <!-- 공통 검색 입력란 -->
         <input
             type="text"
-            ng-model="searchTerm"
-            placeholder="버스 번호 입력 예) 201"
+            ng-model="searchKeyword"
+            placeholder="버스 번호 또는 정류장 이름을 입력하세요"
             class="bus-search-input"
+            style="
+                flex:1 1 auto;
+                min-width:320px;
+                padding:8px 10px;
+                font-size:15px;
+            "
         />
-        <button type="button" ng-click="searchBus()" class="bus-search-btn">
+
+        <!-- 검색 타입 선택 (버스 / 정류장) -->
+        <div
+            style="
+                display:flex;
+                align-items:center;
+                gap:10px;
+                white-space:nowrap;
+                font-size:14px;
+            "
+        >
+            <label style="margin:0;">
+                <input type="radio" ng-model="searchType" value="route" />
+                버스
+            </label>
+            <label style="margin:0;">
+                <input type="radio" ng-model="searchType" value="stop" />
+                정류장
+            </label>
+        </div>
+
+        <!-- 공통 검색 버튼 -->
+        <button
+            type="button"
+            ng-click="doSearch()"
+            class="bus-search-btn"
+            style="
+                padding:8px 16px;
+                font-size:15px;
+                border-radius:6px;
+                white-space:nowrap;
+            "
+        >
             검색
         </button>
     </div>
@@ -50,7 +99,8 @@
     >
         <button
             type="button"
-            ng-click="enableAutoRefresh()"
+            ng-click="enableAutoRefresh()
+            "
             ng-disabled="isAutoRefreshOn"
             style="padding: 5px 10px; background-color: #28a745; color: #fff; border-radius: 4px;"
         >
@@ -118,10 +168,15 @@
         <div style="display:flex; gap:16px; flex-wrap:wrap;">
             <!-- 정류장 목록 -->
             <div style="flex:1 1 260px; min-width:260px;">
-                <h3 style="margin-top:0; margin-bottom:8px;">경유 정류장 목록</h3>
+                <h3 style="margin-top:0; margin-bottom:8px;">정류장 목록</h3>
                 <div ng-if="stops && stops.length">
                     <ul style="max-height:220px; overflow-y:auto; padding-left:18px; margin:0;">
-                        <li ng-repeat="s in stops track by $index">
+                        <li
+                            ng-repeat="s in stops track by $index"
+                            ng-click="selectStop(s)"
+                            ng-class="{'row-active': selectedStop === s}"
+                            style="cursor:pointer;"
+                        >
                             {{$index + 1}}.
                             {{ s.nodenm || s.stationName || '정류장명 없음' }}
                             <span style="color:#868e96;" ng-if="s.nodeid || s.nodeId">
@@ -147,7 +202,7 @@
                     </span>
                 </p>
                 <p style="margin-top:0; margin-bottom:8px;" ng-if="!currentStop">
-                    대표 버스의 현재 정류장을 파악할 수 없어 도착 정보를 표시할 수 없습니다.
+                    기준 정류장을 선택해야 도착 정보를 표시할 수 있습니다.
                 </p>
 
                 <table
