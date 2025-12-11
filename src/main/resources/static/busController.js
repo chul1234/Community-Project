@@ -2,6 +2,7 @@
 //       + 정류장 영역으로 지도 자동 이동 + 대표 버스 유지
 //       + 현재 정류장 기준 도착 예정 버스 목록(arrivalList) 조회/표시
 //       + 버스/정류장 통합 검색 + 정류장 이름 검색 + 정류장 클릭 시 도착정보 조회
+//       + [정류장 검색 모드] 정류장 선택 시 도착 예정 버스들의 노선(routeId) 기준으로 버스 위치 전부 표시
 
 // =========================
 // EPSG:5179(UTM-K, GRS80) 좌표계 정의 + proj4 등록
@@ -35,7 +36,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     // JSON 디버그용 바인딩
     $scope.routeResultJson    = ''; // 노선 JSON
     $scope.stopsResultJson    = ''; // 정류장 JSON
-    $scope.locationResultJson = ''; // 버스 위치 JSON
+    $scope.locationResultJson = ''; // 버스 위치 JSON;
 
     // 선택된 노선 ID
     $scope.currentRouteId = null;
@@ -52,7 +53,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     // 자동 새로고침 상태
     $scope.isAutoRefreshOn = false;
 
-    // 지도 내부 로딩 플래그 (●●● 전용)
+    // 지도 내부 로딩 플래그
     $scope.isMapLoading = false;
 
     // 대표 버스(랜덤 1대, 가능하면 계속 유지)
@@ -347,6 +348,75 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     }
 
     // -------------------------
+    // [추가] 정류장 도착정보 기반으로 해당 정류장에 오는 버스들 위치 전부 표시
+    //       - 정류장 검색 모드(searchType='stop', currentRouteId == null)에서만 사용
+    // -------------------------
+    function drawBusesForArrivalRoutes(arrivals) {
+        // 정류장 검색 모드가 아니면 여기서는 아무것도 하지 않음
+        if ($scope.currentRouteId) {
+            return;
+        }
+
+        clearBusMarkers();
+
+        if (!arrivals || !arrivals.length) {
+            return;
+        }
+
+        // 도착정보에 포함된 routeId(또는 routeid)를 전부 모아서 중복 제거
+        var routeIdMap = {};
+        arrivals.forEach(function (a) {
+            var rid = a.routeid || a.routeId || a.route_id;
+            if (rid) {
+                routeIdMap[rid] = true;
+            }
+        });
+
+        var routeIds = Object.keys(routeIdMap);
+        if (!routeIds.length) {
+            return;
+        }
+
+        // 각 노선(routeId)에 대해 /api/bus/locations 호출해서 버스 마커 추가
+        routeIds.forEach(function (rid) {
+            $http.get('/api/bus/locations', {
+                params: {
+                    routeId:  rid,
+                    pageNo:   1,
+                    numOfRows: 100
+                }
+            }).then(function (res) {
+                var data = parseMaybeJson(res.data);
+                if (!data || !data.response || !data.response.body) {
+                    console.warn('정류장 모드 버스 위치 응답 구조가 예상과 다름(routeId=' + rid + '):', data);
+                    return;
+                }
+
+                var items = data.response.body.items && data.response.body.items.item;
+                if (!items) {
+                    return;
+                }
+
+                var busArray = angular.isArray(items) ? items : [items];
+
+                // 정류장 모드에서는 대표 버스 개념 없이 전부 일반 마커로 표시
+                busArray.forEach(function (b) {
+                    var lat = parseFloat(b.gpslati);
+                    var lon = parseFloat(b.gpslong);
+                    if (isNaN(lat) || isNaN(lon)) {
+                        return;
+                    }
+
+                    var label = (b.vehicleno || '') + ' / ' + (b.routenm || '');
+                    addBusMarker(lat, lon, label.trim(), false);
+                });
+            }).catch(function (err) {
+                console.error('정류장 모드 버스 위치 조회 실패(routeId=' + rid + '):', err);
+            });
+        });
+    }
+
+    // -------------------------
     // 현재 정류장 기준 도착 예정 버스 조회
     // -------------------------
     function fetchArrivalsForCurrentStop() {
@@ -363,7 +433,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
         $http.get('/api/bus/arrivals', {
             params: {
-                nodeId: nodeId,
+                nodeId:    nodeId,
                 numOfRows: 20
             }
         }).then(function (res) {
@@ -400,6 +470,12 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 });
             });
 
+            // ▼ 추가 포인트:
+            //   - 정류장 검색 모드일 때(currentRouteId == null),
+            //     이 정류장을 기준으로 도착 예정인 버스들의 노선(routeId)을 전부 모아서
+            //     해당 버스 위치들을 지도에 찍어준다.
+            drawBusesForArrivalRoutes($scope.arrivalList);
+
         }).catch(function (err) {
             console.error('도착 예정 버스 조회 실패:', err);
             $scope.arrivalList = [];
@@ -415,6 +491,9 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         $scope.selectedStop = stop;
         $scope.currentStop  = stop;
 
+        // 정류장을 수동으로 선택했을 때,
+        // - 노선 모드(route 검색)에서는 기존대로 도착정보만 조회
+        // - 정류장 검색 모드(stop 검색)에서는 위에서 정의한 drawBusesForArrivalRoutes까지 같이 동작
         fetchArrivalsForCurrentStop();
     };
 
@@ -605,7 +684,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     };
 
     // =========================
-    // 정류장 이름으로 정류장 목록 검색 (getSttnNoList 응답 구조 기준)
+    // 정류장 이름으로 정류장 목록 검색
     // =========================
     $scope.searchStops = function () {
         if (!$scope.searchKeyword) {
@@ -653,7 +732,6 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 return;
             }
 
-            // getSttnNoList 기준: body.items.item 에 단일 객체 또는 배열로 있음
             var itemsRoot = data.response.body.items;
             if (!itemsRoot || !itemsRoot.item) {
                 $scope.stops        = [];
@@ -665,7 +743,6 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             var items = itemsRoot.item;
             var rawStopsArray = angular.isArray(items) ? items : [items];
 
-            // nodeid 필드 강제 통일(혹시 다른 이름으로 올 경우 대비)
             var stopsArray = rawStopsArray.map(function (s) {
                 var id =
                     s.nodeid ||
@@ -699,7 +776,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     };
 
     // =========================
-    // 3단계: 현재 routeId 기준 버스 위치 조회
+    // 3단계: 현재 routeId 기준 버스 위치 조회 (폴링 대상)
     // =========================
     $scope.fetchBusLocations = function () {
         if (!$scope.currentRouteId) {
@@ -710,8 +787,8 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
         $http.get('/api/bus/locations', {
             params: {
-                routeId:  $scope.currentRouteId,
-                pageNo:   1,
+                routeId:   $scope.currentRouteId,
+                pageNo:    1,
                 numOfRows: 100
             }
         }).then(function (res) {
@@ -779,7 +856,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 $scope.currentStop = calc2.current;
                 $scope.nextStop    = calc2.next;
 
-                // 현재 정류장 기준 도착 예정 버스 갱신
+                // 노선 모드에서는 여기서 도착정보만 갱신 (정류장 검색 모드는 currentRouteId가 null이라 이쪽 코드 안탐)
                 fetchArrivalsForCurrentStop();
             } else {
                 $scope.prevStop    = null;
