@@ -1,3 +1,5 @@
+<!-- 수정됨: 지도 중앙 로딩 오버레이에 정류장 폴링 로딩(isStopPollingLoading) 포함 -->
+
 <!-- 수정됨: 버스/정류장 JSON 디버그 textarea 제거 + 지도 하단 정보 패널(정류장 목록 + 도착 예정 버스) + 통합 검색 UI(버스/정류장 선택) -->
 
 <!-- 버스 노선 정보 페이지 -->
@@ -131,7 +133,7 @@
     <!-- 지도 내부 중앙 로딩 오버레이 -->
     <div
         id="map-loading-indicator"
-        ng-show="isMapLoading"
+        ng-show="isMapLoading || isStopPollingLoading"
         style="
             position: absolute;
             left: 50%;
