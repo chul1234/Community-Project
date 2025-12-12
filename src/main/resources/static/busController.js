@@ -1,13 +1,18 @@
-// 수정됨: 6번(대표 버스 애니메이션 + 대표 버스로 이동) 추가
+// 수정됨: 2번(대표 버스 애니메이션 + 대표 버스로 이동 + 대표 선정 시 살짝 줌인) 추가
 //       - 대표 버스가 결정/변경될 때 지도 뷰를 해당 버스 위치로 부드럽게 이동(view.animate)
+//       - 대표 버스가 결정/변경될 때 현재 줌 기준으로 +1 정도 살짝 줌인(최대 제한)
 //       - 대표 버스 위치에 펄스(파동) 애니메이션 레이어(repPulseLayer) 추가로 시인성 강화
 //       - 정류장 검색 모드(노선 미선택)에서는 대표 버스 애니메이션/이동 비활성화
-
+//
+// 수정됨: 7번(hover) 1단계(노선/버스 검색 모드) 추가 - OpenLayers Overlay 툴팁
+//       - 정류장/버스 마커 hover 시 정보 표시(버스=다음 정류장 포함, 정류장=이름)
+//       - featureType/busData/stopData 메타데이터를 마커 feature에 저장하여 안정적으로 hover 처리
+//
 // 수정됨: 정류장 검색 모드 버스 마커 텍스트(label) 처리 안정화
 //       - label(trim)이 문자열이 아닐 때(TypeError) 터지던 문제 해결
 //       - routenm/vehicleno 등 어떤 값이 와도 String(...)으로 변환 후 trim 적용
 //       - 정류장 모드에서는 노선번호(102/201...)만 표시
-
+//
 // 수정됨: 4번(노선 라인 방향 화살표) 추가 - 노선 라인(LineString) 세그먼트 방향을 계산해 중간 지점에 화살표 아이콘(회전 적용) 표시
 // 수정됨: 3번(노선 라인 표시) 추가 - 버스(노선) 검색 시 정류장 좌표를 routeseq 기준으로 이어서 라인 표시 + 지도 fit
 //       - 정류장 검색 모드에서는 라인 제거(노선이 특정되지 않으므로)
@@ -37,7 +42,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
     $scope.searchType    = 'route';
     $scope.searchKeyword = '';
-    $scope.searchTerm = '';
+    $scope.searchTerm    = '';
 
     $scope.map1 = null;
     var olMap = null;
@@ -127,20 +132,152 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     }
 
     // -------------------------
-    // [추가] 6번: 대표 버스 펄스(파동) 애니메이션 레이어
+    // 7번(hover) - OpenLayers 툴팁 Overlay
+    // -------------------------
+    var hoverTooltipEl = null;
+    var hoverTooltipOverlay = null;
+
+    function initHoverTooltip() {
+        if (!olMap) return;
+        if (hoverTooltipOverlay) return;
+
+        var mapDiv = document.getElementById('map1');
+        if (!mapDiv) return;
+
+        hoverTooltipEl = document.createElement('div');
+        hoverTooltipEl.style.position = 'absolute';
+        hoverTooltipEl.style.pointerEvents = 'none';
+        hoverTooltipEl.style.background = 'rgba(0, 0, 0, 0.75)';
+        hoverTooltipEl.style.color = '#ffffff';
+        hoverTooltipEl.style.padding = '6px 8px';
+        hoverTooltipEl.style.borderRadius = '6px';
+        hoverTooltipEl.style.fontSize = '12px';
+        hoverTooltipEl.style.whiteSpace = 'nowrap';
+        hoverTooltipEl.style.display = 'none';
+        hoverTooltipEl.style.zIndex = '9999';
+
+        mapDiv.appendChild(hoverTooltipEl);
+
+        hoverTooltipOverlay = new ol.Overlay({
+            element: hoverTooltipEl,
+            offset: [12, 0],
+            positioning: 'bottom-left',
+            stopEvent: false
+        });
+
+        olMap.addOverlay(hoverTooltipOverlay);
+
+        olMap.on('pointermove', function (evt) {
+            // ✅ 1단계는 “노선(버스) 모드”에서만 적용
+            if (!$scope.currentRouteId) {
+                hideHoverTooltip();
+                return;
+            }
+
+            if (evt.dragging) {
+                hideHoverTooltip();
+                return;
+            }
+
+            var pixel = olMap.getEventPixel(evt.originalEvent);
+            var feature = olMap.forEachFeatureAtPixel(pixel, function (f) {
+                return f;
+            });
+
+            if (!feature) {
+                hideHoverTooltip();
+                return;
+            }
+
+            var fType = feature.get('featureType');
+
+            if (fType === 'stop') {
+                var stopData = feature.get('stopData') || null;
+                var stopName =
+                    (stopData && (stopData.nodenm || stopData.stationName)) ||
+                    feature.get('name') ||
+                    '';
+
+                if (!stopName) {
+                    hideHoverTooltip();
+                    return;
+                }
+
+                showHoverTooltip(evt.coordinate, stopName);
+                return;
+            }
+
+            if (fType === 'bus') {
+                var busData = feature.get('busData') || null;
+                if (!busData) {
+                    hideHoverTooltip();
+                    return;
+                }
+
+                // 노선번호(예: 102)
+                var routeNo =
+                    (busData.routenm != null ? String(busData.routenm) : '') ||
+                    (busData.routeno != null ? String(busData.routeno) : '') ||
+                    '';
+
+                var vehicleNo =
+                    (busData.vehicleno != null ? String(busData.vehicleno) : '') ||
+                    '';
+
+                // 다음 정류장 계산
+                var calc = computePrevCurrentNextForBus(busData, $scope.stops || []);
+                var nextStopName =
+                    (calc && calc.next && (calc.next.nodenm || calc.next.stationName)) ||
+                    '';
+
+                var parts = [];
+                if (routeNo) parts.push('노선: ' + routeNo);
+                if (vehicleNo) parts.push('차량: ' + vehicleNo);
+                if (nextStopName) parts.push('다음: ' + nextStopName);
+
+                var text = parts.join(' / ');
+                if (!text) {
+                    hideHoverTooltip();
+                    return;
+                }
+
+                showHoverTooltip(evt.coordinate, text);
+                return;
+            }
+
+            hideHoverTooltip();
+        });
+    }
+
+    function showHoverTooltip(coord, text) {
+        if (!hoverTooltipEl || !hoverTooltipOverlay) return;
+
+        hoverTooltipEl.textContent = text;
+        hoverTooltipEl.style.display = 'block';
+        hoverTooltipOverlay.setPosition(coord);
+    }
+
+    function hideHoverTooltip() {
+        if (!hoverTooltipEl || !hoverTooltipOverlay) return;
+
+        hoverTooltipEl.style.display = 'none';
+        hoverTooltipOverlay.setPosition(undefined);
+    }
+
+    // -------------------------
+    // 6번: 대표 버스 펄스(파동) 애니메이션 레이어
     // -------------------------
     var repPulseSource = new ol.source.Vector();
     var repPulseLayer  = new ol.layer.Vector({
         source: repPulseSource,
         style: function () {
-            // 대표 버스가 없으면 아무것도 그리지 않음
             if (!$scope.representativeBus) return null;
-            if (!$scope.currentRouteId) return null; // 정류장 모드에서는 대표 버스 없음
+            if (!$scope.currentRouteId) return null;
 
             var t = Date.now();
-            var phase = (t % 900) / 900.0; // 0~1
-            var radius = 10 + (phase * 10); // 10~20
-            var opacity = 1.0 - phase; // 1~0
+            var phase = (t % 900) / 900.0;
+            var radius = 10 + (phase * 10);
+            var opacity = 1.0 - phase;
 
             return new ol.style.Style({
                 image: new ol.style.Circle({
@@ -165,12 +302,10 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         if (repPulseRafId != null) return;
 
         var tick = function () {
-            // 대표 버스가 없거나 노선 모드가 아니면 루프 종료
             if (!olMap || !$scope.representativeBus || !$scope.currentRouteId) {
                 repPulseRafId = null;
                 return;
             }
-            // style 함수가 시간에 따라 변하므로 render를 계속 호출
             olMap.render();
             repPulseRafId = requestAnimationFrame(tick);
         };
@@ -220,23 +355,25 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     }
 
     // -------------------------
-    // [추가] 6번: 대표 버스로 지도 이동(animate pan) - 변경될 때만 이동
+    // 2번: 대표 버스로 지도 이동 + 살짝 줌인 (대표 변경될 때만)
     // -------------------------
     var lastRepVehicleNoForPan = null;
     var lastRepPanAtMs = 0;
 
+    // 대표 선정 시 줌인 설정
+    var REP_ZOOM_IN_DELTA = 1;     // 현재 줌 + 1
+    var REP_ZOOM_MAX      = 15;    // 너무 과한 줌 방지
+
     function panToRepresentativeBusIfNeeded(bus) {
         if (!olMap) return;
         if (!bus) return;
-        if (!$scope.currentRouteId) return; // 정류장 모드에서는 이동 X
+        if (!$scope.currentRouteId) return;
 
         var vehicleno = (bus.vehicleno != null) ? String(bus.vehicleno) : null;
         if (!vehicleno) return;
 
-        // 대표 버스가 바뀌었을 때만 이동
         if (lastRepVehicleNoForPan === vehicleno) return;
 
-        // 혹시 폴링이 매우 빠르면 애니메이션 난사 방지(최소 1초 간격)
         var now = Date.now();
         if (now - lastRepPanAtMs < 1000) return;
 
@@ -248,10 +385,17 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         var view = olMap.getView();
         if (!view) return;
 
-        view.animate({
-            center: center5179,
-            duration: 700
-        });
+        var currentZoom = view.getZoom();
+        var targetZoom = currentZoom;
+        if (typeof currentZoom === 'number') {
+            targetZoom = Math.min(REP_ZOOM_MAX, currentZoom + REP_ZOOM_IN_DELTA);
+        }
+
+        // center + zoom 을 같이 애니메이션
+        view.animate(
+            { center: center5179, duration: 700 },
+            { zoom: targetZoom, duration: 700 }
+        );
 
         lastRepVehicleNoForPan = vehicleno;
         lastRepPanAtMs = now;
@@ -308,6 +452,9 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         } else {
             console.warn('ol.Map 인스턴스 또는 addLayer 를 찾지 못했습니다. 마커는 표시되지 않을 수 있습니다.');
         }
+
+        // ✅ hover 초기화
+        initHoverTooltip();
 
         console.log('NGII map 초기화 완료:', $scope.map1, olMap);
     };
@@ -404,7 +551,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         stopSource = newSrc;
     }
 
-    function addStopMarkerToSource(targetSource, lat, lon, title) {
+    function addStopMarkerToSource(targetSource, lat, lon, title, stopData) {
         if (!olMap) return;
         if (isNaN(lat) || isNaN(lon)) return;
 
@@ -415,6 +562,10 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 geometry: new ol.geom.Point(xy5179),
                 name: title || ''
             });
+
+            // ✅ hover용 메타데이터
+            feature.set('featureType', 'stop');
+            feature.set('stopData', stopData || null);
 
             feature.setStyle(
                 new ol.style.Style({
@@ -461,7 +612,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             var lon = parseFloat(s.gpslong || s.gpsLong || s.gpsX);
 
             if (!isNaN(lat) && !isNaN(lon)) {
-                addStopMarkerToSource(newSrc, lat, lon, s.nodenm || s.stationName || '');
+                addStopMarkerToSource(newSrc, lat, lon, s.nodenm || s.stationName || '', s);
             }
         });
 
@@ -480,7 +631,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         busSource = newSrc;
     }
 
-    function addBusMarkerToSource(targetSource, lat, lon, title, isRepresentative) {
+    function addBusMarkerToSource(targetSource, lat, lon, title, isRepresentative, busData) {
         if (!olMap) return;
         if (isNaN(lat) || isNaN(lon)) return;
 
@@ -492,10 +643,14 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 name: title || ''
             });
 
+            // ✅ hover용 메타데이터
+            feature.set('featureType', 'bus');
+            feature.set('busData', busData || null);
+
             var fillColor   = isRepresentative ? '#ffd400' : '#0000ff';
             var radiusValue = isRepresentative ? 7 : 5;
 
-            // 정류장 모드에서만 노선번호 텍스트 표시(5번)
+            // 정류장 모드에서만 노선번호 텍스트 표시
             var busNoText = '';
             if (!$scope.currentRouteId && title != null) {
                 busNoText = String(title).trim();
@@ -548,7 +703,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                     isRepresentative = (rep.vehicleno === b.vehicleno);
                 }
 
-                addBusMarkerToSource(newSrc, lat, lon, label, isRepresentative);
+                addBusMarkerToSource(newSrc, lat, lon, String(label).trim(), isRepresentative, b);
             }
         });
 
@@ -599,7 +754,6 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     function drawBusesForArrivalRoutes(arrivals) {
         if ($scope.currentRouteId) return;
 
-        // 정류장 모드 들어오면 대표버스 애니메이션/펄스는 꺼둠
         $scope.representativeBus = null;
         clearRepPulse();
         lastRepVehicleNoForPan = null;
@@ -650,7 +804,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                     if (isNaN(lat) || isNaN(lon)) return;
 
                     var label = (b.routenm != null) ? String(b.routenm) : '';
-                    addBusMarkerToSource(tempSource, lat, lon, label, false);
+                    addBusMarkerToSource(tempSource, lat, lon, String(label).trim(), false, b);
                 });
             }).catch(function (err) {
                 console.error('정류장 모드 버스 위치 조회 실패(routeId=' + rid + '):', err);
@@ -841,7 +995,6 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             $scope.arrivalList       = [];
             $scope.selectedStop      = null;
 
-            // 노선 모드 진입 시 대표버스 이동 조건 초기화
             lastRepVehicleNoForPan = null;
 
             $scope.fetchRouteStops(routeId);
@@ -935,9 +1088,11 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         clearRouteLine();
         clearBusMarkers();
 
-        // 정류장 모드에서는 대표 버스 펄스/이동 제거
         clearRepPulse();
         lastRepVehicleNoForPan = null;
+
+        // 정류장 모드로 들어오면 hover 툴팁 숨김(1단계는 노선모드만)
+        hideHoverTooltip();
 
         $scope.isMapLoading = true;
 
@@ -1042,7 +1197,6 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
             var busArray = angular.isArray(items) ? items : [items];
 
-            // 대표 버스 유지 로직
             var newRepresentative = null;
             var oldRep = $scope.representativeBus;
 
@@ -1063,7 +1217,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
             $scope.representativeBus = newRepresentative || null;
 
-            // ✅ 6번: 대표 버스로 지도 이동(대표 버스가 바뀐 경우만)
+            // ✅ 2번/6번: 대표 버스로 이동 + 줌인 + 펄스
             if ($scope.representativeBus) {
                 panToRepresentativeBusIfNeeded($scope.representativeBus);
                 updateRepPulseFeatureByBus($scope.representativeBus);
@@ -1071,7 +1225,6 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 clearRepPulse();
             }
 
-            // 대표 버스 기준 이전/현재/다음 정류장 계산
             if ($scope.representativeBus && $scope.stops && $scope.stops.length > 0) {
                 var calc2 = computePrevCurrentNextForBus($scope.representativeBus, $scope.stops);
                 $scope.prevStop    = calc2.prev;
