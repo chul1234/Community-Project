@@ -1,3 +1,5 @@
+// 수정됨: 4번(노선 라인 방향 화살표) 추가 - 노선 라인(LineString) 세그먼트 방향을 계산해 중간 지점에 화살표 아이콘(회전 적용) 표시
+
 // 수정됨: 3번(노선 라인 표시) 추가 - 버스(노선) 검색 시 정류장 좌표를 routeseq 기준으로 이어서 라인 표시 + 지도 fit
 //       - 정류장 검색 모드에서는 라인 제거(노선이 특정되지 않으므로)
 
@@ -103,6 +105,41 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             })
         })
     });
+
+    // -------------------------
+    // [추가] 노선 라인 방향 화살표(4번) 설정/스타일 캐시
+    //  - 라인 세그먼트 진행 방향을 계산해 중간 지점에 화살표 아이콘을 회전 적용하여 표시한다.
+    // -------------------------
+    var ROUTE_ARROW_EVERY_N_SEGMENTS = 2;       // N개 세그먼트마다 1개 화살표 표시(1이면 모든 세그먼트)
+    var ROUTE_ARROW_MIN_SEGMENT_LEN  = 30;      // 너무 짧은 세그먼트는 화살표 생략(지도 좌표계 단위)
+    var routeArrowStyleCache         = {};      // 회전각(rad) 별 스타일 캐시
+
+    function buildRouteArrowSvgDataUri(fillColor) {
+        var svg =
+            '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">' +
+            '<path fill="' + fillColor + '" d="M4 12h11.2l-3.6-3.6L13 7l7 7-7 7-1.4-1.4 3.6-3.6H4z"/>' +
+            '</svg>';
+
+        return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    }
+
+    function getRouteArrowStyle(rotationRad) {
+        // 캐시 키를 너무 세밀하게 하면 커지므로 소수점 2자리로 양자화
+        var key = (Math.round(rotationRad * 100) / 100).toString();
+        if (routeArrowStyleCache[key]) return routeArrowStyleCache[key];
+
+        routeArrowStyleCache[key] = new ol.style.Style({
+            image: new ol.style.Icon({
+                src: buildRouteArrowSvgDataUri('#0066ff'),
+                rotateWithView: true,
+                rotation: rotationRad,
+                scale: 0.7,
+                opacity: 0.95
+            })
+        });
+
+        return routeArrowStyleCache[key];
+    }
 
     // -------------------------
     // 공통: JSON 문자열 → 객체 변환
@@ -211,6 +248,39 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
         // 라인 레이어에 추가
         routeLineSource.addFeature(lineFeature);
+
+        // -------------------------
+        // [추가] 4번: 노선 라인 방향 화살표 표시
+        //  - 각 세그먼트의 방향(시작→끝)을 계산해 중간 지점에 화살표(Point Feature)를 추가한다.
+        //  - 라인과 동일한 source(routeLineSource)에 올려도 Feature별 스타일을 setStyle로 분리한다.
+        // -------------------------
+        for (var i = 0; i < coordinates.length - 1; i++) {
+            if (ROUTE_ARROW_EVERY_N_SEGMENTS > 1 && (i % ROUTE_ARROW_EVERY_N_SEGMENTS) !== 0) {
+                continue;
+            }
+
+            var p1 = coordinates[i];
+            var p2 = coordinates[i + 1];
+            if (!p1 || !p2) continue;
+
+            var dx = p2[0] - p1[0];
+            var dy = p2[1] - p1[1];
+            var segLen = Math.sqrt(dx * dx + dy * dy);
+
+            if (!isFinite(segLen) || segLen < ROUTE_ARROW_MIN_SEGMENT_LEN) {
+                continue;
+            }
+
+            var mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+            var angle = Math.atan2(dy, dx); // '→' 기본 방향(동쪽) 기준 회전
+
+            var arrowFeature = new ol.Feature({
+                geometry: new ol.geom.Point(mid)
+            });
+
+            arrowFeature.setStyle(getRouteArrowStyle(angle));
+            routeLineSource.addFeature(arrowFeature);
+        }
 
         // 라인 기준으로 지도 범위 맞추기 (정류장 fit과 유사)
         var extent = routeLineSource.getExtent();
@@ -797,7 +867,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             // 정류장 마커
             drawStopsOnMap(stopsArray);
 
-            // ✅ [추가] 노선 라인 (3번)
+            // ✅ [추가] 노선 라인 (3번) + 화살표 (4번)
             drawRouteLineFromStops(stopsArray);
 
             // 대표 버스가 있으면 prev/current/next 재계산
