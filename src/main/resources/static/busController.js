@@ -1,30 +1,6 @@
-// 수정됨: 2번(대표 버스 애니메이션 + 대표 버스로 이동 + 대표 선정 시 살짝 줌인) 추가
-//       - 대표 버스가 결정/변경될 때 지도 뷰를 해당 버스 위치로 부드럽게 이동(view.animate)
-//       - 대표 버스가 결정/변경될 때 현재 줌 기준으로 +1 정도 살짝 줌인(최대 제한)
-//       - 대표 버스 위치에 펄스(파동) 애니메이션 레이어(repPulseLayer) 추가로 시인성 강화
-//       - 정류장 검색 모드(노선 미선택)에서는 대표 버스 애니메이션/이동 비활성화
-//
-// 수정됨: 7번(hover) 1단계(노선/버스 검색 모드) 추가 - OpenLayers Overlay 툴팁
-//       - 정류장/버스 마커 hover 시 정보 표시(버스=다음 정류장 포함, 정류장=이름)
-//       - featureType/busData/stopData 메타데이터를 마커 feature에 저장하여 안정적으로 hover 처리
-//
-// 수정됨: 정류장 검색 모드 버스 마커 텍스트(label) 처리 안정화
-//       - label(trim)이 문자열이 아닐 때(TypeError) 터지던 문제 해결
-//       - routenm/vehicleno 등 어떤 값이 와도 String(...)으로 변환 후 trim 적용
-//       - 정류장 모드에서는 노선번호(102/201...)만 표시
-//
-// 수정됨: 4번(노선 라인 방향 화살표) 추가 - 노선 라인(LineString) 세그먼트 방향을 계산해 중간 지점에 화살표 아이콘(회전 적용) 표시
-// 수정됨: 3번(노선 라인 표시) 추가 - 버스(노선) 검색 시 정류장 좌표를 routeseq 기준으로 이어서 라인 표시 + 지도 fit
-//       - 정류장 검색 모드에서는 라인 제거(노선이 특정되지 않으므로)
-
-/*
- * TAGO 좌표 → NGII 변환 + 정류장/버스 마커 표시 + 자동 새로고침
- * + 정류장 영역으로 지도 자동 이동 + 대표 버스 유지
- * + 현재 정류장 기준 도착 예정 버스 목록(arrivalList) 조회/표시
- * + 버스/정류장 통합 검색 + 정류장 이름 검색 + 정류장 클릭 시 도착정보 조회
- * + [정류장 검색 모드] 정류장 선택 시 도착 예정 버스들의 노선(routeId) 기준으로 버스 위치 전부 표시
- * + [폴링] 정류장/버스 둘 다 “깜빡임 최소화” (목록/마커를 미리 비우지 않고 준비 후 교체)
- */
+// 수정됨: 7번(hover) 2단계 추가 - 정류장 검색 모드에서도 hover 툴팁 동작
+//       - 노선(버스) 모드: 기존처럼 버스=다음 정류장 포함, 정류장=이름
+//       - 정류장 검색 모드: 정류장=이름, 버스=노선/차량만 표시(노선별 정류장 목록이 없어서 다음 정류장 계산 불가)
 
 // =========================
 // EPSG:5179(UTM-K, GRS80) 좌표계 정의 + proj4 등록
@@ -167,22 +143,39 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
         olMap.addOverlay(hoverTooltipOverlay);
 
-        olMap.on('pointermove', function (evt) {
-            // ✅ 1단계는 “노선(버스) 모드”에서만 적용
-            if (!$scope.currentRouteId) {
-                hideHoverTooltip();
-                return;
-            }
+        // ✅ 2단계: 지도 영역에서 마우스가 나가면 툴팁 숨김(툴팁 “고정” 방지)
+        mapDiv.addEventListener('mouseleave', function () {
+            hideHoverTooltip();
+        });
 
+        olMap.on('pointermove', function (evt) {
+            // ✅ 드래그 중엔 무조건 숨김
             if (evt.dragging) {
                 hideHoverTooltip();
                 return;
             }
 
+            // ✅ 2단계: 노선 모드 OR 정류장 검색 모드일 때만 hover 활성화
+            var isRouteMode = !!$scope.currentRouteId;
+            var isStopSearchMode = !isRouteMode && ($scope.stops && $scope.stops.length > 0);
+
+            if (!isRouteMode && !isStopSearchMode) {
+                hideHoverTooltip();
+                return;
+            }
+
             var pixel = olMap.getEventPixel(evt.originalEvent);
-            var feature = olMap.forEachFeatureAtPixel(pixel, function (f) {
-                return f;
-            });
+
+            // ✅ repPulseLayer(대표 펄스) hit-detect 제외
+            var feature = olMap.forEachFeatureAtPixel(
+                pixel,
+                function (f) { return f; },
+                {
+                    layerFilter: function (layer) {
+                        return layer !== repPulseLayer;
+                    }
+                }
+            );
 
             if (!feature) {
                 hideHoverTooltip();
@@ -224,16 +217,18 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                     (busData.vehicleno != null ? String(busData.vehicleno) : '') ||
                     '';
 
-                // 다음 정류장 계산
-                var calc = computePrevCurrentNextForBus(busData, $scope.stops || []);
-                var nextStopName =
-                    (calc && calc.next && (calc.next.nodenm || calc.next.stationName)) ||
-                    '';
-
                 var parts = [];
                 if (routeNo) parts.push('노선: ' + routeNo);
                 if (vehicleNo) parts.push('차량: ' + vehicleNo);
-                if (nextStopName) parts.push('다음: ' + nextStopName);
+
+                // ✅ 노선(버스) 모드에서만 “다음 정류장” 계산 가능
+                if (isRouteMode) {
+                    var calc = computePrevCurrentNextForBus(busData, $scope.stops || []);
+                    var nextStopName =
+                        (calc && calc.next && (calc.next.nodenm || calc.next.stationName)) ||
+                        '';
+                    if (nextStopName) parts.push('다음: ' + nextStopName);
+                }
 
                 var text = parts.join(' / ');
                 if (!text) {
@@ -361,8 +356,8 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     var lastRepPanAtMs = 0;
 
     // 대표 선정 시 줌인 설정
-    var REP_ZOOM_IN_DELTA = 1;     // 현재 줌 + 1
-    var REP_ZOOM_MAX      = 15;    // 너무 과한 줌 방지
+    var REP_ZOOM_IN_DELTA = 1;
+    var REP_ZOOM_MAX      = 15;
 
     function panToRepresentativeBusIfNeeded(bus) {
         if (!olMap) return;
@@ -391,7 +386,6 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             targetZoom = Math.min(REP_ZOOM_MAX, currentZoom + REP_ZOOM_IN_DELTA);
         }
 
-        // center + zoom 을 같이 애니메이션
         view.animate(
             { center: center5179, duration: 700 },
             { zoom: targetZoom, duration: 700 }
@@ -453,7 +447,6 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             console.warn('ol.Map 인스턴스 또는 addLayer 를 찾지 못했습니다. 마커는 표시되지 않을 수 있습니다.');
         }
 
-        // ✅ hover 초기화
         initHoverTooltip();
 
         console.log('NGII map 초기화 완료:', $scope.map1, olMap);
