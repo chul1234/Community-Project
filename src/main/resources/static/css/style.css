@@ -649,3 +649,278 @@ header h1 {
     display: inline-block;
     min-width: 90px;
 }
+
+/* ... 위쪽은 기존 코드 그대로 유지 ... */
+
+/* ========================================================================== */
+/* ★ 버스 정보 페이지 전용 스타일 (기존 레이아웃 영향 없음 / 추가된 부분) ★ */
+/* ========================================================================== */
+
+/* 1. 버스 검색바 (카드 형태) */
+.bus-dashboard-search {
+    background: #ffffff;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    border: 1px solid #eaeaea;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+/* 검색바 내부 입력창 */
+.bus-dashboard-input {
+    flex: 1; /* 남은 공간 차지 */
+    min-width: 250px;
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 15px;
+    transition: border-color 0.2s;
+}
+.bus-dashboard-input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.1);
+}
+
+/* 라디오 버튼 그룹 (깔끔한 뱃지 스타일) */
+.bus-radio-wrap {
+    background-color: #f1f3f5;
+    padding: 5px;
+    border-radius: 6px;
+    display: flex;
+    gap: 5px;
+}
+.bus-radio-label {
+    padding: 6px 12px;
+    font-size: 14px;
+    color: #495057;
+    cursor: pointer;
+    border-radius: 4px;
+    margin: 0;
+    transition: all 0.2s;
+}
+/* 라디오 버튼 선택 시 효과 */
+.bus-radio-wrap input[type="radio"] {
+    display: none;
+}
+.bus-radio-wrap input[type="radio"]:checked + span {
+    background-color: #fff;
+    color: #007bff;
+    font-weight: 700;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* 검색 버튼 */
+.btn-bus-action {
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-bus-action:hover {
+    background-color: #0069d9;
+}
+
+/* 2. 상태 대시보드 (대표 버스 + 제어 버튼) */
+.bus-status-container {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+/* 상태 카드 공통 */
+.bus-card {
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #eaeaea;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+    padding: 15px 20px;
+    display: flex;
+    align-items: center;
+}
+
+/* 정보 표시 카드 (왼쪽) */
+.bus-card.info-section {
+    flex: 2;
+    min-width: 320px;
+    border-left: 5px solid #007bff; /* 포인트 컬러 */
+    justify-content: space-between;
+}
+
+/* 제어 버튼 카드 (오른쪽) */
+.bus-card.control-section {
+    flex: 1;
+    min-width: 280px;
+    justify-content: flex-end;
+    gap: 10px;
+    background-color: #fcfcfc;
+}
+
+/* 정보 아이템 디자인 */
+.status-item {
+    display: flex;
+    flex-direction: column;
+}
+.status-label {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+.status-value {
+    font-size: 15px;
+    font-weight: 600;
+    color: #333;
+}
+
+/* 새로고침 버튼 스타일 */
+.btn-refresh-toggle {
+    padding: 8px 12px;
+    font-size: 13px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    font-weight: 600;
+}
+.btn-refresh-toggle.on {
+    background-color: #e6fcf5;
+    color: #0ca678;
+    border-color: #c3fae8;
+}
+.btn-refresh-toggle.off {
+    background-color: #fff5f5;
+    color: #fa5252;
+    border-color: #ffc9c9;
+}
+
+/* 3. 지도 영역 (둥근 모서리와 그림자) */
+.bus-map-frame {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    border: 1px solid #ddd;
+    background: #eee;
+}
+.bus-map-canvas {
+    width: 100%;
+    height: 600px;
+}
+
+/* 지도 위 로딩 뱃지 */
+.map-loading-badge {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(33, 37, 41, 0.85);
+    color: #fff;
+    padding: 10px 25px;
+    border-radius: 50px;
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+/* 4. 하단 정보 패널 (2단 그리드) */
+.bus-info-grid {
+    display: flex;
+    gap: 20px;
+    margin-top: 25px;
+    flex-wrap: wrap;
+}
+
+.bus-panel-box {
+    flex: 1;
+    min-width: 300px;
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #eaeaea;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.bus-panel-header {
+    background-color: #f8f9fa;
+    padding: 12px 15px;
+    border-bottom: 1px solid #eee;
+    font-weight: 700;
+    color: #495057;
+    font-size: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.bus-panel-header.accent-blue { border-left: 4px solid #007bff; }
+.bus-panel-header.accent-green { border-left: 4px solid #28a745; }
+
+.bus-panel-content {
+    flex: 1;
+    padding: 0;
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+/* 정류장 리스트 스타일 */
+.stop-list-row {
+    padding: 12px 15px;
+    border-bottom: 1px solid #f1f1f1;
+    cursor: pointer;
+    transition: background 0.1s;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+}
+.stop-list-row:hover {
+    background-color: #f8f9fa;
+    color: #007bff;
+}
+.stop-list-row.active {
+    background-color: #e7f5ff;
+    color: #007bff;
+    font-weight: 700;
+    border-left: 3px solid #007bff;
+}
+
+/* 도착 정보 테이블 스타일 */
+.arrival-info-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+.arrival-info-table th {
+    background-color: #fafafa;
+    color: #666;
+    font-weight: 600;
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    text-align: left;
+}
+.arrival-info-table td {
+    padding: 12px 10px;
+    border-bottom: 1px solid #f5f5f5;
+    color: #333;
+}
+.arrival-highlight {
+    color: #d6336c;
+    font-weight: 700;
+}
+.panel-empty-msg {
+    padding: 40px;
+    text-align: center;
+    color: #999;
+    font-size: 13px;
+}
