@@ -1,6 +1,4 @@
-// 수정됨: 대용량(big_posts) 통계 추가 + 기존(posts) 통계 유지
-//       - GET /api/stats/posts       : 기존 일반 게시판 통계
-//       - GET /api/stats/big-posts   : 대용량 게시판 통계 추가
+// 수정됨: 대용량(big_posts) 통계를 2개 통계 테이블(big_posts_user_stats, big_posts_daily_stats)에서 조회하도록 추가
 
 package com.example.demo.dao;
 
@@ -33,17 +31,14 @@ public class StatsDAO {
     public Map<String, Object> getPostStats() {
         Map<String, Object> result = new HashMap<>();
 
-        // 사용자별 게시글 수 Top10
         result.put("topUsers", query(
             "SELECT user_id,COUNT(*) cnt FROM posts GROUP BY user_id ORDER BY cnt DESC LIMIT 10"
         ));
 
-        // 조회수 Top10
         result.put("topViews", query(
             "SELECT title,view_count FROM posts ORDER BY view_count DESC LIMIT 10"
         ));
 
-        // 날짜별 게시글 수 (전 기간)
         result.put("daily", query(
             "SELECT DATE(created_at) day,COUNT(*) cnt FROM posts GROUP BY DATE(created_at) ORDER BY day"
         ));
@@ -52,27 +47,55 @@ public class StatsDAO {
     }
 
     // ----------------------------------
-    // 대용량 게시판 통계 (big_posts)
+    // 대용량 게시판 통계 (2개 테이블 기반)
     // ----------------------------------
     public Map<String, Object> getBigPostStats() {
         Map<String, Object> result = new HashMap<>();
 
-        // 사용자별 게시글 수 Top10
+        // 사용자별 게시글 수 Top10 (통계 테이블)
         result.put("topUsers", query(
-            "SELECT user_id,COUNT(*) cnt FROM big_posts GROUP BY user_id ORDER BY cnt DESC LIMIT 10"
+            "SELECT user_id, cnt FROM big_posts_user_stats ORDER BY cnt DESC LIMIT 10"
         ));
 
-        // 조회수 Top10
+        // 조회수 Top10 (원본 big_posts, view_count 인덱스 활용)
+        // ※ 여기만은 통계테이블로 분리하지 않아도 인덱스로 빨라야 정상
         result.put("topViews", query(
-            "SELECT post_id,title,view_count FROM big_posts ORDER BY view_count DESC LIMIT 10"
+            "SELECT title, view_count FROM big_posts ORDER BY view_count DESC LIMIT 10"
         ));
 
-        // 날짜별 게시글 수 (전 기간)
+        // 일별 게시글 수(전체기간) (통계 테이블)
         result.put("daily", query(
-            "SELECT DATE(created_at) day,COUNT(*) cnt FROM big_posts GROUP BY DATE(created_at) ORDER BY day"
+            "SELECT day, cnt FROM big_posts_daily_stats ORDER BY day"
         ));
 
         return result;
+    }
+
+    // ----------------------------------
+    // (선택) 통계 테이블 리빌드 (테스트용)
+    // ----------------------------------
+    public void rebuildBigPostStats() {
+        execute("TRUNCATE TABLE big_posts_user_stats");
+        execute(
+            "INSERT INTO big_posts_user_stats (user_id, cnt) " +
+            "SELECT user_id, COUNT(*) AS cnt FROM big_posts GROUP BY user_id"
+        );
+
+        execute("TRUNCATE TABLE big_posts_daily_stats");
+        execute(
+            "INSERT INTO big_posts_daily_stats (day, cnt) " +
+            "SELECT DATE(created_at) AS day, COUNT(*) AS cnt " +
+            "FROM big_posts GROUP BY DATE(created_at) ORDER BY day"
+        );
+    }
+
+    private void execute(String sql) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.executeUpdate();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     // ----------------------------------
@@ -100,6 +123,5 @@ public class StatsDAO {
 
         return list;
     }
-
 }
 // 수정됨 끝

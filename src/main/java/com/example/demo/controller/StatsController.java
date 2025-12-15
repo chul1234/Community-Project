@@ -1,4 +1,4 @@
-// 수정됨: 대용량(big_posts) 통계 API 추가 (GET /api/stats/big-posts)
+// 수정됨: /api/stats/big-posts + (선택) /api/stats/big-posts/rebuild 추가
 
 package com.example.demo.controller;
 
@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -28,6 +29,13 @@ public class StatsController {
     @GetMapping("/big-posts")
     public Map<String, Object> getBigPostStats() {
         return statsDAO.getBigPostStats();
+    }
+
+    // (선택) 통계 테이블 재생성(테스트용)
+    @PostMapping("/big-posts/rebuild")
+    public String rebuildBigPostStats() {
+        statsDAO.rebuildBigPostStats();
+        return "OK";
     }
 }
 // 수정됨 끝
