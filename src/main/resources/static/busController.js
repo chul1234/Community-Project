@@ -911,7 +911,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     $scope.selectStop = function (stop) { // 선택 함수
         if (!stop) return; // 정류장 없으면 중단
         $scope.selectedStop = stop; // 선택된 정류장 설정
-        $scope.currentStop  = stop; // 현재 정류장 설정
+        $scope.currentStop = stop; // 현재 정류장 설정
 
         fetchArrivalsForCurrentStop(); // 도착 정보 조회
         
