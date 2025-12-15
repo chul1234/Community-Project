@@ -1,4 +1,4 @@
-<!-- 수정됨: HTML 출력 방식 변경 (ng-bind-html + trustedHtml 적용) -->
+<!-- 수정됨: 작성 정보 영역에 조회수(view_count) 표시 추가 -->
 
 <div class="container" >
     <div class="page-header">
@@ -17,6 +17,9 @@
         <span>작성자: {{ post.user_id }}</span>
         <span style="margin-left: 15px">
             작성일: {{ post.created_at | date:'yyyy-MM-dd HH:mm' }}
+        </span>
+        <span style="margin-left: 15px">
+            조회수: {{ post.view_count | number }}
         </span>
     </div>
 

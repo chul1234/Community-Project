@@ -1,4 +1,4 @@
-<!-- 수정됨: 대용량 게시판 검색 UI 추가 + 기존 pageSize/키셋 구조 유지 -->
+<!-- 수정됨: 목록 테이블에 조회수(view_count) 컬럼 추가 -->
 
 <!-- 로딩 오버레이 -->
 <div
@@ -113,9 +113,10 @@
         <thead>
             <tr>
                 <th style="width: 10%">번호</th>
-                <th style="width: 50%">제목</th>
-                <th style="width: 20%">작성자</th>
-                <th style="width: 20%">작성일</th>
+                <th style="width: 45%">제목</th>
+                <th style="width: 15%">작성자</th>
+                <th style="width: 15%">조회수</th>
+                <th style="width: 15%">작성일</th>
             </tr>
         </thead>
         <tbody>
@@ -123,11 +124,12 @@
                 <td>{{ getRowNumber($index) | number }}</td>
                 <td><a href="#!/big-posts/{{ post.post_id }}">{{ post.title }}</a></td>
                 <td>{{ post.user_id }}</td>
+                <td>{{ post.view_count | number }}</td>
                 <td>{{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</td>
             </tr>
 
             <tr ng-if="!postList.length">
-                <td colspan="4" style="text-align: center; color: #999;">등록된 게시글이 없습니다.</td>
+                <td colspan="5" style="text-align: center; color: #999;">등록된 게시글이 없습니다.</td>
             </tr>
         </tbody>
     </table>

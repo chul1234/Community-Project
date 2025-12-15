@@ -1,4 +1,4 @@
-// 수정됨: 대용량 게시판 검색 기능 (제목/내용 접두(prefix) 검색 + user_id 인덱스 활용)
+// 수정됨: view_count 조회/증가 기능 추가 + 목록/단건 조회에 view_count 포함
 
 package com.example.demo.dao;
 
@@ -42,20 +42,13 @@ public class BigPostDAO {
 
     // ------------------------------------------------------
     // 1-2) OFFSET + 검색 조건 버전
-    //      searchType: title, content, title_content, user_id, time
-    //      - title / content / title_content:
-    //          · LIKE '키워드%' (접두 검색) 사용 → title 인덱스, content(255) 인덱스 활용 가능
-    //      - user_id:
-    //          · '=' 비교 → (user_id, post_id) 인덱스 활용
-    //      - time:
-    //          · HOUR(created_at) = ? (함수 사용이라 인덱스는 못 타지만 사용 빈도 낮다고 가정)
     // ------------------------------------------------------
     public List<Map<String, Object>> findAll(int size, int offset, String searchType, String searchKeyword) {
         List<Map<String, Object>> list = new ArrayList<>();
 
         // 기본 SELECT
         StringBuilder sql = new StringBuilder(
-                "SELECT post_id, title, user_id, created_at " +
+                "SELECT post_id, title, user_id, created_at, view_count " +
                 "FROM big_posts "
         );
 
@@ -72,7 +65,6 @@ public class BigPostDAO {
             // ⚠ 여기서부터는 반드시 '키워드%' 형태로만 사용 → 인덱스 활용
             if ("title".equals(searchType)) {
                 where.append(" AND title LIKE ? ");
-                // '%키워드%' → '키워드%' (접두 검색)
                 params.add(searchKeyword + "%");
             } else if ("content".equals(searchType)) {
                 where.append(" AND content LIKE ? ");
@@ -82,11 +74,9 @@ public class BigPostDAO {
                 params.add(searchKeyword + "%");
                 params.add(searchKeyword + "%");
             } else if ("user_id".equals(searchType)) {
-                // user_id 인덱스를 활용하기 위해 '=' 비교 사용
                 where.append(" AND user_id = ? ");
                 params.add(searchKeyword);
             } else if ("time".equals(searchType)) {
-                // 0~23 시 기준 (문자열 그대로 바인딩, DB에서 숫자로 변환됨)
                 where.append(" AND HOUR(created_at) = ? ");
                 params.add(searchKeyword);
             }
@@ -113,6 +103,7 @@ public class BigPostDAO {
                     row.put("title", rs.getString("title"));
                     row.put("user_id", rs.getString("user_id"));
                     row.put("created_at", rs.getTimestamp("created_at"));
+                    row.put("view_count", rs.getLong("view_count"));
                     list.add(row);
                 }
             }
@@ -125,10 +116,6 @@ public class BigPostDAO {
 
     // ------------------------------------------------------
     // 2) 전체 개수 조회
-    //    - 검색어 없으면: 카운터 테이블 사용 (기존 로직, 매우 빠름)
-    //    - 검색어 있으면: big_posts에서 조건 COUNT(*)
-    //      · title/content/title_content: LIKE '키워드%' 기준
-    //      · user_id/time: '=' / HOUR(created_at) 그대로
     // ------------------------------------------------------
     public int countAll() {
         return countAll(null, null);
@@ -165,7 +152,6 @@ public class BigPostDAO {
             searchType = "title_content";
         }
 
-        // 여기서도 findAll과 동일하게 '키워드%' 접두 검색 사용
         if ("title".equals(searchType)) {
             where.append(" AND title LIKE ? ");
             params.add(searchKeyword + "%");
@@ -177,7 +163,6 @@ public class BigPostDAO {
             params.add(searchKeyword + "%");
             params.add(searchKeyword + "%");
         } else if ("user_id".equals(searchType)) {
-            // COUNT 쿼리에서도 user_id = ? 로 통일 (인덱스 활용)
             where.append(" AND user_id = ? ");
             params.add(searchKeyword);
         } else if ("time".equals(searchType)) {
@@ -225,6 +210,7 @@ public class BigPostDAO {
                     row.put("title", rs.getString("title"));
                     row.put("user_id", rs.getString("user_id"));
                     row.put("created_at", rs.getTimestamp("created_at"));
+                    row.put("view_count", rs.getLong("view_count"));
                     list.add(row);
                 }
             }
@@ -237,7 +223,6 @@ public class BigPostDAO {
 
     // ------------------------------------------------------
     // 4) 키셋 페이징 - 다음 페이지
-    //    lastId 보다 작은 post_id 들 중에서 상위 size개
     // ------------------------------------------------------
     public List<Map<String, Object>> findNextPage(long lastId, int size) {
         String query = sql("bigpost.select.next");
@@ -256,6 +241,7 @@ public class BigPostDAO {
                     row.put("title", rs.getString("title"));
                     row.put("user_id", rs.getString("user_id"));
                     row.put("created_at", rs.getTimestamp("created_at"));
+                    row.put("view_count", rs.getLong("view_count"));
                     list.add(row);
                 }
             }
@@ -267,7 +253,7 @@ public class BigPostDAO {
     }
 
     // ------------------------------------------------------
-    // 5) 단건 조회 (일반 게시판 getPost 같은 역할)
+    // 5) 단건 조회
     // ------------------------------------------------------
     public Optional<Map<String, Object>> findById(long postId) {
         String query = sql("bigpost.select.one");
@@ -285,7 +271,7 @@ public class BigPostDAO {
                     row.put("content", rs.getString("content"));
                     row.put("user_id", rs.getString("user_id"));
                     row.put("created_at", rs.getTimestamp("created_at"));
-                    // big_posts 테이블 컬럼 더 있으면 여기서 추가로 put
+                    row.put("view_count", rs.getLong("view_count"));
                     return Optional.of(row);
                 }
             }
@@ -297,7 +283,25 @@ public class BigPostDAO {
     }
 
     // ------------------------------------------------------
-    // 6) INSERT + 카운터 +1  (일반 게시판의 save와 비슷한 역할)
+    // 5-1) 조회수 +1
+    // ------------------------------------------------------
+    public int increaseViewCount(long postId) {
+        String query = sql("bigpost.view.increment");
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
+
+            pstmt.setLong(1, postId);
+            return pstmt.executeUpdate();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    // ------------------------------------------------------
+    // 6) INSERT + 카운터 +1
     // ------------------------------------------------------
     public int insert(Map<String, Object> post) {
         String insertSql = sql("bigpost.insert");
@@ -343,7 +347,7 @@ public class BigPostDAO {
     }
 
     // ------------------------------------------------------
-    // 7) UPDATE (제목/내용 수정, 카운터는 변경 없음)
+    // 7) UPDATE
     // ------------------------------------------------------
     public int update(Map<String, Object> post) {
         String updateSql = sql("bigpost.update");

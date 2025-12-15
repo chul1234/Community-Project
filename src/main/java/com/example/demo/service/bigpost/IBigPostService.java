@@ -1,4 +1,4 @@
-// 수정됨: 대용량 게시판 검색 기능 추가 (getBigPosts에 검색 파라미터 추가)
+// 수정됨: 상세 조회 시 조회수(view_count) +1 처리 메서드 추가
 
 package com.example.demo.service.bigpost;
 
@@ -23,11 +23,19 @@ public interface IBigPostService {
     // ------------------------------------------------------
 
     /**
-     * 대용량 게시글 단건 조회
+     * 대용량 게시글 단건 조회 (조회수 증가 없음)
      * @param postId 조회할 게시글 ID
      * @return 게시글 정보(Map) 없으면 null
      */
     Map<String, Object> getPost(long postId);
+
+    /**
+     * 대용량 게시글 단건 조회 + 조회수(view_count) +1
+     * - 상세 화면 진입용(차트/통계 반영 포함)
+     * @param postId 조회할 게시글 ID
+     * @return 게시글 정보(Map) 없으면 null
+     */
+    Map<String, Object> getPostAndIncreaseViewCount(long postId);
 
     /**
      * 대용량 게시글 생성

@@ -1,4 +1,4 @@
-// 수정됨: 대용량 게시판 검색 기능 추가 (getBigPosts에서 검색 처리 분기)
+// 수정됨: 상세 조회 시 조회수(view_count) +1 처리 메서드 추가 + 인터페이스 연동
 
 package com.example.demo.service.bigpost.impl; // 서비스 구현 클래스가 속한 패키지 선언
 
@@ -79,6 +79,15 @@ public class BigPostServiceImpl implements IBigPostService {
     @Override
     public Map<String, Object> getPost(long postId) {
         // DAO에서 Optional<Map> 형태로 받아와서, 없으면 null 반환
+        return bigPostDAO.findById(postId).orElse(null);
+    }
+
+    @Override
+    public Map<String, Object> getPostAndIncreaseViewCount(long postId) {
+        // 1) 조회수 +1 (실패해도 단건 조회는 가능하도록 분리)
+        bigPostDAO.increaseViewCount(postId);
+
+        // 2) 최신 view_count 포함해서 단건 재조회
         return bigPostDAO.findById(postId).orElse(null);
     }
 
