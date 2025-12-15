@@ -15,10 +15,11 @@
         <script src="/lib/angular-route.js"></script>
 
         <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular-sanitize.js"></script>
+
         <!-- jQuery (한 번만) -->
         <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
-        <!-- Summernote LITE (Bootstrap 필요 없음) -->
+        <!-- Summernote LITE -->
         <link
             rel="stylesheet"
             href="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.20/summernote-lite.min.css"
@@ -26,30 +27,37 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.20/summernote-lite.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.20/lang/summernote-ko-KR.min.js"></script>
 
-        <!-- ★★★★★ 여기부터 수정된 부분 (지도 API) ★★★★★ -->
-        <!-- OpenLayers 6.4.3 (NGII 샘플과 동일 경로) -->
+        <!-- OpenLayers -->
         <link
             rel="stylesheet"
             href="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.4.3/css/ol.css"
             type="text/css"
         />
         <script src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.4.3/build/ol.js"></script>
-
         <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4.js"></script>
-
         <script
             type="text/javascript"
             src="https://map.ngii.go.kr/openapi/wmts_ngiiMap_v6.4.3.js?apikey=518BD309EE343709E6FF861BEE6F05D2"
         ></script>
-        <!-- ★★★★★ 지도 API 추가 끝 ★★★★★ -->
 
+        <!-- Angular App -->
         <script src="/app.js"></script>
+
+        <!-- 기존 컨트롤러 -->
         <script src="/busController.js"></script>
         <script src="/userController.js"></script>
-
         <script src="/boardController.js"></script>
         <script src="/bigPostController.js"></script>
+
+        <!-- ===================== -->
+        <!-- 통계 차트 추가 (필수) -->
+        <!-- ===================== -->
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="/BoardStatsController.js"></script>
+        <script src="/BigBoardStatsController.js"></script>
+        <!-- ===================== -->
     </head>
+
     <body ng-controller="MainController">
         <!-- 전역 로딩 오버레이 -->
         <div
@@ -74,7 +82,9 @@
                     >
                         회원탈퇴
                     </button>
-                    <a href="/logout"><button type="button">로그아웃</button></a>
+                    <a href="/logout">
+                        <button type="button">로그아웃</button>
+                    </a>
                 </div>
             </header>
 
@@ -84,7 +94,6 @@
                     ng-repeat="mainMenu in menuItems"
                     ng-class="{ active: $location.path().startsWith(mainMenu.pathPrefix) }"
                 >
-                    <!-- (1) 소메뉴 있는 대메뉴 → 기존 로직 유지 -->
                     <a
                         ng-if="mainMenu.subMenus.length > 0"
                         ng-href="{{ mainMenu.subMenus[0].path }}"
@@ -92,7 +101,6 @@
                         {{ mainMenu.menu_name }}
                     </a>
 
-                    <!-- (2) 소메뉴 없는 대메뉴 → 클릭 가능하게 변경 -->
                     <a
                         ng-if="!mainMenu.subMenus.length"
                         ng-href="{{ mainMenu.path }}"

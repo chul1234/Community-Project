@@ -1,0 +1,59 @@
+<div class="container stats-container" ng-controller="BoardStatsController">
+    
+    <div style="margin-bottom: 25px; border-bottom: 2px solid #343a40; padding-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+        <h2 style="margin: 0; font-weight: 700; color: #343a40;">📊 게시판 통계 분석</h2>
+        <span style="font-size: 13px; color: #888;">실시간 데이터 현황</span>
+    </div>
+
+    <div class="stats-grid-row">
+        <div class="stats-card">
+            <div class="stats-header">
+                <h3 class="stats-title">👥 사용자별 활동량 (Top 10)</h3>
+            </div>
+            <div class="stats-body">
+                <canvas id="userChart"></canvas>
+            </div>
+        </div>
+
+        <div class="stats-card">
+            <div class="stats-header">
+                <h3 class="stats-title">🍩 활동 점유율</h3>
+            </div>
+            <div class="stats-body">
+                <canvas id="userDoughnut"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats-grid-row">
+        <div class="stats-card">
+            <div class="stats-header">
+                <h3 class="stats-title">🔥 인기 게시글 (조회수 Top 10)</h3>
+            </div>
+            <div class="stats-body">
+                <canvas id="viewChart"></canvas>
+            </div>
+        </div>
+
+        <div class="stats-card">
+            <div class="stats-header">
+                <h3 class="stats-title">❄️ 조회수 분포 (Polar Area)</h3>
+            </div>
+            <div class="stats-body">
+                <canvas id="viewPolar"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats-grid-row">
+        <div class="stats-card full-width">
+            <div class="stats-header">
+                <h3 class="stats-title">📈 일별 게시글 등록 추이</h3>
+            </div>
+            <div class="stats-body" style="height: 350px;">
+                <canvas id="dailyChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+</div>

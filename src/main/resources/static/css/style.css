@@ -924,3 +924,72 @@ header h1 {
     color: #999;
     font-size: 13px;
 }
+
+/* ========================================= */
+/* ★ 통계(Stats) 대시보드 전용 스타일 ★ */
+/* ========================================= */
+
+.stats-container {
+    padding-top: 20px;
+    padding-bottom: 40px;
+}
+
+.stats-grid-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.stats-card {
+    flex: 1;
+    min-width: 320px;
+    background: #ffffff;
+    border: 1px solid #eaeaea;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.stats-card.full-width {
+    flex: 100%;
+    min-width: 100%;
+}
+
+.stats-header {
+    background-color: #f8f9fa;
+    padding: 15px 20px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 4px solid #007bff;
+}
+
+.stats-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #495057;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stats-body {
+    padding: 14px;
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+.stats-card.full-width .stats-body {
+    padding: 16px;
+}
+
+.stats-body canvas {
+    width: 100% !important;
+    height: 100% !important;
+}

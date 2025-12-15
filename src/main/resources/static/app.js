@@ -72,6 +72,16 @@ app.config(function ($routeProvider) {
             controller: 'BigPostDetailController',
         })
 
+        .when('/board-stats', {
+            templateUrl: 'views/board-stats.html',
+            controller: 'BoardStatsController',
+        })
+
+        .when('/big-board-stats', {
+            templateUrl: 'views/big-board-stats.html',
+            controller: 'BigBoardStatsController',
+        })
+
         .otherwise({
             redirectTo: '/welcome',
         });
@@ -81,9 +91,9 @@ app.config(function ($routeProvider) {
  * MainController: 헤더, 메뉴, 공통 레이아웃 제어
  */
 app.controller('MainController', function ($scope, $http, $location, $rootScope) {
-    $scope.$location = $location;     // 템플릿에서 현재 경로 체크용
-    $rootScope.currentUser = {};      // 전역 사용자 정보
-    $rootScope.menuItems = [];        // 전역 메뉴
+    $scope.$location = $location; // 템플릿에서 현재 경로 체크용
+    $rootScope.currentUser = {}; // 전역 사용자 정보
+    $rootScope.menuItems = []; // 전역 메뉴
 
     // 로그인한 사용자 정보 조회
     $http
@@ -152,7 +162,7 @@ app.directive('fileModel', [
  * 전역 run 블록: 로딩 플래그 + 현재 경로(currentPath) 관리
  */
 app.run(function ($rootScope, $location) {
-    $rootScope.isLoading = false;           // 전체 앱 공용 로딩 플래그
+    $rootScope.isLoading = false; // 전체 앱 공용 로딩 플래그
     $rootScope.currentPath = $location.path(); // 현재 라우트 경로 문자열
 
     // 라우트 변경 시마다 currentPath 갱신
