@@ -1,4 +1,4 @@
-// 수정됨: 정류장 선택 시 '줌인+이동' 기능 추가 + 기존 디자인 유지
+// 수정됨: 노선 라인 화살표 회전/기준점(앵커) 보정 + 방향 오프셋 상수 추가(방향 정밀 조정 가능)
 
 // =========================
 // 좌표계 정의 (UTM-K, GRS80)
@@ -99,6 +99,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     // -------------------------
     var ROUTE_ARROW_EVERY_N_SEGMENTS = 2; // 화살표 간격 (세그먼트 수)
     var ROUTE_ARROW_MIN_SEGMENT_LEN  = 30; // 화살표 표시 최소 길이
+    var ROUTE_ARROW_ROTATION_OFFSET  = 0; // 화살표 기본 방향이 다를 때 보정(예: Math.PI/2, Math.PI 등)
     var routeArrowStyleCache         = {}; // 화살표 스타일 캐시
 
     function buildRouteArrowSvgDataUri(fillColor) { // 화살표 SVG 생성 함수
@@ -111,22 +112,30 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     }
 
     function getRouteArrowStyle(rotationRad) { // 화살표 스타일 반환 함수
-        var key = (Math.round(rotationRad * 100) / 100).toString(); // 회전각 키 생성
-        if (routeArrowStyleCache[key]) return routeArrowStyleCache[key]; // 캐시 확인
+    var rot = rotationRad + ROUTE_ARROW_ROTATION_OFFSET; // 회전 오프셋 반영
 
-        routeArrowStyleCache[key] = new ol.style.Style({ // 스타일 생성
-            image: new ol.style.Icon({ // 아이콘 설정
-                src: buildRouteArrowSvgDataUri('#0066ff'), // 이미지 소스
-                rotateWithView: true, // 지도 회전 연동
-                rotation: rotationRad, // 회전각 설정
-                scale: 0.7, // 크기 조절
-                opacity: 0.95 // 투명도 설정
-            })
-        });
+    // ✅ 핵심: OpenLayers Icon.rotation은 +가 시계방향이라서 부호를 뒤집어준다
+    rot = -rot;
 
-        return routeArrowStyleCache[key]; // 스타일 반환
-    }
+    var key = (Math.round(rot * 100) / 100).toString();
+    if (routeArrowStyleCache[key]) return routeArrowStyleCache[key];
 
+    routeArrowStyleCache[key] = new ol.style.Style({
+        image: new ol.style.Icon({
+            src: buildRouteArrowSvgDataUri('#0066ff'),
+            imgSize: [24, 24],
+            anchor: [0.5, 0.5],
+            anchorXUnits: 'fraction',
+            anchorYUnits: 'fraction',
+            rotateWithView: true,
+            rotation: rot,         // ✅ 여기로 들어감
+            scale: 0.7,
+            opacity: 0.95
+        })
+    });
+
+    return routeArrowStyleCache[key];
+}
     // -------------------------
     // 툴팁 (Hover)
     // -------------------------
@@ -615,11 +624,11 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             feature.set('stopData', stopData || null); // 데이터 설정
 
             // 스타일 변수 설정
-            var fillColor   = isSelected ? '#007bff' : '#ffffff'; // 채우기 색
+            var fillColor   = isSelected ? '#007bff' : '#ffffff'; // 채우기 색
             var strokeColor = isSelected ? '#ffffff' : '#555555'; // 테두리 색
             var strokeWidth = isSelected ? 3 : 2; // 테두리 두께
-            var radiusVal   = isSelected ? 8 : 5; // 반지름
-            var zIndexVal   = isSelected ? 999 : 10; // z-index
+            var radiusVal   = isSelected ? 8 : 5; // 반지름
+            var zIndexVal   = isSelected ? 999 : 10; // z-index
 
             feature.setStyle( // 스타일 적용
                 new ol.style.Style({
@@ -662,7 +671,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         stops.forEach(function (s) { // 순회
             var lat = parseFloat(s.gpslati || s.gpsLati || s.gpsY); // 위도
             var lon = parseFloat(s.gpslong || s.gpsLong || s.gpsX); // 경도
-            
+
             // 선택된 정류장 확인
             var isSelected = ($scope.selectedStop && s === $scope.selectedStop);
 
@@ -757,7 +766,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         busItems.forEach(function (b) { // 순회
             var lat = parseFloat(b.gpslati); // 위도
             var lon = parseFloat(b.gpslong); // 경도
-            if (!isNaN(lat) && !isNaN(lon)) { // 유효성 검사
+            if (!isNaN(lat) || !isNaN(lon)) { // 유효성 검사
                 var label = (b.vehicleno || '') + ' / ' + (b.routenm || ''); // 라벨
                 var isRepresentative = false; // 대표 여부
                 if (rep && rep.vehicleno && b.vehicleno) { // 대표 버스 확인
@@ -779,8 +788,8 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         if (!bus || !stops || !stops.length) return result; // 데이터 검사
 
         var currentIndex = -1; // 인덱스 초기화
-        var busNodeId    = bus.nodeid || bus.nodeId || null; // 노드 ID
-        var busSeq       = bus.routeseq || bus.routeSeq || null; // 순번
+        var busNodeId    = bus.nodeid || bus.nodeId || null; // 노드 ID
+        var busSeq       = bus.routeseq || bus.routeSeq || null; // 순번
 
         if (busNodeId) { // 노드 ID로 검색
             for (var i = 0; i < stops.length; i++) {
@@ -907,14 +916,14 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         });
     }
 
-    // [수정됨] 정류장 선택 함수 (줌인+이동 포함)
+    // 정류장 선택 함수 (줌인+이동 포함)
     $scope.selectStop = function (stop) { // 선택 함수
         if (!stop) return; // 정류장 없으면 중단
         $scope.selectedStop = stop; // 선택된 정류장 설정
-        $scope.currentStop = stop; // 현재 정류장 설정
+        $scope.currentStop  = stop; // 현재 정류장 설정
 
         fetchArrivalsForCurrentStop(); // 도착 정보 조회
-        
+
         // 1. 마커 색상 갱신
         drawStopsOnMap($scope.stops); // 정류장 다시 그리기
 
@@ -1206,3 +1215,5 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         });
     };
 });
+
+// 수정됨 끝
