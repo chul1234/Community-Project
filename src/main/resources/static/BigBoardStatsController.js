@@ -1,3 +1,5 @@
+// 수정됨: 대용량 가로 막대 차트(사용자별/조회수) 우측 잘림 해결 - layout 우측 패딩 확대 + x축 ticks 회전 방지 + scales 병합(grace 포함)
+
 app.controller('BigBoardStatsController', function ($scope, $http) {
 
     function getCommonOptions() {
@@ -19,11 +21,34 @@ app.controller('BigBoardStatsController', function ($scope, $http) {
         };
     }
 
+    function applyHorizontalBarFix(opt) {
+        opt.layout = opt.layout || {};
+        opt.layout.padding = opt.layout.padding || {};
+
+        // ✅ 오른쪽/아래 여유를 충분히 줘서 축 숫자/막대 끝이 잘리지 않게 함
+        opt.layout.padding.right = 80;
+        opt.layout.padding.bottom = 18;
+
+        opt.scales = opt.scales || {};
+        opt.scales.x = opt.scales.x || {};
+        opt.scales.x.grace = '10%';
+
+        // ✅ Chart.js가 공간 부족하면 ticks를 회전시키는데, 회전되면 캔버스 끝에서 잘리기 쉬움
+        opt.scales.x.ticks = opt.scales.x.ticks || {};
+        opt.scales.x.ticks.maxRotation = 0;
+        opt.scales.x.ticks.minRotation = 0;
+        opt.scales.x.ticks.padding = 8;
+        opt.scales.x.ticks.autoSkip = true;
+        opt.scales.x.ticks.autoSkipPadding = 12;
+
+        return opt;
+    }
+
     $http.get('/api/stats/big-posts').then(function (res) {
         const data = res.data;
 
         // 1) 사용자별 게시글 수 (가로 막대)
-        const userOpt = getCommonOptions();
+        const userOpt = applyHorizontalBarFix(getCommonOptions());
         userOpt.indexAxis = 'y';
 
         new Chart(document.getElementById('bigUserChart'), {
@@ -72,7 +97,7 @@ app.controller('BigBoardStatsController', function ($scope, $http) {
         });
 
         // 3) 조회수 Top10 (가로 막대)
-        const viewOpt = getCommonOptions();
+        const viewOpt = applyHorizontalBarFix(getCommonOptions());
         viewOpt.indexAxis = 'y';
 
         new Chart(document.getElementById('bigViewChart'), {
@@ -133,7 +158,7 @@ app.controller('BigBoardStatsController', function ($scope, $http) {
                 ticks: { autoSkip: true, maxRotation: 0, autoSkipPadding: 20 },
                 grid: { display: false }
             },
-            y: { beginAtZero: true, ticks: { stepSize: 1 } }
+            y: { beginAtZero: true }
         };
         lineOpt.elements = { line: { tension: 0.3 } };
         lineOpt.clip = false;
@@ -160,3 +185,5 @@ app.controller('BigBoardStatsController', function ($scope, $http) {
     });
 
 });
+
+// 수정됨 끝
