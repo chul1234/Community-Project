@@ -1,18 +1,34 @@
+<!-- 수정됨: 트램 노선 토글 버튼 문구 '숨기기' → '지우기' -->
+
 <div class="container" style="padding-top: 20px;">
     <div style="margin-bottom: 20px; border-bottom: 2px solid #343a40; padding-bottom: 10px;">
         <h2 style="margin: 0; font-weight: 700; color: #343a40;">버스 노선 관제</h2>
     </div>
 
+    <!-- ================= 검색 영역 ================= -->
     <div class="bus-dashboard-search">
+
+        <!-- 버스 / 정류장 / 트램 토글 영역 -->
         <div class="bus-radio-wrap">
             <label class="bus-radio-label">
                 <input type="radio" ng-model="searchType" value="route">
                 <span>🚌 버스</span>
             </label>
+
             <label class="bus-radio-label">
                 <input type="radio" ng-model="searchType" value="stop">
                 <span>🚏 정류장</span>
             </label>
+
+            <!-- 트램 노선 토글 버튼 -->
+            <button
+                type="button"
+                ng-click="toggleTramLayer()"
+                class="btn-tram-toggle"
+                ng-class="{'active': isTramVisible}"
+            >
+                🚋 트램 {{ isTramVisible ? '지우기' : '보이기' }}
+            </button>
         </div>
 
         <input
@@ -28,12 +44,15 @@
         </button>
     </div>
 
+    <!-- ================= 상태 영역 ================= -->
     <div class="bus-status-container">
         <div class="bus-card info-section">
             <div ng-if="representativeBus" style="display: flex; width: 100%; gap: 20px;">
                 <div class="status-item">
                     <span class="status-label">대표차량</span>
-                    <span class="status-value" style="color:#007bff;">{{ representativeBus.vehicleno || '-' }}</span>
+                    <span class="status-value" style="color:#007bff;">
+                        {{ representativeBus.vehicleno || '-' }}
+                    </span>
                 </div>
                 <div class="status-item">
                     <span class="status-label">노선</span>
@@ -41,9 +60,12 @@
                 </div>
                 <div class="status-item" style="flex: 1;">
                     <span class="status-label">현재 위치</span>
-                    <span class="status-value">{{ (currentStop && currentStop.nodenm) || '주행 중...' }}</span>
+                    <span class="status-value">
+                        {{ (currentStop && currentStop.nodenm) || '주행 중...' }}
+                    </span>
                 </div>
             </div>
+
             <div ng-if="!representativeBus" style="color: #999; font-size: 13px; font-style: italic;">
                 운행 중인 버스가 없거나 검색되지 않았습니다.
             </div>
@@ -58,6 +80,7 @@
             >
                 ▶ 자동갱신
             </button>
+
             <button
                 type="button"
                 ng-click="disableAutoRefresh()"
@@ -66,29 +89,36 @@
             >
                 ⏸ 멈춤
             </button>
+
             <div style="font-size: 12px; color: #888; align-self: center;">
                 상태: <strong>{{ isAutoRefreshOn ? 'ON' : 'OFF' }}</strong>
             </div>
         </div>
     </div>
 
+    <!-- ================= 지도 ================= -->
     <div class="bus-map-frame">
         <div id="map1" class="bus-map-canvas"></div>
-        
+
         <div class="map-loading-badge" ng-show="isMapLoading || isStopPollingLoading">
             데이터를 불러오는 중입니다...
         </div>
     </div>
 
+    <!-- ================= 하단 정보 ================= -->
     <div class="bus-info-grid">
-        
+
         <div class="bus-panel-box">
             <div class="bus-panel-header accent-blue">
                 <span>📍 정류장 목록</span>
-                <span style="font-size: 12px; font-weight: 400; color: #666;" ng-if="stops.length">
+                <span
+                    style="font-size: 12px; font-weight: 400; color: #666;"
+                    ng-if="stops.length"
+                >
                     총 {{ stops.length }}개
                 </span>
             </div>
+
             <div class="bus-panel-content">
                 <div ng-if="stops && stops.length">
                     <div
@@ -101,11 +131,15 @@
                             {{$index + 1}}
                         </strong>
                         <span>{{ s.nodenm || s.stationName || '정류장명 없음' }}</span>
-                        <span style="margin-left: auto; font-size: 11px; background: #eee; padding: 2px 6px; border-radius: 4px; color: #666;">
+                        <span
+                            style="margin-left: auto; font-size: 11px; background: #eee;
+                                   padding: 2px 6px; border-radius: 4px; color: #666;"
+                        >
                             {{ s.nodeid || s.nodeId }}
                         </span>
                     </div>
                 </div>
+
                 <div class="panel-empty-msg" ng-if="!stops || !stops.length">
                     검색 결과가 없습니다.
                 </div>
@@ -115,12 +149,19 @@
         <div class="bus-panel-box">
             <div class="bus-panel-header accent-green">
                 <span>⏱️ 도착 예정 정보</span>
-                <span style="font-size: 12px; font-weight: 400; color: #666;" ng-if="currentStop">
+                <span
+                    style="font-size: 12px; font-weight: 400; color: #666;"
+                    ng-if="currentStop"
+                >
                     {{ currentStop.nodenm }} 기준
                 </span>
             </div>
+
             <div class="bus-panel-content">
-                <table class="arrival-info-table" ng-if="arrivalList && arrivalList.length && currentStop">
+                <table
+                    class="arrival-info-table"
+                    ng-if="arrivalList && arrivalList.length && currentStop"
+                >
                     <thead>
                         <tr>
                             <th width="30%">노선</th>
@@ -130,11 +171,12 @@
                     </thead>
                     <tbody>
                         <tr ng-repeat="a in arrivalList">
+                            <td><strong>{{ a.routeno || a.routenm || '-' }}</strong></td>
                             <td>
-                                <strong>{{ a.routeno || a.routenm || '-' }}</strong>
-                            </td>
-                            <td>
-                                <span style="font-size: 12px; background: #f1f3f5; padding: 3px 6px; border-radius: 4px;">
+                                <span
+                                    style="font-size: 12px; background: #f1f3f5;
+                                           padding: 3px 6px; border-radius: 4px;"
+                                >
                                     {{ a.remainStops != null ? a.remainStops + '번째 전' : '-' }}
                                 </span>
                             </td>
@@ -153,10 +195,15 @@
                 <div class="panel-empty-msg" ng-if="!currentStop">
                     왼쪽 목록에서 정류장을 선택해주세요.
                 </div>
-                <div class="panel-empty-msg" ng-if="currentStop && (!arrivalList || !arrivalList.length)">
+                <div
+                    class="panel-empty-msg"
+                    ng-if="currentStop && (!arrivalList || !arrivalList.length)"
+                >
                     현재 도착 예정인 버스 정보가 없습니다.
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- 수정됨 끝 -->

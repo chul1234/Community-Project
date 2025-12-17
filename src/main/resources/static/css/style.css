@@ -925,6 +925,48 @@ header h1 {
     font-size: 13px;
 }
 
+/* ========================================================================== */
+/* ★ 트램 노선 보이기/숨기기 버튼 (버스 검색바 전용) ★ */
+/* ========================================================================== */
+
+.btn-tram-toggle {
+    background: transparent;
+    border: 1px solid #dee2e6;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #495057;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
+    white-space: nowrap; /* 버튼 줄바꿈 방지 */
+}
+
+/* hover 효과 */
+.btn-tram-toggle:hover {
+    background-color: #ffffff;
+    border-color: #ced4da;
+}
+
+/* 활성 상태 (트램 노선 보이는 중) */
+.btn-tram-toggle.active {
+    background-color: #fff3bf;   /* 은은한 노랑 */
+    border-color: #ffe066;
+    color: #b8860b;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* bus-radio-wrap 안에서 버튼/라디오 정렬 보정 */
+.bus-radio-wrap {
+    align-items: center;   /* 세로 정렬 보정 */
+    flex-wrap: wrap;       /* 화면 좁을 때 자연스러운 줄바꿈 */
+}
+
+
 /* ========================================= */
 /* ★ 통계(Stats) 대시보드 전용 스타일 ★ */
 /* ========================================= */

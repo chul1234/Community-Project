@@ -1,4 +1,4 @@
-// 수정됨: 노선 라인 화살표 회전/기준점(앵커) 보정 + 방향 오프셋 상수 추가(방향 정밀 조정 가능)
+// 수정됨: 트램 토글 버튼(HTML: toggleTramLayer)과 JS 함수명 불일치 문제 해결 + 초기 로딩 시 트램 자동표시 방지(보이기 눌러야만 표시)
 
 // =========================
 // 좌표계 정의 (UTM-K, GRS80)
@@ -49,18 +49,163 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     $scope.tempRouteIdFromStop = null;
 
     // =========================================================
+    // [트램] 토글 상태 (HTML 버튼과 바인딩: isTramVisible)
+    // =========================================================
+    $scope.isTramVisible = false; // ✅ 초기엔 "보이기" 상태 (지금 바로 보이면 안 됨)
+
+    // =========================================================
     // [디자인] SVG 아이콘 생성 함수
     // =========================================================
     function createSvgIcon(color, type) {
         var svg = ''; // SVG 문자열 초기화
         // 버스 아이콘일 경우
         if (type === 'bus') {
-            svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">' + // SVG 헤더
-                  '<path fill="' + color + '" d="M48 64C48 28.7 76.7 0 112 0H400c35.3 0 64 28.7 64 64V448c0 35.3-28.7 64-64 64H384c-17.7 0-32-14.3-32-32s14.3-32 32-32h16c8.8 0 16-7.2 16-16V384H96v64c0 8.8 7.2 16 16 16h16c17.7 0 32 14.3 32 32s-14.3 32-32 32H112c-35.3 0-64-28.7-64-64V64zm32 32c0-17.7 14.3-32 32-32H400c17.7 0 32 14.3 32 32v64c0 17.7-14.3 32-32 32H112c-17.7 0-32-14.3-32-32V96zm0 160c-17.7 0-32 14.3-32 32v32c0 17.7 14.3 32 32 32h32c17.7 0 32-14.3 32-32V288c0-17.7-14.3-32-32-32H80zm352 0c-17.7 0-32 14.3-32 32v32c0 17.7 14.3 32 32 32h32c17.7 0 32-14.3 32-32V288c0-17.7-14.3-32-32-32H432z"/>' + // 버스 경로 데이터
-                  '</svg>'; // SVG 종료 태그
+            svg =
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">' +
+                '<path fill="' +
+                color +
+                '" d="M48 64C48 28.7 76.7 0 112 0H400c35.3 0 64 28.7 64 64V448c0 35.3-28.7 64-64 64H384c-17.7 0-32-14.3-32-32s14.3-32 32-32h16c8.8 0 16-7.2 16-16V384H96v64c0 8.8 7.2 16 16 16h16c17.7 0 32 14.3 32 32s-14.3 32-32 32H112c-35.3 0-64-28.7-64-64V64zm32 32c0-17.7 14.3-32 32-32H400c17.7 0 32 14.3 32 32v64c0 17.7-14.3 32-32 32H112c-17.7 0-32-14.3-32-32V96zm0 160c-17.7 0-32 14.3-32 32v32c0 17.7 14.3 32 32 32h32c17.7 0 32-14.3 32-32V288c0-17.7-14.3-32-32-32H80zm352 0c-17.7 0-32 14.3-32 32v32c0 17.7 14.3 32 32 32h32c17.7 0 32-14.3 32-32V288c0-17.7-14.3-32-32-32H432z"/>' +
+                '</svg>';
         }
         return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); // Data URI 반환
     }
+
+    // =========================================================
+    // [트램] 라인/정거장 레이어 (버스/정류장과 완전 분리)
+    //  - 데이터: tramRouteData.js에서 window.TRAM_ROUTE_FULL_HD 제공
+    //  - 표기: name 미표기, id 숫자만 표기 (정수 id만)
+    // =========================================================
+    var tramLineSource = new ol.source.Vector(); // 트램 라인 소스
+    var tramLineLayer  = new ol.layer.Vector({ // 트램 라인 레이어
+        source: tramLineSource, // 소스 연결
+        zIndex: 4, // z-index (버스/정류장/버스노선 라인보다 아래)
+        style: new ol.style.Style({ // 라인 스타일
+            stroke: new ol.style.Stroke({
+                color: 'rgba(220, 53, 69, 0.85)', // 트램 전용(붉은 계열)
+                width: 6, // 두께
+                lineCap: 'round',
+                lineJoin: 'round'
+            })
+        })
+    });
+
+    var tramStopSource = new ol.source.Vector(); // 트램 정거장 소스
+    var tramStopLayer  = new ol.layer.Vector({ // 트램 정거장 레이어
+        source: tramStopSource, // 소스 연결
+        zIndex: 8 // 정류장(stopLayer=10)보다는 아래/비슷, 필요시 조정 가능
+    });
+
+    function isIntegerId(idVal) { // 정수 ID인지 체크 (201 같은 것만 라벨)
+        if (idVal == null) return false; // null/undefined 방지
+        var n = Number(idVal); // 숫자 변환
+        return Number.isFinite(n) && Math.floor(n) === n; // 정수 여부
+    }
+
+    function clearTram() { // 트램 라인/정거장 초기화
+        tramLineSource.clear(); // 라인 제거
+        tramStopSource.clear(); // 정거장 제거
+    }
+
+    function buildTramCoordinatesFromData(tramData) { // 트램 좌표 배열 생성 (waypoint 포함)
+        if (!tramData || !tramData.length) return []; // 데이터 없으면 빈 배열
+        var coords = []; // 좌표 배열
+        tramData.forEach(function (p) {
+            var lat = parseFloat(p.lat); // 위도
+            var lng = parseFloat(p.lng); // 경도
+            if (isNaN(lat) || isNaN(lng)) return; // 좌표 이상하면 스킵
+            var xy5179 = ol.proj.transform([lng, lat], 'EPSG:4326', 'EPSG:5179'); // 좌표 변환
+            coords.push(xy5179); // 좌표 추가
+        });
+        return coords; // 반환
+    }
+
+    function drawTramLine(tramData) { // 트램 라인 그리기
+        if (!olMap) return; // 지도 없으면 중단
+        tramLineSource.clear(); // 기존 라인 제거
+        var coords = buildTramCoordinatesFromData(tramData); // 좌표 생성
+        if (coords.length < 2) return; // 2개 미만이면 라인 불가
+
+        var f = new ol.Feature({ // 라인 피처 생성
+            geometry: new ol.geom.LineString(coords)
+        });
+        f.set('featureType', 'tram_line'); // 타입 지정(충돌 방지)
+        tramLineSource.addFeature(f); // 소스에 추가
+    }
+
+    function drawTramStops(tramData) { // 트램 정거장 번호(정수 id)만 표시
+        if (!olMap) return; // 지도 없으면 중단
+        tramStopSource.clear(); // 기존 정거장 제거
+        if (!tramData || !tramData.length) return; // 데이터 없으면 중단
+
+        tramData.forEach(function (p) {
+            if (!p) return; // 데이터 null 방지
+
+            // waypoint는 라벨/정거장 표시 제외 (선 보정점이므로)
+            if (p.type === 'waypoint') return;
+
+            // 205.5 같은 값은 표시 제외, 201 같은 정수만 표시
+            if (!isIntegerId(p.id)) return;
+
+            var lat = parseFloat(p.lat); // 위도
+            var lng = parseFloat(p.lng); // 경도
+            if (isNaN(lat) || isNaN(lng)) return; // 좌표 이상하면 스킵
+
+            var xy5179 = ol.proj.transform([lng, lat], 'EPSG:4326', 'EPSG:5179'); // 좌표 변환
+            var feature = new ol.Feature({ // 피처 생성
+                geometry: new ol.geom.Point(xy5179) // 포인트 생성
+            });
+
+            feature.set('featureType', 'tram_stop'); // 타입 지정(충돌 방지)
+
+            feature.setStyle([ // 점 + 텍스트(번호)
+                new ol.style.Style({
+                    image: new ol.style.Circle({
+                        radius: 6, // 점 크기
+                        fill: new ol.style.Fill({ color: '#ffffff' }), // 내부 흰색
+                        stroke: new ol.style.Stroke({ color: '#dc3545', width: 3 }) // 외곽 붉은색
+                    }),
+                    zIndex: 8
+                }),
+                new ol.style.Style({
+                    text: new ol.style.Text({
+                        text: String(p.id), // ✅ 이름 대신 id만
+                        font: 'bold 12px "Pretendard", sans-serif',
+                        fill: new ol.style.Fill({ color: '#111' }),
+                        stroke: new ol.style.Stroke({ color: '#fff', width: 4 }),
+                        offsetY: -16,
+                        textAlign: 'center'
+                    }),
+                    zIndex: 9
+                })
+            ]);
+
+            tramStopSource.addFeature(feature); // 소스에 추가
+        });
+    }
+
+    function drawTramOnMapIfExists() { // 데이터 있으면 트램 표시
+        // tramRouteData.js가 window.TRAM_ROUTE_FULL_HD 를 제공한다는 전제
+        var data = window.TRAM_ROUTE_FULL_HD || window.TRAM_STATIONS || null; // 우선순위: FULL_HD -> STATIONS
+        if (!data || !data.length) { // 데이터 없으면
+            clearTram(); // 트램 제거
+            return; // 종료
+        }
+        drawTramLine(data); // 라인 그림
+        drawTramStops(data); // 정거장 번호 그림
+    }
+
+    // =========================================================
+    // [트램] 토글 동작 함수 (실제 로직)
+    // =========================================================
+    $scope.toggleTramLayer = function () { // ✅ HTML에서 바로 호출됨
+        $scope.isTramVisible = !$scope.isTramVisible; // 토글
+
+        if ($scope.isTramVisible) {
+            drawTramOnMapIfExists(); // 보이기
+        } else {
+            clearTram(); // 지우기
+        }
+    };
 
     // -------------------------
     // 벡터 레이어 준비 (정류장/버스)
@@ -103,7 +248,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     var routeArrowStyleCache         = {}; // 화살표 스타일 캐시
 
     function buildRouteArrowSvgDataUri(fillColor) { // 화살표 SVG 생성 함수
-        var svg = // SVG 문자열
+        var svg =
             '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">' +
             '<path fill="' + fillColor + '" d="M4 12h11.2l-3.6-3.6L13 7l7 7-7 7-1.4-1.4 3.6-3.6H4z"/>' +
             '</svg>';
@@ -112,30 +257,31 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     }
 
     function getRouteArrowStyle(rotationRad) { // 화살표 스타일 반환 함수
-    var rot = rotationRad + ROUTE_ARROW_ROTATION_OFFSET; // 회전 오프셋 반영
+        var rot = rotationRad + ROUTE_ARROW_ROTATION_OFFSET; // 회전 오프셋 반영
 
-    // ✅ 핵심: OpenLayers Icon.rotation은 +가 시계방향이라서 부호를 뒤집어준다
-    rot = -rot;
+        // ✅ 핵심: OpenLayers Icon.rotation은 +가 시계방향이라서 부호를 뒤집어준다
+        rot = -rot;
 
-    var key = (Math.round(rot * 100) / 100).toString();
-    if (routeArrowStyleCache[key]) return routeArrowStyleCache[key];
+        var key = (Math.round(rot * 100) / 100).toString();
+        if (routeArrowStyleCache[key]) return routeArrowStyleCache[key];
 
-    routeArrowStyleCache[key] = new ol.style.Style({
-        image: new ol.style.Icon({
-            src: buildRouteArrowSvgDataUri('#0066ff'),
-            imgSize: [24, 24],
-            anchor: [0.5, 0.5],
-            anchorXUnits: 'fraction',
-            anchorYUnits: 'fraction',
-            rotateWithView: true,
-            rotation: rot,         // ✅ 여기로 들어감
-            scale: 0.7,
-            opacity: 0.95
-        })
-    });
+        routeArrowStyleCache[key] = new ol.style.Style({
+            image: new ol.style.Icon({
+                src: buildRouteArrowSvgDataUri('#0066ff'),
+                imgSize: [24, 24],
+                anchor: [0.5, 0.5],
+                anchorXUnits: 'fraction',
+                anchorYUnits: 'fraction',
+                rotateWithView: true,
+                rotation: rot,
+                scale: 0.7,
+                opacity: 0.95
+            })
+        });
 
-    return routeArrowStyleCache[key];
-}
+        return routeArrowStyleCache[key];
+    }
+
     // -------------------------
     // 툴팁 (Hover)
     // -------------------------
@@ -193,7 +339,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
             var pixel = olMap.getEventPixel(evt.originalEvent); // 픽셀 좌표 획득
 
-            var feature = olMap.forEachFeatureAtPixel( // 피처 감지
+            var feature = olMap.forEachFeatureAtPixel(
                 pixel,
                 function (f) { return f; },
                 {
@@ -215,271 +361,269 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 var stopData = feature.get('stopData') || null; // 데이터 획득
                 var stopName = (stopData && (stopData.nodenm || stopData.stationName)) || feature.get('name') || ''; // 이름 획득
 
-                if (!stopName) { // 이름 없으면
-                    hideHoverTooltip(); // 숨김
+                if (!stopName) {
+                    hideHoverTooltip();
                     return;
                 }
-                showHoverTooltip(evt.coordinate, '🚏 ' + stopName); // 툴팁 표시
+                showHoverTooltip(evt.coordinate, '🚏 ' + stopName);
                 return;
             }
 
             // 버스 호버
             if (fType === 'bus') {
-                var busData = feature.get('busData') || null; // 데이터 획득
-                if (!busData) { // 데이터 없으면
-                    hideHoverTooltip(); // 숨김
+                var busData = feature.get('busData') || null;
+                if (!busData) {
+                    hideHoverTooltip();
                     return;
                 }
 
-                var routeNo = (busData.routenm != null ? String(busData.routenm) : '') || (busData.routeno != null ? String(busData.routeno) : '') || ''; // 노선번호
-                var vehicleNo = (busData.vehicleno != null ? String(busData.vehicleno) : '') || ''; // 차량번호
+                var routeNo = (busData.routenm != null ? String(busData.routenm) : '') || (busData.routeno != null ? String(busData.routeno) : '') || '';
+                var vehicleNo = (busData.vehicleno != null ? String(busData.vehicleno) : '') || '';
 
-                var parts = []; // 텍스트 조합 배열
-                if (routeNo) parts.push(routeNo + '번'); // 노선번호 추가
-                if (vehicleNo) parts.push(vehicleNo); // 차량번호 추가
+                var parts = [];
+                if (routeNo) parts.push(routeNo + '번');
+                if (vehicleNo) parts.push(vehicleNo);
 
-                if (isRouteMode) { // 노선 모드면
-                    var calc = computePrevCurrentNextForBus(busData, $scope.stops || []); // 이전/다음 계산
-                    var nextStopName = (calc && calc.next && (calc.next.nodenm || calc.next.stationName)) || ''; // 다음 정류장
-                    if (nextStopName) parts.push('→ ' + nextStopName); // 다음 정류장 추가
+                if (isRouteMode) {
+                    var calc = computePrevCurrentNextForBus(busData, $scope.stops || []);
+                    var nextStopName = (calc && calc.next && (calc.next.nodenm || calc.next.stationName)) || '';
+                    if (nextStopName) parts.push('→ ' + nextStopName);
                 }
 
-                var text = parts.join(' | '); // 텍스트 결합
-                if (!text) { // 텍스트 없으면
-                    hideHoverTooltip(); // 숨김
+                var text = parts.join(' | ');
+                if (!text) {
+                    hideHoverTooltip();
                     return;
                 }
-                showHoverTooltip(evt.coordinate, '🚌 ' + text); // 툴팁 표시
+                showHoverTooltip(evt.coordinate, '🚌 ' + text);
                 return;
             }
 
-            hideHoverTooltip(); // 그 외 숨김
+            hideHoverTooltip();
         });
     }
 
     function showHoverTooltip(coord, text) { // 툴팁 표시 함수
-        if (!hoverTooltipEl || !hoverTooltipOverlay) return; // 요소 없으면 중단
-        hoverTooltipEl.textContent = text; // 텍스트 설정
-        hoverTooltipEl.style.display = 'block'; // 보이기
-        hoverTooltipOverlay.setPosition(coord); // 위치 설정
+        if (!hoverTooltipEl || !hoverTooltipOverlay) return;
+        hoverTooltipEl.textContent = text;
+        hoverTooltipEl.style.display = 'block';
+        hoverTooltipOverlay.setPosition(coord);
     }
 
     function hideHoverTooltip() { // 툴팁 숨김 함수
-        if (!hoverTooltipEl || !hoverTooltipOverlay) return; // 요소 없으면 중단
-        hoverTooltipEl.style.display = 'none'; // 숨기기
-        hoverTooltipOverlay.setPosition(undefined); // 위치 해제
+        if (!hoverTooltipEl || !hoverTooltipOverlay) return;
+        hoverTooltipEl.style.display = 'none';
+        hoverTooltipOverlay.setPosition(undefined);
     }
 
     // -------------------------
     // 대표 버스 펄스(파동) 애니메이션
     // -------------------------
-    var repPulseSource = new ol.source.Vector(); // 펄스 소스 생성
-    var repPulseLayer  = new ol.layer.Vector({ // 펄스 레이어 생성
-        source: repPulseSource, // 소스 연결
-        zIndex: 15, // z-index 설정
-        style: function () { // 스타일 함수
-            if (!$scope.representativeBus) return null; // 대표 버스 없으면 null
-            if (!$scope.currentRouteId) return null; // 노선 ID 없으면 null
+    var repPulseSource = new ol.source.Vector();
+    var repPulseLayer  = new ol.layer.Vector({
+        source: repPulseSource,
+        zIndex: 15,
+        style: function () {
+            if (!$scope.representativeBus) return null;
+            if (!$scope.currentRouteId) return null;
 
-            var t = Date.now(); // 현재 시간
-            var phase = (t % 1500) / 1500.0; // 애니메이션 단계 (0~1)
-            var radius = 5 + (phase * 20); // 반지름 계산
-            var opacity = 1.0 - phase; // 투명도 계산
+            var t = Date.now();
+            var phase = (t % 1500) / 1500.0;
+            var radius = 5 + (phase * 20);
+            var opacity = 1.0 - phase;
 
-            var pulseColor = '255, 149, 0'; // 펄스 색상 (주황)
+            var pulseColor = '255, 149, 0';
 
-            return new ol.style.Style({ // 스타일 생성
-                image: new ol.style.Circle({ // 원형 이미지
-                    radius: radius, // 반지름
-                    stroke: new ol.style.Stroke({ // 테두리
-                        color: 'rgba(' + pulseColor + ', ' + opacity.toFixed(3) + ')', // 색상
-                        width: 2 + (2 * (1 - phase)) // 두께
+            return new ol.style.Style({
+                image: new ol.style.Circle({
+                    radius: radius,
+                    stroke: new ol.style.Stroke({
+                        color: 'rgba(' + pulseColor + ', ' + opacity.toFixed(3) + ')',
+                        width: 2 + (2 * (1 - phase))
                     }),
-                    fill: new ol.style.Fill({ // 채우기
-                        color: 'rgba(' + pulseColor + ', ' + (opacity * 0.1).toFixed(3) + ')' // 색상
+                    fill: new ol.style.Fill({
+                        color: 'rgba(' + pulseColor + ', ' + (opacity * 0.1).toFixed(3) + ')'
                     })
                 })
             });
         }
     });
 
-    var repPulseFeature = null; // 펄스 피처 변수
-    var repPulseRafId = null; // 애니메이션 프레임 ID
+    var repPulseFeature = null;
+    var repPulseRafId = null;
 
-    function startRepPulseAnimationLoop() { // 애니메이션 시작 함수
-        if (!olMap) return; // 지도 없으면 중단
-        if (repPulseRafId != null) return; // 이미 실행 중이면 중단
+    function startRepPulseAnimationLoop() {
+        if (!olMap) return;
+        if (repPulseRafId != null) return;
 
-        var tick = function () { // 프레임 함수
-            if (!olMap || !$scope.representativeBus || !$scope.currentRouteId) { // 조건 불만족 시
-                repPulseRafId = null; // ID 초기화
-                return; // 종료
+        var tick = function () {
+            if (!olMap || !$scope.representativeBus || !$scope.currentRouteId) {
+                repPulseRafId = null;
+                return;
             }
-            olMap.render(); // 지도 렌더링
-            repPulseRafId = requestAnimationFrame(tick); // 다음 프레임 요청
+            olMap.render();
+            repPulseRafId = requestAnimationFrame(tick);
         };
-        repPulseRafId = requestAnimationFrame(tick); // 첫 프레임 요청
+        repPulseRafId = requestAnimationFrame(tick);
     }
 
-    function stopRepPulseAnimationLoop() { // 애니메이션 중지 함수
-        if (repPulseRafId != null) { // 실행 중이면
-            cancelAnimationFrame(repPulseRafId); // 취소
-            repPulseRafId = null; // ID 초기화
+    function stopRepPulseAnimationLoop() {
+        if (repPulseRafId != null) {
+            cancelAnimationFrame(repPulseRafId);
+            repPulseRafId = null;
         }
     }
 
-    function clearRepPulse() { // 펄스 초기화 함수
-        repPulseSource.clear(); // 소스 비우기
-        repPulseFeature = null; // 피처 초기화
-        stopRepPulseAnimationLoop(); // 애니메이션 중지
+    function clearRepPulse() {
+        repPulseSource.clear();
+        repPulseFeature = null;
+        stopRepPulseAnimationLoop();
     }
 
-    function updateRepPulseFeatureByBus(bus) { // 펄스 피처 업데이트 함수
-        if (!olMap) return; // 지도 없으면 중단
-        if (!bus) { // 버스 없으면
-            clearRepPulse(); // 초기화
+    function updateRepPulseFeatureByBus(bus) {
+        if (!olMap) return;
+        if (!bus) {
+            clearRepPulse();
             return;
         }
 
-        var lat = parseFloat(bus.gpslati); // 위도
-        var lon = parseFloat(bus.gpslong); // 경도
-        if (isNaN(lat) || isNaN(lon)) { // 좌표 유효성 검사
-            clearRepPulse(); // 초기화
+        var lat = parseFloat(bus.gpslati);
+        var lon = parseFloat(bus.gpslong);
+        if (isNaN(lat) || isNaN(lon)) {
+            clearRepPulse();
             return;
         }
 
-        var xy5179 = ol.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:5179'); // 좌표 변환
+        var xy5179 = ol.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:5179');
 
-        if (!repPulseFeature) { // 피처 없으면
-            repPulseFeature = new ol.Feature({ // 생성
-                geometry: new ol.geom.Point(xy5179) // 지오메트리 설정
+        if (!repPulseFeature) {
+            repPulseFeature = new ol.Feature({
+                geometry: new ol.geom.Point(xy5179)
             });
-            repPulseSource.addFeature(repPulseFeature); // 소스에 추가
-        } else { // 있으면
-            repPulseFeature.setGeometry(new ol.geom.Point(xy5179)); // 위치 업데이트
+            repPulseSource.addFeature(repPulseFeature);
+        } else {
+            repPulseFeature.setGeometry(new ol.geom.Point(xy5179));
         }
-        startRepPulseAnimationLoop(); // 애니메이션 시작
+        startRepPulseAnimationLoop();
     }
 
     // -------------------------
     // 대표 버스 지도 이동
     // -------------------------
-    var lastRepVehicleNoForPan = null; // 마지막 이동 차량번호
-    var lastRepPanAtMs = 0; // 마지막 이동 시간
-    var REP_ZOOM_IN_DELTA = 1; // 줌 증가량
-    var REP_ZOOM_MAX      = 15; // 최대 줌 레벨
+    var lastRepVehicleNoForPan = null;
+    var lastRepPanAtMs = 0;
+    var REP_ZOOM_IN_DELTA = 1;
+    var REP_ZOOM_MAX      = 15;
 
-    function panToRepresentativeBusIfNeeded(bus) { // 지도 이동 함수
-        if (!olMap) return; // 지도 없으면 중단
-        if (!bus) return; // 버스 없으면 중단
-        if (!$scope.currentRouteId) return; // 노선 ID 없으면 중단
+    function panToRepresentativeBusIfNeeded(bus) {
+        if (!olMap) return;
+        if (!bus) return;
+        if (!$scope.currentRouteId) return;
 
-        var vehicleno = (bus.vehicleno != null) ? String(bus.vehicleno) : null; // 차량번호
-        if (!vehicleno) return; // 차량번호 없으면 중단
+        var vehicleno = (bus.vehicleno != null) ? String(bus.vehicleno) : null;
+        if (!vehicleno) return;
 
-        if (lastRepVehicleNoForPan === vehicleno) return; // 같은 차량이면 중단
+        if (lastRepVehicleNoForPan === vehicleno) return;
 
-        var now = Date.now(); // 현재 시간
-        if (now - lastRepPanAtMs < 1000) return; // 1초 내 재이동 방지
+        var now = Date.now();
+        if (now - lastRepPanAtMs < 1000) return;
 
-        var lat = parseFloat(bus.gpslati); // 위도
-        var lon = parseFloat(bus.gpslong); // 경도
-        if (isNaN(lat) || isNaN(lon)) return; // 좌표 유효성 검사
+        var lat = parseFloat(bus.gpslati);
+        var lon = parseFloat(bus.gpslong);
+        if (isNaN(lat) || isNaN(lon)) return;
 
-        var center5179 = ol.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:5179'); // 좌표 변환
-        var view = olMap.getView(); // 뷰 객체 획득
-        if (!view) return; // 뷰 없으면 중단
+        var center5179 = ol.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:5179');
+        var view = olMap.getView();
+        if (!view) return;
 
-        var currentZoom = view.getZoom(); // 현재 줌
-        var targetZoom = currentZoom; // 타겟 줌
-        if (typeof currentZoom === 'number') { // 줌 유효하면
-            targetZoom = Math.min(REP_ZOOM_MAX, currentZoom + REP_ZOOM_IN_DELTA); // 줌 계산
+        var currentZoom = view.getZoom();
+        var targetZoom = currentZoom;
+        if (typeof currentZoom === 'number') {
+            targetZoom = Math.min(REP_ZOOM_MAX, currentZoom + REP_ZOOM_IN_DELTA);
         }
 
-        view.animate( // 애니메이션 이동
-            { center: center5179, duration: 800 }, // 중심 이동
-            { zoom: targetZoom, duration: 800 } // 줌 이동
+        view.animate(
+            { center: center5179, duration: 800 },
+            { zoom: targetZoom, duration: 800 }
         );
 
-        lastRepVehicleNoForPan = vehicleno; // 차량번호 갱신
-        lastRepPanAtMs = now; // 시간 갱신
+        lastRepVehicleNoForPan = vehicleno;
+        lastRepPanAtMs = now;
     }
 
     // -------------------------
     // JSON 파싱 함수
     // -------------------------
-    function parseMaybeJson(data) { // 파싱 함수
-        if (angular.isObject(data)) return data; // 객체면 반환
-        if (!data) return null; // 데이터 없으면 null
+    function parseMaybeJson(data) {
+        if (angular.isObject(data)) return data;
+        if (!data) return null;
         try {
-            return JSON.parse(data); // 파싱 시도
+            return JSON.parse(data);
         } catch (e) {
-            console.error('JSON 파싱 실패:', e, data); // 에러 로그
-            return null; // 실패 시 null
+            console.error('JSON 파싱 실패:', e, data);
+            return null;
         }
     }
 
     // -------------------------
     // 정류장 모드: 버스 클릭 이벤트
     // -------------------------
-    function initBusClickToShowRouteLine() { // 클릭 이벤트 초기화
-        if (!olMap) return; // 지도 없으면 중단
-        if (olMap.__busClickToRouteLineBound) return; // 이미 바인딩됐으면 중단
+    function initBusClickToShowRouteLine() {
+        if (!olMap) return;
+        if (olMap.__busClickToRouteLineBound) return;
 
-        olMap.__busClickToRouteLineBound = true; // 바인딩 플래그 설정
+        olMap.__busClickToRouteLineBound = true;
 
-        olMap.on('singleclick', function (evt) { // 클릭 리스너 등록
-            if (!olMap) return; // 지도 없으면 중단
+        olMap.on('singleclick', function (evt) {
+            if (!olMap) return;
 
-            // 정류장 검색 모드 확인
             var isRouteMode = !!$scope.currentRouteId;
             var isStopSearchMode = !isRouteMode && ($scope.stops && $scope.stops.length > 0);
-            if (!isStopSearchMode) return; // 아니면 중단
+            if (!isStopSearchMode) return;
 
-            var pixel = olMap.getEventPixel(evt.originalEvent); // 픽셀 좌표
+            var pixel = olMap.getEventPixel(evt.originalEvent);
 
-            var feature = olMap.forEachFeatureAtPixel( // 피처 감지
+            var feature = olMap.forEachFeatureAtPixel(
                 pixel,
                 function (f) { return f; },
                 {
-                    layerFilter: function (layer) { // 레이어 필터
+                    layerFilter: function (layer) {
                         return layer !== repPulseLayer;
                     }
                 }
             );
 
-            if (!feature) return; // 피처 없으면 중단
-            if (feature.get('featureType') !== 'bus') return; // 버스 아니면 중단
+            if (!feature) return;
+            if (feature.get('featureType') !== 'bus') return;
 
-            var busData = feature.get('busData') || null; // 버스 데이터
-            if (!busData) return; // 데이터 없으면 중단
+            var busData = feature.get('busData') || null;
+            if (!busData) return;
 
-            var routeId = busData.routeid || busData.routeId || busData.route_id || null; // 노선 ID
+            var routeId = busData.routeid || busData.routeId || busData.route_id || null;
             if (!routeId) {
-                console.warn('버스 클릭 감지했지만 routeId 없음:', busData); // 경고 로그
+                console.warn('버스 클릭 감지했지만 routeId 없음:', busData);
                 return;
             }
 
-            // 임시 노선 ID 설정
             $scope.tempRouteIdFromStop = String(routeId);
 
-            clearRouteLine(); // 라인 초기화
+            clearRouteLine();
 
-            $http.get('/api/bus/route-stops', { // 정류장 목록 조회
+            $http.get('/api/bus/route-stops', {
                 params: { routeId: routeId }
-            }).then(function (res) { // 성공 시
-                var data = parseMaybeJson(res.data); // 데이터 파싱
-                if (!data || !data.response || !data.response.body) return; // 유효성 검사
+            }).then(function (res) {
+                var data = parseMaybeJson(res.data);
+                if (!data || !data.response || !data.response.body) return;
 
-                var items = data.response.body.items && data.response.body.items.item; // 아이템 추출
-                if (!items) return; // 아이템 없으면 중단
+                var items = data.response.body.items && data.response.body.items.item;
+                if (!items) return;
 
-                var stopsArray = angular.isArray(items) ? items : [items]; // 배열 변환
-                drawRouteLineFromStops(stopsArray); // 라인 그리기
+                var stopsArray = angular.isArray(items) ? items : [items];
+                drawRouteLineFromStops(stopsArray);
 
-                if (!$scope.$$phase) $scope.$applyAsync(); // 스코프 적용
-            }).catch(function (err) { // 에러 시
-                console.error('버스 클릭 → 노선 정류장 조회 실패:', err); // 에러 로그
+                if (!$scope.$$phase) $scope.$applyAsync();
+            }).catch(function (err) {
+                console.error('버스 클릭 → 노선 정류장 조회 실패:', err);
             });
         });
     }
@@ -487,114 +631,122 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     // -------------------------
     // 지도 초기화 함수
     // -------------------------
-    $scope.initMap = function () { // 초기화 함수
-        var mapDiv = document.getElementById('map1'); // 지도 컨테이너
+    $scope.initMap = function () {
+        var mapDiv = document.getElementById('map1');
 
-        if (!window.ngii_wmts || !mapDiv) { // 필수 요소 확인
-            console.error('NGII 지도 스크립트 미로드'); // 에러 로그
+        if (!window.ngii_wmts || !mapDiv) {
+            console.error('NGII 지도 스크립트 미로드');
             return;
         }
 
-        $scope.map1 = new ngii_wmts.map('map1', { // 지도 생성
+        $scope.map1 = new ngii_wmts.map('map1', {
             zoom: 3
         });
 
-        if (typeof $scope.map1._getMap === 'function') { // _getMap 확인
-            olMap = $scope.map1._getMap(); // olMap 획득
+        if (typeof $scope.map1._getMap === 'function') {
+            olMap = $scope.map1._getMap();
         } else {
-            console.warn('_getMap 함수 없음'); // 경고 로그
+            console.warn('_getMap 함수 없음');
             olMap = null;
         }
 
-        if (olMap && typeof olMap.addLayer === 'function') { // 레이어 추가 확인
-            olMap.addLayer(routeLineLayer); // 노선 레이어 추가
-            olMap.addLayer(stopLayer); // 정류장 레이어 추가
-            olMap.addLayer(busLayer); // 버스 레이어 추가
-            olMap.addLayer(repPulseLayer); // 펄스 레이어 추가
-            console.log('레이어 추가 완료 (디자인 적용됨)'); // 성공 로그
+        if (olMap && typeof olMap.addLayer === 'function') {
+            // ✅ 트램 레이어는 항상 추가(표시/숨김은 source clear로 제어)
+            olMap.addLayer(tramLineLayer);
+            olMap.addLayer(tramStopLayer);
+
+            // 기존 레이어
+            olMap.addLayer(routeLineLayer);
+            olMap.addLayer(stopLayer);
+            olMap.addLayer(busLayer);
+            olMap.addLayer(repPulseLayer);
+
+            console.log('레이어 추가 완료 (트램 포함)');
         }
 
-        initHoverTooltip(); // 툴팁 초기화
-        initBusClickToShowRouteLine(); // 클릭 이벤트 초기화
+        initHoverTooltip();
+        initBusClickToShowRouteLine();
+
+        // ✅ 초기에는 무조건 트램을 "지움" 상태로 둔다 (보이기 눌러야만 표시)
+        clearTram();
+        $scope.isTramVisible = false;
     };
 
-    $timeout($scope.initMap, 0); // 타임아웃으로 실행
+    $timeout($scope.initMap, 0);
 
     // -------------------------
     // 노선 라인 관련 함수
     // -------------------------
-    function clearRouteLine() { // 라인 지우기
-        routeLineSource.clear(); // 소스 클리어
+    function clearRouteLine() {
+        routeLineSource.clear();
     }
 
-    function drawRouteLineFromStops(stops) { // 라인 그리기 함수
-        var routeIdForLine = $scope.currentRouteId || $scope.tempRouteIdFromStop; // 노선 ID 확인
-        if (!routeIdForLine) { // 없으면
-            clearRouteLine(); // 지우기
+    function drawRouteLineFromStops(stops) {
+        var routeIdForLine = $scope.currentRouteId || $scope.tempRouteIdFromStop;
+        if (!routeIdForLine) {
+            clearRouteLine();
             return;
         }
 
-        clearRouteLine(); // 초기화
+        clearRouteLine();
 
-        if (!olMap) return; // 지도 없으면 중단
-        if (!stops || stops.length < 2) return; // 정류장 부족하면 중단
+        if (!olMap) return;
+        if (!stops || stops.length < 2) return;
 
-        var sortedStops = stops.slice().sort(function (a, b) { // 정류장 정렬
-            var sa = parseInt(a.routeseq || a.routeSeq || 0, 10); // 순번 A
-            var sb = parseInt(b.routeseq || b.routeSeq || 0, 10); // 순번 B
-            return sa - sb; // 오름차순
+        var sortedStops = stops.slice().sort(function (a, b) {
+            var sa = parseInt(a.routeseq || a.routeSeq || 0, 10);
+            var sb = parseInt(b.routeseq || b.routeSeq || 0, 10);
+            return sa - sb;
         });
 
-        var coordinates = []; // 좌표 배열
-        sortedStops.forEach(function (s) { // 순회
-            var lat = parseFloat(s.gpslati || s.gpsLati || s.gpsY); // 위도
-            var lon = parseFloat(s.gpslong || s.gpsLong || s.gpsX); // 경도
-            if (!isNaN(lat) && !isNaN(lon)) { // 유효성 검사
-                var xy5179 = ol.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:5179'); // 좌표 변환
-                coordinates.push(xy5179); // 배열 추가
+        var coordinates = [];
+        sortedStops.forEach(function (s) {
+            var lat = parseFloat(s.gpslati || s.gpsLati || s.gpsY);
+            var lon = parseFloat(s.gpslong || s.gpsLong || s.gpsX);
+            if (!isNaN(lat) && !isNaN(lon)) {
+                var xy5179 = ol.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:5179');
+                coordinates.push(xy5179);
             }
         });
 
-        if (coordinates.length < 2) return; // 좌표 부족하면 중단
+        if (coordinates.length < 2) return;
 
-        var lineFeature = new ol.Feature({ // 라인 피처 생성
-            geometry: new ol.geom.LineString(coordinates) // 지오메트리 설정
+        var lineFeature = new ol.Feature({
+            geometry: new ol.geom.LineString(coordinates)
         });
-        routeLineSource.addFeature(lineFeature); // 소스에 추가
+        routeLineSource.addFeature(lineFeature);
 
-        // 화살표 그리기 루프
         for (var i = 0; i < coordinates.length - 1; i++) {
-            if (ROUTE_ARROW_EVERY_N_SEGMENTS > 1 && (i % ROUTE_ARROW_EVERY_N_SEGMENTS) !== 0) continue; // 간격 체크
+            if (ROUTE_ARROW_EVERY_N_SEGMENTS > 1 && (i % ROUTE_ARROW_EVERY_N_SEGMENTS) !== 0) continue;
 
-            var p1 = coordinates[i]; // 시작점
-            var p2 = coordinates[i + 1]; // 끝점
-            if (!p1 || !p2) continue; // 점 없으면 패스
+            var p1 = coordinates[i];
+            var p2 = coordinates[i + 1];
+            if (!p1 || !p2) continue;
 
-            var dx = p2[0] - p1[0]; // X 차이
-            var dy = p2[1] - p1[1]; // Y 차이
-            var segLen = Math.sqrt(dx * dx + dy * dy); // 길이 계산
+            var dx = p2[0] - p1[0];
+            var dy = p2[1] - p1[1];
+            var segLen = Math.sqrt(dx * dx + dy * dy);
 
-            if (!isFinite(segLen) || segLen < ROUTE_ARROW_MIN_SEGMENT_LEN) continue; // 길이 체크
+            if (!isFinite(segLen) || segLen < ROUTE_ARROW_MIN_SEGMENT_LEN) continue;
 
-            var mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2]; // 중간점
-            var angle = Math.atan2(dy, dx); // 각도 계산
+            var mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+            var angle = Math.atan2(dy, dx);
 
-            var arrowFeature = new ol.Feature({ // 화살표 피처 생성
-                geometry: new ol.geom.Point(mid) // 위치 설정
+            var arrowFeature = new ol.Feature({
+                geometry: new ol.geom.Point(mid)
             });
-            arrowFeature.setStyle(getRouteArrowStyle(angle)); // 스타일 설정
-            routeLineSource.addFeature(arrowFeature); // 소스에 추가
+            arrowFeature.setStyle(getRouteArrowStyle(angle));
+            routeLineSource.addFeature(arrowFeature);
         }
 
-        // 라인 범위로 지도 줌
-        var extent = routeLineSource.getExtent(); // 범위 획득
-        if (extent && isFinite(extent[0])) { // 유효하면
-            var view = olMap.getView(); // 뷰 획득
+        var extent = routeLineSource.getExtent();
+        if (extent && isFinite(extent[0])) {
+            var view = olMap.getView();
             if (view) {
-                view.fit(extent, { // 줌 이동
-                    padding: [60, 60, 60, 60], // 패딩
-                    maxZoom: 14, // 최대 줌
-                    duration: 500 // 지속 시간
+                view.fit(extent, {
+                    padding: [60, 60, 60, 60],
+                    maxZoom: 14,
+                    duration: 500
                 });
             }
         }
@@ -603,497 +755,492 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     // -------------------------
     // 정류장 마커 관련 함수
     // -------------------------
-    function clearStopMarkers() { // 정류장 지우기
-        var newSrc = new ol.source.Vector(); // 새 소스 생성
-        stopLayer.setSource(newSrc); // 레이어 소스 교체
-        stopSource = newSrc; // 변수 갱신
+    function clearStopMarkers() {
+        var newSrc = new ol.source.Vector();
+        stopLayer.setSource(newSrc);
+        stopSource = newSrc;
     }
 
-    function addStopMarkerToSource(targetSource, lat, lon, title, stopData, isSelected) { // 마커 추가 함수
-        if (!olMap) return; // 지도 없으면 중단
-        if (isNaN(lat) || isNaN(lon)) return; // 좌표 유효성 검사
+    function addStopMarkerToSource(targetSource, lat, lon, title, stopData, isSelected) {
+        if (!olMap) return;
+        if (isNaN(lat) || isNaN(lon)) return;
 
         try {
-            var xy5179 = ol.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:5179'); // 좌표 변환
-            var feature = new ol.Feature({ // 피처 생성
-                geometry: new ol.geom.Point(xy5179), // 지오메트리
-                name: title || '' // 이름
+            var xy5179 = ol.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:5179');
+            var feature = new ol.Feature({
+                geometry: new ol.geom.Point(xy5179),
+                name: title || ''
             });
 
-            feature.set('featureType', 'stop'); // 타입 설정
-            feature.set('stopData', stopData || null); // 데이터 설정
+            feature.set('featureType', 'stop');
+            feature.set('stopData', stopData || null);
 
-            // 스타일 변수 설정
-            var fillColor   = isSelected ? '#007bff' : '#ffffff'; // 채우기 색
-            var strokeColor = isSelected ? '#ffffff' : '#555555'; // 테두리 색
-            var strokeWidth = isSelected ? 3 : 2; // 테두리 두께
-            var radiusVal   = isSelected ? 8 : 5; // 반지름
-            var zIndexVal   = isSelected ? 999 : 10; // z-index
+            var fillColor   = isSelected ? '#007bff' : '#ffffff';
+            var strokeColor = isSelected ? '#ffffff' : '#555555';
+            var strokeWidth = isSelected ? 3 : 2;
+            var radiusVal   = isSelected ? 8 : 5;
+            var zIndexVal   = isSelected ? 999 : 10;
 
-            feature.setStyle( // 스타일 적용
+            feature.setStyle(
                 new ol.style.Style({
-                    image: new ol.style.Circle({ // 원형
-                        radius: radiusVal, // 반지름
-                        fill: new ol.style.Fill({ color: fillColor }), // 채우기
-                        stroke: new ol.style.Stroke({ color: strokeColor, width: strokeWidth }) // 테두리
+                    image: new ol.style.Circle({
+                        radius: radiusVal,
+                        fill: new ol.style.Fill({ color: fillColor }),
+                        stroke: new ol.style.Stroke({ color: strokeColor, width: strokeWidth })
                     }),
-                    zIndex: zIndexVal // z-index
+                    zIndex: zIndexVal
                 })
             );
 
-            targetSource.addFeature(feature); // 소스에 추가
+            targetSource.addFeature(feature);
         } catch (e) {
-            console.warn('정류장 마커 오류:', e); // 에러 로그
+            console.warn('정류장 마커 오류:', e);
         }
     }
 
-    function fitMapToStops() { // 정류장 전체 보기
-        if (!olMap) return; // 지도 없으면 중단
-        var extent = stopSource.getExtent(); // 범위 획득
-        if (!extent || !isFinite(extent[0])) return; // 유효성 검사
+    function fitMapToStops() {
+        if (!olMap) return;
+        var extent = stopSource.getExtent();
+        if (!extent || !isFinite(extent[0])) return;
 
-        var view = olMap.getView(); // 뷰 획득
+        var view = olMap.getView();
         if (view) {
-            view.fit(extent, { // 줌 이동
-                padding: [50, 50, 50, 50], // 패딩
-                maxZoom: 14, // 최대 줌
-                duration: 500 // 지속 시간
+            view.fit(extent, {
+                padding: [50, 50, 50, 50],
+                maxZoom: 14,
+                duration: 500
             });
         }
     }
 
-    function drawStopsOnMap(stops) { // 정류장 그리기 함수
-        if (!stops || !stops.length) { // 정류장 없으면
-            clearStopMarkers(); // 지우기
+    function drawStopsOnMap(stops) {
+        if (!stops || !stops.length) {
+            clearStopMarkers();
             return;
         }
-        var newSrc = new ol.source.Vector(); // 새 소스
-        stops.forEach(function (s) { // 순회
-            var lat = parseFloat(s.gpslati || s.gpsLati || s.gpsY); // 위도
-            var lon = parseFloat(s.gpslong || s.gpsLong || s.gpsX); // 경도
+        var newSrc = new ol.source.Vector();
+        stops.forEach(function (s) {
+            var lat = parseFloat(s.gpslati || s.gpsLati || s.gpsY);
+            var lon = parseFloat(s.gpslong || s.gpsLong || s.gpsX);
 
-            // 선택된 정류장 확인
             var isSelected = ($scope.selectedStop && s === $scope.selectedStop);
 
-            if (!isNaN(lat) && !isNaN(lon)) { // 유효성 검사
-                addStopMarkerToSource(newSrc, lat, lon, s.nodenm || s.stationName || '', s, isSelected); // 마커 추가
+            if (!isNaN(lat) && !isNaN(lon)) {
+                addStopMarkerToSource(newSrc, lat, lon, s.nodenm || s.stationName || '', s, isSelected);
             }
         });
-        stopLayer.setSource(newSrc); // 레이어 소스 교체
-        stopSource = newSrc; // 변수 갱신
+        stopLayer.setSource(newSrc);
+        stopSource = newSrc;
 
-        if (!$scope.selectedStop) { // 선택된 정류장 없으면
-            fitMapToStops(); // 전체 보기
+        if (!$scope.selectedStop) {
+            fitMapToStops();
         }
     }
 
     // -------------------------
     // 버스 마커 관련 함수
     // -------------------------
-    function clearBusMarkers() { // 버스 지우기
-        var newSrc = new ol.source.Vector(); // 새 소스
-        busLayer.setSource(newSrc); // 소스 교체
-        busSource = newSrc; // 변수 갱신
+    function clearBusMarkers() {
+        var newSrc = new ol.source.Vector();
+        busLayer.setSource(newSrc);
+        busSource = newSrc;
     }
 
-    function addBusMarkerToSource(targetSource, lat, lon, title, isRepresentative, busData) { // 버스 마커 추가
-        if (!olMap) return; // 지도 없으면 중단
-        if (isNaN(lat) || isNaN(lon)) return; // 좌표 유효성 검사
+    function addBusMarkerToSource(targetSource, lat, lon, title, isRepresentative, busData) {
+        if (!olMap) return;
+        if (isNaN(lat) || isNaN(lon)) return;
 
         try {
-            var xy5179 = ol.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:5179'); // 좌표 변환
-            var feature = new ol.Feature({ // 피처 생성
-                geometry: new ol.geom.Point(xy5179), // 지오메트리
-                name: title || '' // 이름
+            var xy5179 = ol.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:5179');
+            var feature = new ol.Feature({
+                geometry: new ol.geom.Point(xy5179),
+                name: title || ''
             });
 
-            feature.set('featureType', 'bus'); // 타입 설정
-            feature.set('busData', busData || null); // 데이터 설정
+            feature.set('featureType', 'bus');
+            feature.set('busData', busData || null);
 
-            var busColor = isRepresentative ? '#ff9500' : '#007bff'; // 버스 색상
-            var iconScale = isRepresentative ? 0.05 : 0.03; // 아이콘 크기
-            var zIndexVal = isRepresentative ? 100 : 50; // z-index
+            var busColor = isRepresentative ? '#ff9500' : '#007bff';
+            var iconScale = isRepresentative ? 0.05 : 0.03;
+            var zIndexVal = isRepresentative ? 100 : 50;
 
-            var busNoText = ''; // 버스 번호 텍스트
-            if (!$scope.currentRouteId && title != null) { // 노선 모드 아니면
-                busNoText = String(title).trim(); // 번호 설정
+            var busNoText = '';
+            if (!$scope.currentRouteId && title != null) {
+                busNoText = String(title).trim();
             }
 
-            var styleArray = [ // 스타일 배열
-                new ol.style.Style({ // 아이콘 스타일
+            var styleArray = [
+                new ol.style.Style({
                     image: new ol.style.Icon({
-                        src: createSvgIcon(busColor, 'bus'), // SVG 아이콘
-                        anchor: [0.5, 0.5], // 중심점
-                        scale: iconScale, // 크기
-                        opacity: 1.0, // 투명도
-                        rotation: 0 // 회전
+                        src: createSvgIcon(busColor, 'bus'),
+                        anchor: [0.5, 0.5],
+                        scale: iconScale,
+                        opacity: 1.0,
+                        rotation: 0
                     }),
-                    zIndex: zIndexVal // z-index
+                    zIndex: zIndexVal
                 })
             ];
 
-            if (busNoText) { // 텍스트 있으면
-                styleArray.push(new ol.style.Style({ // 텍스트 스타일 추가
+            if (busNoText) {
+                styleArray.push(new ol.style.Style({
                     text: new ol.style.Text({
-                        text: busNoText, // 텍스트
-                        font: 'bold 12px "Pretendard", sans-serif', // 폰트
-                        fill: new ol.style.Fill({ color: '#333' }), // 글자색
-                        stroke: new ol.style.Stroke({ color: '#fff', width: 3 }), // 외곽선
-                        offsetY: -15, // 위치 조정
-                        textAlign: 'center' // 정렬
+                        text: busNoText,
+                        font: 'bold 12px "Pretendard", sans-serif',
+                        fill: new ol.style.Fill({ color: '#333' }),
+                        stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
+                        offsetY: -15,
+                        textAlign: 'center'
                     }),
-                    zIndex: zIndexVal + 1 // z-index
+                    zIndex: zIndexVal + 1
                 }));
             }
 
-            feature.setStyle(styleArray); // 스타일 적용
-            targetSource.addFeature(feature); // 소스에 추가
+            feature.setStyle(styleArray);
+            targetSource.addFeature(feature);
 
         } catch (e) {
-            console.warn('버스 마커 오류:', e); // 에러 로그
+            console.warn('버스 마커 오류:', e);
         }
     }
 
-    function drawBusLocationsOnMap(busItems) { // 버스 위치 그리기
-        if (!busItems || !busItems.length) { // 데이터 없으면
-            clearBusMarkers(); // 지우기
+    function drawBusLocationsOnMap(busItems) {
+        if (!busItems || !busItems.length) {
+            clearBusMarkers();
             return;
         }
 
-        var newSrc = new ol.source.Vector(); // 새 소스
-        var rep = $scope.representativeBus; // 대표 버스
+        var newSrc = new ol.source.Vector();
+        var rep = $scope.representativeBus;
 
-        busItems.forEach(function (b) { // 순회
-            var lat = parseFloat(b.gpslati); // 위도
-            var lon = parseFloat(b.gpslong); // 경도
-            if (!isNaN(lat) || !isNaN(lon)) { // 유효성 검사
-                var label = (b.vehicleno || '') + ' / ' + (b.routenm || ''); // 라벨
-                var isRepresentative = false; // 대표 여부
-                if (rep && rep.vehicleno && b.vehicleno) { // 대표 버스 확인
+        busItems.forEach(function (b) {
+            var lat = parseFloat(b.gpslati);
+            var lon = parseFloat(b.gpslong);
+            if (!isNaN(lat) && !isNaN(lon)) {
+                var label = (b.vehicleno || '') + ' / ' + (b.routenm || '');
+                var isRepresentative = false;
+                if (rep && rep.vehicleno && b.vehicleno) {
                     isRepresentative = (rep.vehicleno === b.vehicleno);
                 }
-                addBusMarkerToSource(newSrc, lat, lon, String(label).trim(), isRepresentative, b); // 마커 추가
+                addBusMarkerToSource(newSrc, lat, lon, String(label).trim(), isRepresentative, b);
             }
         });
 
-        busLayer.setSource(newSrc); // 소스 교체
-        busSource = newSrc; // 변수 갱신
+        busLayer.setSource(newSrc);
+        busSource = newSrc;
     }
 
     // -------------------------
     // API 호출 및 데이터 처리
     // -------------------------
-    function computePrevCurrentNextForBus(bus, stops) { // 이전/현재/다음 정류장 계산
-        var result = { prev: null, current: null, next: null }; // 결과 초기화
-        if (!bus || !stops || !stops.length) return result; // 데이터 검사
+    function computePrevCurrentNextForBus(bus, stops) {
+        var result = { prev: null, current: null, next: null };
+        if (!bus || !stops || !stops.length) return result;
 
-        var currentIndex = -1; // 인덱스 초기화
-        var busNodeId    = bus.nodeid || bus.nodeId || null; // 노드 ID
-        var busSeq       = bus.routeseq || bus.routeSeq || null; // 순번
+        var currentIndex = -1;
+        var busNodeId    = bus.nodeid || bus.nodeId || null;
+        var busSeq       = bus.routeseq || bus.routeSeq || null;
 
-        if (busNodeId) { // 노드 ID로 검색
+        if (busNodeId) {
             for (var i = 0; i < stops.length; i++) {
                 var s = stops[i];
-                if ((s.nodeid || s.nodeId) === busNodeId) { currentIndex = i; break; } // 일치 시 중단
+                if ((s.nodeid || s.nodeId) === busNodeId) { currentIndex = i; break; }
             }
         }
 
-        if (currentIndex === -1 && busSeq != null) { // 순번으로 검색
+        if (currentIndex === -1 && busSeq != null) {
             var busSeqNum = parseInt(busSeq, 10);
             if (!isNaN(busSeqNum)) {
                 for (var j = 0; j < stops.length; j++) {
                     var st = stops[j];
                     var stopSeq = parseInt(st.routeseq || st.routeSeq, 10);
-                    if (!isNaN(stopSeq) && stopSeq === busSeqNum) { currentIndex = j; break; } // 일치 시 중단
+                    if (!isNaN(stopSeq) && stopSeq === busSeqNum) { currentIndex = j; break; }
                 }
             }
         }
 
-        if (currentIndex === -1) return result; // 못 찾으면 반환
-        result.current = stops[currentIndex]; // 현재 설정
-        if (currentIndex > 0) result.prev = stops[currentIndex - 1]; // 이전 설정
-        if (currentIndex < stops.length - 1) result.next = stops[currentIndex + 1]; // 다음 설정
-        return result; // 결과 반환
+        if (currentIndex === -1) return result;
+        result.current = stops[currentIndex];
+        if (currentIndex > 0) result.prev = stops[currentIndex - 1];
+        if (currentIndex < stops.length - 1) result.next = stops[currentIndex + 1];
+        return result;
     }
 
-    function drawBusesForArrivalRoutes(arrivals) { // 도착 버스 그리기
-        if ($scope.currentRouteId) return; // 노선 모드면 중단
-        $scope.representativeBus = null; // 대표 버스 초기화
-        clearRepPulse(); // 펄스 초기화
-        lastRepVehicleNoForPan = null; // 이동 변수 초기화
+    function drawBusesForArrivalRoutes(arrivals) {
+        if ($scope.currentRouteId) return;
+        $scope.representativeBus = null;
+        clearRepPulse();
+        lastRepVehicleNoForPan = null;
 
-        if (!arrivals || !arrivals.length) { // 데이터 없으면
-            clearBusMarkers(); // 지우기
+        if (!arrivals || !arrivals.length) {
+            clearBusMarkers();
             return;
         }
 
-        var routeIdMap = {}; // 노선 ID 맵
-        arrivals.forEach(function (a) { // 순회
-            var rid = a.routeid || a.routeId || a.route_id; // ID 추출
-            if (rid) routeIdMap[rid] = true; // 맵에 추가
+        var routeIdMap = {};
+        arrivals.forEach(function (a) {
+            var rid = a.routeid || a.routeId || a.route_id;
+            if (rid) routeIdMap[rid] = true;
         });
 
-        var routeIds = Object.keys(routeIdMap); // ID 목록
-        if (!routeIds.length) { // 없으면
-            clearBusMarkers(); // 지우기
+        var routeIds = Object.keys(routeIdMap);
+        if (!routeIds.length) {
+            clearBusMarkers();
             return;
         }
 
-        lastArrivalDrawRequestId++; // 요청 ID 증가
-        var myReqId = lastArrivalDrawRequestId; // 내 요청 ID
-        var pending = routeIds.length; // 대기 카운트
-        var tempSource = new ol.source.Vector(); // 임시 소스
+        lastArrivalDrawRequestId++;
+        var myReqId = lastArrivalDrawRequestId;
+        var pending = routeIds.length;
+        var tempSource = new ol.source.Vector();
 
-        routeIds.forEach(function (rid) { // ID 순회
-            $http.get('/api/bus/locations', { // API 호출
+        routeIds.forEach(function (rid) {
+            $http.get('/api/bus/locations', {
                 params: { routeId: rid, pageNo: 1, numOfRows: 100 }
-            }).then(function (res) { // 성공 시
-                if (myReqId !== lastArrivalDrawRequestId) return; // 요청 ID 불일치 시 중단
-                var data = parseMaybeJson(res.data); // 데이터 파싱
-                if (!data || !data.response || !data.response.body) return; // 유효성 검사
-                var items = data.response.body.items && data.response.body.items.item; // 아이템 추출
-                if (!items) return; // 아이템 없으면 중단
+            }).then(function (res) {
+                if (myReqId !== lastArrivalDrawRequestId) return;
+                var data = parseMaybeJson(res.data);
+                if (!data || !data.response || !data.response.body) return;
+                var items = data.response.body.items && data.response.body.items.item;
+                if (!items) return;
 
-                var busArray = angular.isArray(items) ? items : [items]; // 배열 변환
-                busArray.forEach(function (b) { // 순회
-                    if (!b.routeid && !b.routeId && !b.route_id) b.routeid = rid; // ID 설정
-                    var lat = parseFloat(b.gpslati); // 위도
-                    var lon = parseFloat(b.gpslong); // 경도
-                    if (isNaN(lat) || isNaN(lon)) return; // 유효성 검사
-                    var label = (b.routenm != null) ? String(b.routenm) : ''; // 라벨
-                    addBusMarkerToSource(tempSource, lat, lon, String(label).trim(), false, b); // 마커 추가
+                var busArray = angular.isArray(items) ? items : [items];
+                busArray.forEach(function (b) {
+                    if (!b.routeid && !b.routeId && !b.route_id) b.routeid = rid;
+                    var lat = parseFloat(b.gpslati);
+                    var lon = parseFloat(b.gpslong);
+                    if (isNaN(lat) || isNaN(lon)) return;
+                    var label = (b.routenm != null) ? String(b.routenm) : '';
+                    addBusMarkerToSource(tempSource, lat, lon, String(label).trim(), false, b);
                 });
-            }).catch(function (err) { // 에러 시
-                console.error('정류장 모드 버스 위치 조회 실패:', err); // 에러 로그
-            }).finally(function () { // 완료 시
-                if (myReqId !== lastArrivalDrawRequestId) return; // 요청 ID 불일치 시 중단
-                pending--; // 카운트 감소
-                if (pending === 0) { // 모두 완료 시
-                    busLayer.setSource(tempSource); // 소스 교체
-                    busSource = tempSource; // 변수 갱신
+            }).catch(function (err) {
+                console.error('정류장 모드 버스 위치 조회 실패:', err);
+            }).finally(function () {
+                if (myReqId !== lastArrivalDrawRequestId) return;
+                pending--;
+                if (pending === 0) {
+                    busLayer.setSource(tempSource);
+                    busSource = tempSource;
                 }
             });
         });
     }
 
-    function fetchArrivalsForCurrentStop() { // 도착 정보 조회 함수
-        if (!$scope.currentStop) return; // 정류장 없으면 중단
-        var nodeId = $scope.currentStop.nodeid || $scope.currentStop.nodeId; // 노드 ID
-        if (!nodeId) return; // ID 없으면 중단
+    function fetchArrivalsForCurrentStop() {
+        if (!$scope.currentStop) return;
+        var nodeId = $scope.currentStop.nodeid || $scope.currentStop.nodeId;
+        if (!nodeId) return;
 
-        var previousArrivalList = $scope.arrivalList || []; // 이전 목록
+        var previousArrivalList = $scope.arrivalList || [];
 
-        $http.get('/api/bus/arrivals', { // API 호출
+        $http.get('/api/bus/arrivals', {
             params: { nodeId: nodeId, numOfRows: 20 }
-        }).then(function (res) { // 성공 시
-            var data = parseMaybeJson(res.data); // 파싱
-            if (!data || !data.response || !data.response.body) { // 유효성 검사
-                $scope.arrivalList = previousArrivalList; // 이전 값 복원
+        }).then(function (res) {
+            var data = parseMaybeJson(res.data);
+            if (!data || !data.response || !data.response.body) {
+                $scope.arrivalList = previousArrivalList;
                 return;
             }
-            var items = data.response.body.items && data.response.body.items.item; // 아이템 추출
-            if (!items) { // 아이템 없으면
-                $scope.arrivalList = []; // 목록 초기화
-                clearBusMarkers(); // 마커 초기화
+            var items = data.response.body.items && data.response.body.items.item;
+            if (!items) {
+                $scope.arrivalList = [];
+                clearBusMarkers();
                 return;
             }
-            var list = angular.isArray(items) ? items : [items]; // 배열 변환
-            var mapped = list.map(function (a) { // 매핑
-                var remainStops = (a.arrprevstationcnt != null) ? parseInt(a.arrprevstationcnt, 10) : null; // 남은 정류장
-                var sec = (a.arrtime != null) ? parseInt(a.arrtime, 10) : null; // 남은 시간(초)
-                var minutes = null; // 남은 시간(분)
-                if (!isNaN(sec) && sec != null) minutes = Math.round(sec / 60.0); // 분 계산
-                return angular.extend({}, a, { // 객체 확장
+            var list = angular.isArray(items) ? items : [items];
+            var mapped = list.map(function (a) {
+                var remainStops = (a.arrprevstationcnt != null) ? parseInt(a.arrprevstationcnt, 10) : null;
+                var sec = (a.arrtime != null) ? parseInt(a.arrtime, 10) : null;
+                var minutes = null;
+                if (!isNaN(sec) && sec != null) minutes = Math.round(sec / 60.0);
+                return angular.extend({}, a, {
                     remainStops: isNaN(remainStops) ? null : remainStops,
                     remainMinutes: minutes
                 });
             });
-            $scope.arrivalList = mapped; // 목록 갱신
-            drawBusesForArrivalRoutes($scope.arrivalList); // 버스 그리기
-        }).catch(function (err) { // 에러 시
-            console.error('도착 정보 조회 실패:', err); // 로그
-            $scope.arrivalList = previousArrivalList; // 복원
+            $scope.arrivalList = mapped;
+            drawBusesForArrivalRoutes($scope.arrivalList);
+        }).catch(function (err) {
+            console.error('도착 정보 조회 실패:', err);
+            $scope.arrivalList = previousArrivalList;
         });
     }
 
-    // 정류장 선택 함수 (줌인+이동 포함)
-    $scope.selectStop = function (stop) { // 선택 함수
-        if (!stop) return; // 정류장 없으면 중단
-        $scope.selectedStop = stop; // 선택된 정류장 설정
-        $scope.currentStop  = stop; // 현재 정류장 설정
+    $scope.selectStop = function (stop) {
+        if (!stop) return;
+        $scope.selectedStop = stop;
+        $scope.currentStop  = stop;
 
-        fetchArrivalsForCurrentStop(); // 도착 정보 조회
+        fetchArrivalsForCurrentStop();
 
-        // 1. 마커 색상 갱신
-        drawStopsOnMap($scope.stops); // 정류장 다시 그리기
+        drawStopsOnMap($scope.stops);
 
-        // 2. 지도 이동 및 줌인
-        if (olMap) { // 지도 있으면
-            var lat = parseFloat(stop.gpslati || stop.gpsLati || stop.gpsY); // 위도
-            var lon = parseFloat(stop.gpslong || stop.gpsLong || stop.gpsX); // 경도
+        if (olMap) {
+            var lat = parseFloat(stop.gpslati || stop.gpsLati || stop.gpsY);
+            var lon = parseFloat(stop.gpslong || stop.gpsLong || stop.gpsX);
 
-            if (!isNaN(lat) && !isNaN(lon)) { // 유효성 검사
-                var center = ol.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:5179'); // 좌표 변환
-                var view = olMap.getView(); // 뷰 획득
-                if (view) { // 뷰 있으면
-                    view.animate({ // 애니메이션
-                        center: center, // 중심 이동
-                        zoom: 17, // 줌 레벨 (확대)
-                        duration: 500 // 지속 시간
+            if (!isNaN(lat) && !isNaN(lon)) {
+                var center = ol.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:5179');
+                var view = olMap.getView();
+                if (view) {
+                    view.animate({
+                        center: center,
+                        zoom: 17,
+                        duration: 500
                     });
                 }
             }
         }
     };
 
-    function cancelAutoRefresh() { // 자동고침 취소
+    function cancelAutoRefresh() {
         if (autoRefreshPromise) {
-            $interval.cancel(autoRefreshPromise); // 취소
-            autoRefreshPromise = null; // 초기화
+            $interval.cancel(autoRefreshPromise);
+            autoRefreshPromise = null;
         }
-        $scope.isAutoRefreshOn = false; // 플래그 끔
+        $scope.isAutoRefreshOn = false;
     }
 
-    function startAutoRefresh() { // 자동고침 시작
-        cancelAutoRefresh(); // 기존 취소
-        if ($scope.currentRouteId) { // 노선 모드면
+    function startAutoRefresh() {
+        cancelAutoRefresh();
+        if ($scope.currentRouteId) {
             autoRefreshPromise = $interval(function () {
-                $scope.fetchBusLocations(); // 위치 조회
-            }, 10000); // 10초마다
-            $scope.isAutoRefreshOn = true; // 플래그 켬
-        } else if ($scope.selectedStop) { // 정류장 모드면
+                $scope.fetchBusLocations();
+            }, 10000);
+            $scope.isAutoRefreshOn = true;
+        } else if ($scope.selectedStop) {
             autoRefreshPromise = $interval(function () {
-                fetchArrivalsForCurrentStop(); // 도착 정보 조회
-            }, 10000); // 10초마다
-            $scope.isAutoRefreshOn = true; // 플래그 켬
+                fetchArrivalsForCurrentStop();
+            }, 10000);
+            $scope.isAutoRefreshOn = true;
         }
     }
 
-    $scope.$on('$destroy', function () { // 소멸 시
-        cancelAutoRefresh(); // 자동고침 취소
-        clearRepPulse(); // 펄스 초기화
+    $scope.$on('$destroy', function () {
+        cancelAutoRefresh();
+        clearRepPulse();
     });
 
-    $scope.enableAutoRefresh = function () { // 자동고침 활성화
-        if ($scope.currentRouteId || $scope.selectedStop) { // 조건 만족 시
-            startAutoRefresh(); // 시작
-        } else { // 아니면
-            alert('먼저 버스 번호를 검색하거나 정류장을 선택하세요.'); // 경고
+    $scope.enableAutoRefresh = function () {
+        if ($scope.currentRouteId || $scope.selectedStop) {
+            startAutoRefresh();
+        } else {
+            alert('먼저 버스 번호를 검색하거나 정류장을 선택하세요.');
         }
     };
 
-    $scope.disableAutoRefresh = function () { // 자동고침 비활성화
-        cancelAutoRefresh(); // 취소
+    $scope.disableAutoRefresh = function () {
+        cancelAutoRefresh();
     };
 
-    $scope.doSearch = function () { // 검색 함수
-        if (!$scope.searchKeyword) { // 검색어 없으면
-            alert('검색어를 입력하세요.'); // 경고
+    $scope.doSearch = function () {
+        if (!$scope.searchKeyword) {
+            alert('검색어를 입력하세요.');
             return;
         }
-        if ($scope.searchType === 'route') { // 노선 검색
+        if ($scope.searchType === 'route') {
             $scope.searchTerm = $scope.searchKeyword;
             $scope.searchBus();
-        } else if ($scope.searchType === 'stop') { // 정류장 검색
+        } else if ($scope.searchType === 'stop') {
             $scope.searchStops();
-        } else { // 기타 (기본 노선)
+        } else {
             $scope.searchTerm = $scope.searchKeyword;
             $scope.searchBus();
         }
     };
 
-    $scope.searchBus = function () { // 버스 노선 검색
-        if (!$scope.searchTerm) { // 검색어 없으면
+    $scope.searchBus = function () {
+        if (!$scope.searchTerm) {
             alert('버스 번호를 입력하세요.');
             return;
         }
-        var routeNo = $scope.searchTerm; // 노선번호
-        cancelAutoRefresh(); // 자동고침 취소
+        var routeNo = $scope.searchTerm;
+        cancelAutoRefresh();
 
-        $http.get('/api/bus/routes', { params: { routeNo: routeNo } }) // API 호출
-            .then(function (res) { // 성공 시
-                $scope.routeResultJson = angular.isString(res.data) ? res.data : JSON.stringify(res.data, null, 2); // 결과 저장
-                var data = parseMaybeJson(res.data); // 파싱
-                if (!data || !data.response || !data.response.body) { // 유효성 검사
+        $http.get('/api/bus/routes', { params: { routeNo: routeNo } })
+            .then(function (res) {
+                $scope.routeResultJson = angular.isString(res.data) ? res.data : JSON.stringify(res.data, null, 2);
+                var data = parseMaybeJson(res.data);
+                if (!data || !data.response || !data.response.body) {
                     alert('노선 정보를 찾을 수 없습니다.');
                     return;
                 }
-                var items = data.response.body.items && data.response.body.items.item; // 아이템 추출
-                if (!items) { // 아이템 없으면
+                var items = data.response.body.items && data.response.body.items.item;
+                if (!items) {
                     alert('노선 목록이 비어 있습니다.');
                     return;
                 }
-                var first = angular.isArray(items) ? items[0] : items; // 첫 번째 항목
-                var routeId = first.routeid || first.routeId; // 노선 ID
-                if (!routeId) { // ID 없으면
+                var first = angular.isArray(items) ? items[0] : items;
+                var routeId = first.routeid || first.routeId;
+                if (!routeId) {
                     alert('routeId 없음');
                     return;
                 }
 
-                $scope.currentRouteId = routeId; // ID 설정
-                $scope.representativeBus = null; // 대표 버스 초기화
-                $scope.prevStop = null; // 이전 정류장 초기화
-                $scope.currentStop = null; // 현재 정류장 초기화
-                $scope.nextStop = null; // 다음 정류장 초기화
-                $scope.arrivalList = []; // 도착 목록 초기화
-                $scope.selectedStop = null; // 선택된 정류장 초기화
-                $scope.tempRouteIdFromStop = null; // 임시 ID 초기화
-                lastRepVehicleNoForPan = null; // 이동 변수 초기화
+                $scope.currentRouteId = routeId;
+                $scope.representativeBus = null;
+                $scope.prevStop = null;
+                $scope.currentStop = null;
+                $scope.nextStop = null;
+                $scope.arrivalList = [];
+                $scope.selectedStop = null;
+                $scope.tempRouteIdFromStop = null;
+                lastRepVehicleNoForPan = null;
 
-                $scope.fetchRouteStops(routeId); // 정류장 조회
-                $scope.fetchBusLocations(); // 위치 조회
-                startAutoRefresh(); // 자동고침 시작
-            }).catch(function (err) { // 에러 시
+                $scope.fetchRouteStops(routeId);
+                $scope.fetchBusLocations();
+                startAutoRefresh();
+            }).catch(function (err) {
                 console.error('노선 조회 실패:', err);
                 alert('노선 정보를 가져오지 못했습니다.');
             });
     };
 
-    $scope.fetchRouteStops = function (routeId) { // 노선 정류장 조회
-        if (!routeId) return; // ID 없으면 중단
-        $http.get('/api/bus/route-stops', { params: { routeId: routeId } }) // API 호출
-            .then(function (res) { // 성공 시
-                $scope.stopsResultJson = angular.isString(res.data) ? res.data : JSON.stringify(res.data, null, 2); // 결과 저장
-                var data = parseMaybeJson(res.data); // 파싱
-                if (!data || !data.response || !data.response.body) { // 유효성 검사
+    $scope.fetchRouteStops = function (routeId) {
+        if (!routeId) return;
+        $http.get('/api/bus/route-stops', { params: { routeId: routeId } })
+            .then(function (res) {
+                $scope.stopsResultJson = angular.isString(res.data) ? res.data : JSON.stringify(res.data, null, 2);
+                var data = parseMaybeJson(res.data);
+                if (!data || !data.response || !data.response.body) {
                     alert('정류장 정보를 찾을 수 없습니다.');
                     return;
                 }
-                var items = data.response.body.items && data.response.body.items.item; // 아이템 추출
-                if (!items) { // 아이템 없으면
+                var items = data.response.body.items && data.response.body.items.item;
+                if (!items) {
                     alert('정류장 목록이 비어 있습니다.');
                     return;
                 }
-                var stopsArray = angular.isArray(items) ? items : [items]; // 배열 변환
-                $scope.stops = stopsArray; // 목록 저장
-                $scope.selectedStop = null; // 선택 초기화
+                var stopsArray = angular.isArray(items) ? items : [items];
+                $scope.stops = stopsArray;
+                $scope.selectedStop = null;
 
-                drawStopsOnMap(stopsArray); // 정류장 그리기
-                drawRouteLineFromStops(stopsArray); // 라인 그리기
+                drawStopsOnMap(stopsArray);
+                drawRouteLineFromStops(stopsArray);
 
-                if ($scope.representativeBus) { // 대표 버스 있으면
-                    var calc = computePrevCurrentNextForBus($scope.representativeBus, $scope.stops); // 계산
-                    $scope.prevStop = calc.prev; // 이전 설정
-                    $scope.currentStop = calc.current; // 현재 설정
-                    $scope.nextStop = calc.next; // 다음 설정
-                    fetchArrivalsForCurrentStop(); // 도착 정보 조회
+                if ($scope.representativeBus) {
+                    var calc = computePrevCurrentNextForBus($scope.representativeBus, $scope.stops);
+                    $scope.prevStop = calc.prev;
+                    $scope.currentStop = calc.current;
+                    $scope.nextStop = calc.next;
+                    fetchArrivalsForCurrentStop();
                 }
-            }).catch(function (err) { // 에러 시
+            }).catch(function (err) {
                 console.error('정류장 목록 조회 실패:', err);
                 alert('정류장 정보를 가져오지 못했습니다.');
             });
     };
 
-    $scope.searchStops = function () { // 정류장 검색
-        if (!$scope.searchKeyword) { // 검색어 없으면
+    $scope.searchStops = function () {
+        if (!$scope.searchKeyword) {
             alert('정류장 이름을 입력하세요.');
             return;
         }
-        var keyword = $scope.searchKeyword; // 검색어
-        cancelAutoRefresh(); // 자동고침 취소
+        var keyword = $scope.searchKeyword;
+        cancelAutoRefresh();
 
-        $scope.currentRouteId = null; // 노선 ID 초기화
-        $scope.representativeBus = null; // 대표 버스 초기화
+        $scope.currentRouteId = null;
+        $scope.representativeBus = null;
         $scope.prevStop = null;
         $scope.currentStop = null;
         $scope.nextStop = null;
@@ -1101,117 +1248,117 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         $scope.selectedStop = null;
         $scope.tempRouteIdFromStop = null;
 
-        clearRouteLine(); // 라인 지우기
-        clearBusMarkers(); // 버스 지우기
-        clearRepPulse(); // 펄스 지우기
-        lastRepVehicleNoForPan = null; // 이동 변수 초기화
-        hideHoverTooltip(); // 툴팁 숨김
+        clearRouteLine();
+        clearBusMarkers();
+        clearRepPulse();
+        lastRepVehicleNoForPan = null;
+        hideHoverTooltip();
 
-        $scope.isMapLoading = true; // 로딩 시작
+        $scope.isMapLoading = true;
 
-        $http.get('/api/bus/stops-by-name', { // API 호출
+        $http.get('/api/bus/stops-by-name', {
             params: { nodeName: keyword, pageNo: 1, numOfRows: 100 }
-        }).then(function (res) { // 성공 시
-            $scope.stopsResultJson = angular.isString(res.data) ? res.data : JSON.stringify(res.data, null, 2); // 결과 저장
-            var data = parseMaybeJson(res.data); // 파싱
-            if (!data || !data.response || !data.response.body) { // 유효성 검사
+        }).then(function (res) {
+            $scope.stopsResultJson = angular.isString(res.data) ? res.data : JSON.stringify(res.data, null, 2);
+            var data = parseMaybeJson(res.data);
+            if (!data || !data.response || !data.response.body) {
                 $scope.stops = [];
                 $scope.selectedStop = null;
                 return;
             }
-            var itemsRoot = data.response.body.items; // 루트
-            if (!itemsRoot || !itemsRoot.item) { // 아이템 없으면
+            var itemsRoot = data.response.body.items;
+            if (!itemsRoot || !itemsRoot.item) {
                 $scope.stops = [];
                 $scope.selectedStop = null;
                 alert('검색된 정류장이 없습니다.');
                 return;
             }
-            var items = itemsRoot.item; // 아이템
-            var rawStopsArray = angular.isArray(items) ? items : [items]; // 배열 변환
-            var stopsArray = rawStopsArray.map(function (s) { // 매핑
-                var id = s.nodeid || s.nodeId || s.node_id || s.nodeno || s.sttnId || s.stationId; // ID 추출
-                return angular.extend({}, s, { nodeid: id }); // ID 추가
+            var items = itemsRoot.item;
+            var rawStopsArray = angular.isArray(items) ? items : [items];
+            var stopsArray = rawStopsArray.map(function (s) {
+                var id = s.nodeid || s.nodeId || s.node_id || s.nodeno || s.sttnId || s.stationId;
+                return angular.extend({}, s, { nodeid: id });
             });
-            $scope.stops = stopsArray; // 목록 저장
-            $scope.selectedStop = null; // 선택 초기화
-            drawStopsOnMap(stopsArray); // 그리기
-        }).catch(function (err) { // 에러 시
+            $scope.stops = stopsArray;
+            $scope.selectedStop = null;
+            drawStopsOnMap(stopsArray);
+        }).catch(function (err) {
             console.error('정류장 검색 실패:', err);
             alert('정류장 정보를 가져오지 못했습니다.');
-        }).finally(function () { // 완료 시
-            $scope.isMapLoading = false; // 로딩 끝
+        }).finally(function () {
+            $scope.isMapLoading = false;
         });
     };
 
-    $scope.fetchBusLocations = function () { // 버스 위치 조회
-        if (!$scope.currentRouteId) return; // 노선 ID 없으면 중단
-        $scope.isMapLoading = true; // 로딩 시작
+    $scope.fetchBusLocations = function () {
+        if (!$scope.currentRouteId) return;
+        $scope.isMapLoading = true;
 
-        $http.get('/api/bus/locations', { // API 호출
+        $http.get('/api/bus/locations', {
             params: { routeId: $scope.currentRouteId, pageNo: 1, numOfRows: 100 }
-        }).then(function (res) { // 성공 시
-            $scope.locationResultJson = angular.isString(res.data) ? res.data : JSON.stringify(res.data, null, 2); // 결과 저장
-            var data = parseMaybeJson(res.data); // 파싱
-            if (!data || !data.response || !data.response.body) { // 유효성 검사
+        }).then(function (res) {
+            $scope.locationResultJson = angular.isString(res.data) ? res.data : JSON.stringify(res.data, null, 2);
+            var data = parseMaybeJson(res.data);
+            if (!data || !data.response || !data.response.body) {
                 clearBusMarkers();
                 $scope.representativeBus = null;
                 clearRepPulse();
                 return;
             }
-            var items = data.response.body.items && data.response.body.items.item; // 아이템 추출
-            if (!items) { // 아이템 없으면
+            var items = data.response.body.items && data.response.body.items.item;
+            if (!items) {
                 clearBusMarkers();
                 $scope.representativeBus = null;
                 clearRepPulse();
                 return;
             }
-            var busArray = angular.isArray(items) ? items : [items]; // 배열 변환
-            var newRepresentative = null; // 새 대표 버스
-            var oldRep = $scope.representativeBus; // 구 대표 버스
+            var busArray = angular.isArray(items) ? items : [items];
+            var newRepresentative = null;
+            var oldRep = $scope.representativeBus;
 
-            if (oldRep && oldRep.vehicleno) { // 구 대표 있으면
+            if (oldRep && oldRep.vehicleno) {
                 for (var i = 0; i < busArray.length; i++) {
                     var b = busArray[i];
-                    if (b.vehicleno && b.vehicleno === oldRep.vehicleno) { // 차량번호 일치
-                        newRepresentative = b; // 유지
+                    if (b.vehicleno && b.vehicleno === oldRep.vehicleno) {
+                        newRepresentative = b;
                         break;
                     }
                 }
             }
-            if (!newRepresentative && busArray.length > 0) { // 없으면
-                var idx = Math.floor(Math.random() * busArray.length); // 랜덤 선택
+            if (!newRepresentative && busArray.length > 0) {
+                var idx = Math.floor(Math.random() * busArray.length);
                 newRepresentative = busArray[idx];
             }
 
-            $scope.representativeBus = newRepresentative || null; // 대표 설정
+            $scope.representativeBus = newRepresentative || null;
 
-            if ($scope.representativeBus) { // 대표 있으면
-                panToRepresentativeBusIfNeeded($scope.representativeBus); // 이동
-                updateRepPulseFeatureByBus($scope.representativeBus); // 펄스
-            } else { // 없으면
-                clearRepPulse(); // 펄스 초기화
+            if ($scope.representativeBus) {
+                panToRepresentativeBusIfNeeded($scope.representativeBus);
+                updateRepPulseFeatureByBus($scope.representativeBus);
+            } else {
+                clearRepPulse();
             }
 
-            if ($scope.representativeBus && $scope.stops && $scope.stops.length > 0) { // 정류장 있으면
-                var calc2 = computePrevCurrentNextForBus($scope.representativeBus, $scope.stops); // 계산
+            if ($scope.representativeBus && $scope.stops && $scope.stops.length > 0) {
+                var calc2 = computePrevCurrentNextForBus($scope.representativeBus, $scope.stops);
                 $scope.prevStop = calc2.prev;
                 $scope.currentStop = calc2.current;
                 $scope.nextStop = calc2.next;
-                fetchArrivalsForCurrentStop(); // 도착 조회
-            } else { // 없으면
+                fetchArrivalsForCurrentStop();
+            } else {
                 $scope.prevStop = null;
                 $scope.currentStop = null;
                 $scope.nextStop = null;
                 $scope.arrivalList = [];
                 $scope.selectedStop = null;
             }
-            drawBusLocationsOnMap(busArray); // 버스 그리기
-        }).catch(function (err) { // 에러 시
+            drawBusLocationsOnMap(busArray);
+        }).catch(function (err) {
             console.error('버스 위치 조회 실패:', err);
             $scope.representativeBus = null;
             clearRepPulse();
-        }).finally(function () { // 완료 시
-            $scope.isMapLoading = false; // 로딩 끝
+        }).finally(function () {
+            $scope.isMapLoading = false;
         });
     };
 });
