@@ -1,4 +1,4 @@
-// 수정됨: 트램 토글 버튼(HTML: toggleTramLayer)과 JS 함수명 불일치 문제 해결 + 초기 로딩 시 트램 자동표시 방지(보이기 눌러야만 표시)
+// 수정됨: 트램 라인(section별 세그먼트 분리) 렌더링 시 구간 경계에서 라인이 끊기는 문제를 해결하기 위해, 섹션 변경 시 "이전 세그먼트의 마지막 점"을 "다음 세그먼트의 시작점"으로 함께 포함하여 연결되도록 수정
 
 // =========================
 // 좌표계 정의 (UTM-K, GRS80)
@@ -54,6 +54,52 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     $scope.isTramVisible = false; // ✅ 초기엔 "보이기" 상태 (지금 바로 보이면 안 됨)
 
     // =========================================================
+    // [트램] 구간별 색상 매핑 (이미지처럼 #AB3937 / #202020 적용)
+    //  - section 이름('1구간', '2구간'...) 기준으로 라인 색을 분리한다.
+    //  - 매핑이 없는 section은 기본 #202020을 사용한다.
+    // =========================================================
+    var TRAM_SECTION_COLOR_MAP = { // 트램 구간별 색상 테이블
+        '1구간':  '#AB3937',
+        '2구간':  '#AB3937',
+        '3구간':  '#202020',
+        '4구간':  '#202020',
+        '5구간':  '#202020',
+        '6구간':  '#202020',
+        '7구간':  '#AB3937',
+        '8구간':  '#AB3937',
+        '9구간':  '#202020',
+        '10구간': '#AB3937',
+        '11구간': '#202020',
+        '12구간': '#202020',
+        '13구간': '#AB3937',
+        '14구간': '#202020'
+    };
+
+    function getTramSectionColor(sectionName) { // section -> 색상 반환
+        if (!sectionName) return '#202020'; // 기본색
+        return TRAM_SECTION_COLOR_MAP[sectionName] || '#202020'; // 매핑 없으면 기본색
+    }
+
+    // 트램 라인 스타일 캐시 (섹션 색상별)
+    var tramLineStyleCache = {}; // { '#95443E': Style, '#202020': Style ... }
+
+    function getTramLineStyleByColor(hexColor) { // 라인 스타일(섹션별) 반환
+        var key = String(hexColor || '#202020'); // 캐시 키
+        if (tramLineStyleCache[key]) return tramLineStyleCache[key]; // 있으면 반환
+
+        tramLineStyleCache[key] = new ol.style.Style({ // 새 스타일 생성
+            stroke: new ol.style.Stroke({
+                color: key, // ✅ 섹션 색상 그대로 사용
+                width: 6, // 두께
+                lineCap: 'round',
+                lineJoin: 'round'
+            })
+        });
+
+        return tramLineStyleCache[key]; // 반환
+    }
+
+    // =========================================================
     // [디자인] SVG 아이콘 생성 함수
     // =========================================================
     function createSvgIcon(color, type) {
@@ -78,15 +124,8 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     var tramLineSource = new ol.source.Vector(); // 트램 라인 소스
     var tramLineLayer  = new ol.layer.Vector({ // 트램 라인 레이어
         source: tramLineSource, // 소스 연결
-        zIndex: 4, // z-index (버스/정류장/버스노선 라인보다 아래)
-        style: new ol.style.Style({ // 라인 스타일
-            stroke: new ol.style.Stroke({
-                color: 'rgba(220, 53, 69, 0.85)', // 트램 전용(붉은 계열)
-                width: 6, // 두께
-                lineCap: 'round',
-                lineJoin: 'round'
-            })
-        })
+        zIndex: 4 // z-index (버스/정류장/버스노선 라인보다 아래)
+        // ✅ style은 feature별로 직접 설정(섹션별 색상 적용)하므로 레이어 고정 style 사용 안 함
     });
 
     var tramStopSource = new ol.source.Vector(); // 트램 정거장 소스
@@ -106,33 +145,81 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         tramStopSource.clear(); // 정거장 제거
     }
 
-    function buildTramCoordinatesFromData(tramData) { // 트램 좌표 배열 생성 (waypoint 포함)
-        if (!tramData || !tramData.length) return []; // 데이터 없으면 빈 배열
-        var coords = []; // 좌표 배열
-        tramData.forEach(function (p) {
-            var lat = parseFloat(p.lat); // 위도
-            var lng = parseFloat(p.lng); // 경도
-            if (isNaN(lat) || isNaN(lng)) return; // 좌표 이상하면 스킵
-            var xy5179 = ol.proj.transform([lng, lat], 'EPSG:4326', 'EPSG:5179'); // 좌표 변환
-            coords.push(xy5179); // 좌표 추가
-        });
-        return coords; // 반환
-    }
+    // ✅ (섹션별 세그먼트) 트램 라인 생성 헬퍼
+    function addTramSegmentFeature(coords5179, sectionName) { // 세그먼트 피처 추가
+        if (!coords5179 || coords5179.length < 2) return; // 최소 2점 필요
 
-    function drawTramLine(tramData) { // 트램 라인 그리기
-        if (!olMap) return; // 지도 없으면 중단
-        tramLineSource.clear(); // 기존 라인 제거
-        var coords = buildTramCoordinatesFromData(tramData); // 좌표 생성
-        if (coords.length < 2) return; // 2개 미만이면 라인 불가
-
+        var color = getTramSectionColor(sectionName); // 섹션 색상
         var f = new ol.Feature({ // 라인 피처 생성
-            geometry: new ol.geom.LineString(coords)
+            geometry: new ol.geom.LineString(coords5179)
         });
+
         f.set('featureType', 'tram_line'); // 타입 지정(충돌 방지)
+        f.set('section', sectionName || ''); // 섹션 저장
+
+        // ✅ 섹션별 색상 스타일 적용
+        f.setStyle(getTramLineStyleByColor(color));
+
         tramLineSource.addFeature(f); // 소스에 추가
     }
 
-    function drawTramStops(tramData) { // 트램 정거장 번호(정수 id)만 표시
+    function drawTramLine(tramData) { // 트램 라인 그리기 (섹션별 색상)
+        if (!olMap) return; // 지도 없으면 중단
+        tramLineSource.clear(); // 기존 라인 제거
+        if (!tramData || !tramData.length) return; // 데이터 없으면 중단
+
+        // ✅ 연속된 점들을 section 기준으로 묶어서 세그먼트로 만든다.
+        // ✅ (수정 핵심) 섹션이 바뀌는 순간에도 라인이 끊기지 않도록,
+        //             "이전 세그먼트 마지막 점"을 "새 세그먼트 첫 점"으로 포함해서 이어준다.
+        var currentSection = null; // 현재 세그먼트 섹션
+        var currentCoords = []; // 현재 세그먼트 좌표
+
+        tramData.forEach(function (p) {
+            if (!p) return; // null 방지
+
+            var lat = parseFloat(p.lat); // 위도
+            var lng = parseFloat(p.lng); // 경도
+            if (isNaN(lat) || isNaN(lng)) return; // 좌표 이상 스킵
+
+            var sectionName = p.section || ''; // 구간 이름
+            var xy5179 = ol.proj.transform([lng, lat], 'EPSG:4326', 'EPSG:5179'); // 좌표 변환
+
+            // 세그먼트 시작
+            if (currentSection === null) {
+                currentSection = sectionName;
+                currentCoords = [xy5179];
+                return;
+            }
+
+            // 섹션이 바뀌면 이전 세그먼트 확정 후 새 세그먼트 시작
+            if (sectionName !== currentSection) {
+                // 이전 세그먼트 추가
+                addTramSegmentFeature(currentCoords, currentSection);
+
+                // ✅ 경계 연결: 이전 세그먼트 마지막 점을 다음 세그먼트 첫 점으로 포함
+                var lastPointOfPrev = (currentCoords && currentCoords.length > 0)
+                    ? currentCoords[currentCoords.length - 1]
+                    : null;
+
+                currentSection = sectionName; // 섹션 갱신
+
+                if (lastPointOfPrev) {
+                    currentCoords = [lastPointOfPrev, xy5179]; // ✅ 끊김 방지 연결
+                } else {
+                    currentCoords = [xy5179]; // 방어 코드(이론상 거의 안 탐)
+                }
+                return;
+            }
+
+            // 같은 섹션이면 이어 붙이기
+            currentCoords.push(xy5179);
+        });
+
+        // 마지막 세그먼트 확정
+        addTramSegmentFeature(currentCoords, currentSection);
+    }
+
+    function drawTramStops(tramData) { // 트램 정거장 번호(정수 id)만 표시 (섹션색 외곽선)
         if (!olMap) return; // 지도 없으면 중단
         tramStopSource.clear(); // 기존 정거장 제거
         if (!tramData || !tramData.length) return; // 데이터 없으면 중단
@@ -150,6 +237,8 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             var lng = parseFloat(p.lng); // 경도
             if (isNaN(lat) || isNaN(lng)) return; // 좌표 이상하면 스킵
 
+            var sectionColor = getTramSectionColor(p.section); // ✅ 정거장도 섹션색으로 테두리
+
             var xy5179 = ol.proj.transform([lng, lat], 'EPSG:4326', 'EPSG:5179'); // 좌표 변환
             var feature = new ol.Feature({ // 피처 생성
                 geometry: new ol.geom.Point(xy5179) // 포인트 생성
@@ -162,7 +251,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                     image: new ol.style.Circle({
                         radius: 6, // 점 크기
                         fill: new ol.style.Fill({ color: '#ffffff' }), // 내부 흰색
-                        stroke: new ol.style.Stroke({ color: '#dc3545', width: 3 }) // 외곽 붉은색
+                        stroke: new ol.style.Stroke({ color: sectionColor, width: 3 }) // ✅ 외곽 섹션색
                     }),
                     zIndex: 8
                 }),
@@ -190,8 +279,8 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             clearTram(); // 트램 제거
             return; // 종료
         }
-        drawTramLine(data); // 라인 그림
-        drawTramStops(data); // 정거장 번호 그림
+        drawTramLine(data); // ✅ 섹션별 라인 그림
+        drawTramStops(data); // ✅ 섹션별 정거장 테두리 색 적용
     }
 
     // =========================================================
@@ -576,6 +665,9 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
         olMap.on('singleclick', function (evt) {
             if (!olMap) return;
+
+            // ✅ RoutePicker(노선따기) ON이면 여기 singleclick 로직은 간섭하지 않게 즉시 종료
+            if ($scope.isRoutePickerOn) return;
 
             var isRouteMode = !!$scope.currentRouteId;
             var isStopSearchMode = !isRouteMode && ($scope.stops && $scope.stops.length > 0);
@@ -1119,6 +1211,11 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     $scope.$on('$destroy', function () {
         cancelAutoRefresh();
         clearRepPulse();
+
+        // ✅ RoutePicker 켜진 채로 페이지 이동/컨트롤러 종료될 수 있으니 정리
+        if ($scope.isRoutePickerOn) {
+            $scope.disableRoutePicker();
+        }
     });
 
     $scope.enableAutoRefresh = function () {
@@ -1361,6 +1458,184 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             $scope.isMapLoading = false;
         });
     };
+
+    // =========================================================
+    // [개발자 도구] 클릭해서 노선 좌표 따기 (우클릭 = 취소)
+    //  - ON/OFF 가능하게 만들고, 이벤트 중복 바인딩을 방지한다.
+    // =========================================================
+    $scope.isRoutePickerOn = false; // ✅ 노선따기 모드 상태
+
+    var routePickerCollectedCoords = []; // 데이터 저장소(모드 ON 동안 유지)
+    var routePickerTempSource = null; // 임시 소스
+    var routePickerTempLayer = null; // 임시 레이어
+    var routePickerClickHandler = null; // 지도 클릭 핸들러 참조
+    var routePickerContextHandler = null; // 우클릭 핸들러 참조
+
+    function routePickerRedrawAll() { // 공통: 화면 그리기 및 콘솔 출력 함수
+        if (!routePickerTempSource) return;
+
+        routePickerTempSource.clear(); // 기존 그림 싹 지우기
+
+        if (routePickerCollectedCoords.length === 0) {
+            console.clear();
+            console.log('[]');
+            return;
+        }
+
+        // 저장된 좌표대로 다시 그리기
+        routePickerCollectedCoords.forEach(function (item, index) {
+            // 좌표 변환 (Lat/Lng -> Map Proj)
+            var xy = ol.proj.transform([item.lng, item.lat], 'EPSG:4326', 'EPSG:5179');
+
+            // 점 찍기
+            routePickerTempSource.addFeature(new ol.Feature({
+                geometry: new ol.geom.Point(xy)
+            }));
+
+            // 선 긋기 (이전 점과 연결)
+            if (index > 0) {
+                var prevItem = routePickerCollectedCoords[index - 1];
+                var prevXy = ol.proj.transform([prevItem.lng, prevItem.lat], 'EPSG:4326', 'EPSG:5179');
+
+                routePickerTempSource.addFeature(new ol.Feature({
+                    geometry: new ol.geom.LineString([prevXy, xy])
+                }));
+            }
+        });
+
+        // ★ 콘솔에 실시간 JSON 출력
+        console.clear();
+        console.log(JSON.stringify(routePickerCollectedCoords, null, 2));
+    }
+
+    $scope.enableRoutePicker = function () { // 노선따기 모드 ON
+        if (!olMap) return;
+
+        // ✅ 이미 켜져 있으면 중복 바인딩 방지
+        if ($scope.isRoutePickerOn) {
+            console.log('이미 노선 따기 모드가 켜져 있습니다. (중복 실행 방지)');
+            return;
+        }
+
+        $scope.isRoutePickerOn = true;
+
+        console.log('--- 노선 따기 모드 시작 ---');
+        console.log('좌클릭: 점 추가 / 우클릭: 실행 취소(Undo)');
+        console.log('종료: window.stopPicker() 또는 $scope.disableRoutePicker() 호출');
+
+        routePickerCollectedCoords = []; // 새 시작이므로 초기화
+
+        routePickerTempSource = new ol.source.Vector();
+        routePickerTempLayer = new ol.layer.Vector({
+            source: routePickerTempSource,
+            zIndex: 9999,
+            style: new ol.style.Style({
+                image: new ol.style.Circle({
+                    radius: 5,
+                    fill: new ol.style.Fill({ color: '#ff0000' }),
+                    stroke: new ol.style.Stroke({ color: '#fff', width: 2 })
+                }),
+                stroke: new ol.style.Stroke({
+                    color: '#ff0000',
+                    width: 4
+                })
+            })
+        });
+
+        olMap.addLayer(routePickerTempLayer);
+
+        // -------------------------------------------------
+        // 1. 좌클릭: 점 추가
+        // -------------------------------------------------
+        routePickerClickHandler = function (evt) {
+            if (!$scope.isRoutePickerOn) return;
+
+            var coord = evt.coordinate;
+            var lonLat = ol.proj.transform(coord, 'EPSG:5179', 'EPSG:4326');
+            var lat = parseFloat(lonLat[1].toFixed(5));
+            var lng = parseFloat(lonLat[0].toFixed(5));
+
+            // 데이터 수집
+            var item = {
+                id: (routePickerCollectedCoords.length + 1),
+                section: "UserTrace",
+                type: "waypoint",
+                lat: lat,
+                lng: lng
+            };
+            routePickerCollectedCoords.push(item);
+
+            // 화면 그리기 및 로그 출력
+            routePickerRedrawAll();
+        };
+
+        // ✅ 'click' 대신 singleclick 사용(기존 코드 흐름과 통일)
+        olMap.on('singleclick', routePickerClickHandler);
+
+        // -------------------------------------------------
+        // 2. 우클릭: 실행 취소 (Undo)
+        // -------------------------------------------------
+        routePickerContextHandler = function (evt) {
+            evt.preventDefault(); // 브라우저 기본 메뉴 뜨지 않게 막기
+
+            if (!$scope.isRoutePickerOn) return;
+
+            if (routePickerCollectedCoords.length === 0) {
+                console.log("취소할 지점이 없습니다.");
+                return;
+            }
+
+            // 마지막 데이터 삭제
+            routePickerCollectedCoords.pop();
+            console.log("↩️ 마지막 지점 취소됨. 남은 개수: " + routePickerCollectedCoords.length);
+
+            // 화면 다시 그리기 및 로그 출력
+            routePickerRedrawAll();
+        };
+
+        olMap.getViewport().addEventListener('contextmenu', routePickerContextHandler);
+
+        // 시작 시 콘솔 출력(빈 배열)
+        routePickerRedrawAll();
+    };
+
+    $scope.disableRoutePicker = function () { // 노선따기 모드 OFF
+        if (!olMap) return;
+
+        if (!$scope.isRoutePickerOn) {
+            console.log('노선 따기 모드가 꺼져 있습니다.');
+            return;
+        }
+
+        $scope.isRoutePickerOn = false;
+
+        // 이벤트 해제
+        if (routePickerClickHandler) {
+            olMap.un('singleclick', routePickerClickHandler);
+            routePickerClickHandler = null;
+        }
+
+        if (routePickerContextHandler) {
+            olMap.getViewport().removeEventListener('contextmenu', routePickerContextHandler);
+            routePickerContextHandler = null;
+        }
+
+        // 레이어 제거
+        if (routePickerTempLayer) {
+            olMap.removeLayer(routePickerTempLayer);
+            routePickerTempLayer = null;
+        }
+
+        // 소스 정리
+        routePickerTempSource = null;
+
+        console.log('--- 노선 따기 모드 종료 ---');
+    };
+
+    // 실행 커맨드 노출
+    window.startPicker = $scope.enableRoutePicker;
+    window.stopPicker  = $scope.disableRoutePicker;
+
 });
 
 // 수정됨 끝

@@ -1,175 +1,220 @@
-// window.TRAM_ROUTE_FULL_HD
-// 수정 사항:
-// 1. 1공구(연축~회덕): 계족산로의 굽은 선형을 따라 웨이포인트 5개 추가 (건물 회피)
-// 2. 9공구(진잠): V자 꺾임 구간을 도로망에 맞춰 정밀 보정
-// 3. 13공구(대전역): 역전 광장 진입/진출 곡선 부드럽게 처리
-// 4. 전체 구간: 긴 직선 도로라도 중간에 점을 찍어 도로 이탈 방지
+// =========================================================
+// [최종 완성] 대전 트램 2호선 (UserTrace 14구간 + Station 매핑)
+// =========================================================
 
 window.TRAM_ROUTE_FULL_HD = [
-  // ==========================================
-  // [1공구] 연축지구 ~ 중리네거리 (계족산로 정밀 추적)
-  // ==========================================
-  // 기점: 연축차량기지
-  { id: 244, section: "1공구", name: "연축(차량기지)", lat: 36.39250, lng: 127.42380 },
-  
-  // [보정] 연축 -> 와동 (고속도로 옆 굽은 도로)
-  // 도로가 살짝 서쪽으로 휘었다가 돌아오는 S자 형태
-  { id: 243.8, section: "1공구", type: "waypoint", lat: 36.38900, lng: 127.42300 }, 
-  { id: 243.6, section: "1공구", type: "waypoint", lat: 36.38550, lng: 127.42250 }, // 굴다리 전 휨
-  { id: 243.4, section: "1공구", type: "waypoint", lat: 36.38200, lng: 127.42320 }, // 다시 도로 복귀
-  { id: 243.2, section: "1공구", type: "waypoint", lat: 36.38000, lng: 127.42350 }, // 아파트 단지 옆
+    // -------------------------------------------------------
+    // [1구간] 연축(244) ~ 회덕(243)
+    // -------------------------------------------------------
+    { id: 244, section: '1구간', type: 'station', name: '연축(차량기지)', lat: 36.39229, lng: 127.42084 },
+    { section: '1구간', type: 'waypoint', lat: 36.3919, lng: 127.4207 },
+    { section: '1구간', type: 'waypoint', lat: 36.39125, lng: 127.42077 },
+    { section: '1구간', type: 'waypoint', lat: 36.39057, lng: 127.42084 },
+    { section: '1구간', type: 'waypoint', lat: 36.38953, lng: 127.42125 },
+    { section: '1구간', type: 'waypoint', lat: 36.38871, lng: 127.42169 },
+    { section: '1구간', type: 'waypoint', lat: 36.38803, lng: 127.4223 },
+    { section: '1구간', type: 'waypoint', lat: 36.38719, lng: 127.42321 },
+    { section: '1구간', type: 'waypoint', lat: 36.38582, lng: 127.42468 },
+    { section: '1구간', type: 'waypoint', lat: 36.38537, lng: 127.42512 },
+    { section: '1구간', type: 'waypoint', lat: 36.38483, lng: 127.42537 },
+    { section: '1구간', type: 'waypoint', lat: 36.38353, lng: 127.42571 },
+    { section: '1구간', type: 'waypoint', lat: 36.38214, lng: 127.42599 },
+    { id: 243, section: '1구간', type: 'station', name: '회덕', lat: 36.37892, lng: 127.42668 },
+    { section: '1구간', type: 'waypoint', lat: 36.37191, lng: 127.42863 },
+    { id: 242, section: '1구간', type: 'station', name: '읍내', lat: 36.37191, lng: 127.42863 }, // (1구간 끝과 연결)
 
-  // 243: 회덕 (와동초교 앞)
-  { id: 243, section: "1공구", name: "회덕(와동초교)", lat: 36.37820, lng: 127.42350 },
-  
-  // [보정] 회덕 -> 읍내 (장동로/계족로 합류부)
-  { id: 242.7, section: "1공구", type: "waypoint", lat: 36.37500, lng: 127.42280 },
-  { id: 242.3, section: "1공구", type: "waypoint", lat: 36.37200, lng: 127.42150 },
+    // -------------------------------------------------------
+    // [2구간] 읍내(242) ~ 법동(241) ~ 중리(212)
+    // -------------------------------------------------------
+    
+    // 중간에 법동역 삽입 (경로상 추정 위치)
+    { id: 241, section: '2구간', type: 'station', name: '법동', lat: 36.36633, lng: 127.43022 },
+    { section: '2구간', type: 'waypoint', lat: 36.35976, lng: 127.43202 },
+    { section: '2구간', type: 'waypoint', lat: 36.35913, lng: 127.43211 },
+    { id: 212, section: '2구간', type: 'station', name: '중리네거리', lat: 36.35895, lng: 127.42584 },
 
-  // 242: 읍내동 (대덕소방서)
-  { id: 242, section: "1공구", name: "읍내(대덕소방서)", lat: 36.36850, lng: 127.42050 },
-  
-  // 241: 법동
-  { id: 241, section: "2공구", name: "법동", lat: 36.36520, lng: 127.42210 },
+    // -------------------------------------------------------
+    // [3구간] 중리(212) ~ 용전(213) ~ 한남대(214) ~ 오정(215)
+    // -------------------------------------------------------
+    // *참고: 사용자 데이터에 맞춰 역 위치 매핑
+    { id: 213, section: '3구간', type: 'station', name: '용전', lat: 36.35873, lng: 127.41787 },
+    { id: 214, section: '3구간', type: 'station', name: '한남대', lat: 36.35815, lng: 127.41002 },
+    { section: '3구간', type: 'waypoint', lat: 36.3568, lng: 127.4054 },
+    { id: 215, section: '3구간', type: 'station', name: '오정농수산물', lat: 36.35762, lng: 127.40089 },
+    { section: '3구간', type: 'waypoint', lat: 36.35765, lng: 127.39524 },
 
-  // [보정] 법동 -> 중리 (도로 중앙 유지)
-  { id: 241.5, section: "2공구", type: "waypoint", lat: 36.36350, lng: 127.42550 },
+    // -------------------------------------------------------
+    // [4구간] 오정 ~ 수정타운(216) ~ 둔산(217) ~ 정부청사(218)
+    // -------------------------------------------------------
+    { id: 216, section: '4구간', type: 'station', name: '수정타운', lat: 36.35765, lng: 127.39524 },
+    { id: 217, section: '4구간', type: 'station', name: '창업진흥원', lat: 36.3577, lng: 127.3875 },
+    { section: '4구간', type: 'waypoint', lat: 36.35777, lng: 127.37977 },
+    { section: '4구간', type: 'waypoint', lat: 36.35802, lng: 127.37946 },
+    { id: 218, section: '4구간', type: 'station', name: '정부청사역', lat: 36.35876, lng: 127.37947 },
 
-  // ★ 212: 중리네거리 분기점 (여기가 P자 고리의 매듭)
-  { id: 212, section: "2공구", name: "중리(공사충남본부)", lat: 36.36210, lng: 127.42850 },
+    // -------------------------------------------------------
+    // [5구간] 청사북문(219) ~ 예전(220) ~ 엑스포(221)
+    // -------------------------------------------------------
+    { id: 219, section: '5구간', type: 'station', name: '청사북문', lat: 36.365, lng: 127.3795 }, // (직선상 보간)
+    { id: 220, section: '5구간', type: 'station', name: '예술의전당', lat: 36.37, lng: 127.3795 }, // (직선상 보간)
+    { section: '5구간', type: 'waypoint', lat: 36.37457, lng: 127.37956 },
+    { section: '5구간', type: 'waypoint', lat: 36.37461, lng: 127.37931 },
+    { id: 221, section: '5구간', type: 'station', name: '엑스포과학공원', lat: 36.37406, lng: 127.37817 },
 
-  // ==========================================
-  // [3~4공구] 중리 ~ 정부청사 (한밭대로)
-  // ==========================================
-  { id: 213, section: "3공구", name: "중리네거리", lat: 36.36250, lng: 127.42550 },
-  { id: 214, section: "3공구", name: "한남대(오정동)", lat: 36.36120, lng: 127.41850 },
-  { id: 215, section: "3공구", name: "오정(농수산물시장)", lat: 36.36020, lng: 127.41150 },
+    // -------------------------------------------------------
+    // [6구간] 엑스포 ~ KAIST(222) ~ 유성구청(223)
+    // -------------------------------------------------------
+    { section: '6구간', type: 'waypoint', lat: 36.37255, lng: 127.37534 },
+    { section: '6구간', type: 'waypoint', lat: 36.37171, lng: 127.37388 },
+    { id: 222, section: '6구간', type: 'station', name: 'KAIST', lat: 36.37059, lng: 127.37214 },
+    { section: '6구간', type: 'waypoint', lat: 36.36947, lng: 127.37046 },
+    { id: 223, section: '6구간', type: 'station', name: '유성구청', lat: 36.36641, lng: 127.36592 },
+    { section: '6구간', type: 'waypoint', lat: 36.36525, lng: 127.36343 },
+    { section: '6구간', type: 'waypoint', lat: 36.36391, lng: 127.36071 },
+    { section: '6구간', type: 'waypoint', lat: 36.36275, lng: 127.35895 },
+    { section: '6구간', type: 'waypoint', lat: 36.36156, lng: 127.35684 },
+    { section: '6구간', type: 'waypoint', lat: 36.36092, lng: 127.35489 },
+    { section: '6구간', type: 'waypoint', lat: 36.36044, lng: 127.35335 },
+    { section: '6구간', type: 'waypoint', lat: 36.36032, lng: 127.35234 },
+    { section: '6구간', type: 'waypoint', lat: 36.36038, lng: 127.35123 },
+    { section: '6구간', type: 'waypoint', lat: 36.36064, lng: 127.34984 },
+    { section: '6구간', type: 'waypoint', lat: 36.36182, lng: 127.34597 },
 
-  // [보정] 유등천 횡단 (한밭대교 위) - 강물 위를 지나도록
-  { id: 215.5, section: "4공구", type: "waypoint", lat: 36.36050, lng: 127.40500 },
+    // -------------------------------------------------------
+    // [7구간] 충남대(224) ~ 유성온천(225)
+    // -------------------------------------------------------
+    { id: 224, section: '7구간', type: 'station', name: '충남대', lat: 36.36204, lng: 127.34531 },
+    { section: '7구간', type: 'waypoint', lat: 36.36204, lng: 127.34488 },
+    { section: '7구간', type: 'waypoint', lat: 36.36187, lng: 127.3446 },
+    { id: 225, section: '7구간', type: 'station', name: '유성온천역', lat: 36.35981, lng: 127.3437 },
+    { id: 226, section: '7구간', type: 'station', name: '상대', lat: 36.35065, lng: 127.34027 },
+    { section: '7구간', type: 'waypoint', lat: 36.3463, lng: 127.34031 },
+    { id: 227, section: '7구간', type: 'station', name: '원신흥', lat: 36.34511, lng: 127.34023 },
+    { section: '7구간', type: 'waypoint', lat: 36.34318, lng: 127.33958 },
+    { section: '7구간', type: 'waypoint', lat: 36.34162, lng: 127.33854 },
+    { section: '7구간', type: 'waypoint', lat: 36.33959, lng: 127.33682 },
 
-  { id: 216, section: "4공구", name: "수정타운(둔산)", lat: 36.35980, lng: 127.39820 },
-  { id: 217, section: "4공구", name: "재판소(법원)", lat: 36.35860, lng: 127.38950 },
-  { id: 218, section: "4공구", name: "정부청사역", lat: 36.35800, lng: 127.38120 },
+    // -------------------------------------------------------
+    // [8구간] 도안(228~231) ~ 가수원(232)
+    // -------------------------------------------------------
+    { id: 228, section: '8구간', type: 'station', name: '목원대입구', lat: 36.339, lng: 127.3365 },
+    { section: '8구간', type: 'waypoint', lat: 36.33649, lng: 127.33425 },
+    { section: '8구간', type: 'waypoint', lat: 36.33471, lng: 127.3332 },
+    { id: 229, section: '8구간', type: 'station', name: '도안고', lat: 36.33212, lng: 127.33282 },
+    { id: 230, section: '8구간', type: 'station', name: '목원대', lat: 36.326, lng: 127.3328 },
+    { id: 231, section: '8구간', type: 'station', name: '용소', lat: 36.31927, lng: 127.33309 },
+    { section: '8구간', type: 'waypoint', lat: 36.31779, lng: 127.33377 },
+    { section: '8구간', type: 'waypoint', lat: 36.31622, lng: 127.3346 },
+    { section: '8구간', type: 'waypoint', lat: 36.31543, lng: 127.33482 },
+    { section: '8구간', type: 'waypoint', lat: 36.31441, lng: 127.33501 },
+    { id: 232, section: '8구간', type: 'station', name: '가수원네거리', lat: 36.30294, lng: 127.33479 },
+    { section: '8구간', type: 'waypoint', lat: 36.30176, lng: 127.33481 },
+    { section: '8구간', type: 'waypoint', lat: 36.30153, lng: 127.33504 },
+    { section: '8구간', type: 'waypoint', lat: 36.30151, lng: 127.33568 },
 
-  // ==========================================
-  // [5공구] 둔산 ~ 엑스포 (90도 회전 구간)
-  // ==========================================
-  // [보정] 청사역 사거리 우회전 (건물 모서리 안 자르게)
-  { id: 218.3, section: "5공구", type: "waypoint", lat: 36.35820, lng: 127.38010 }, 
-  { id: 218.7, section: "5공구", type: "waypoint", lat: 36.35950, lng: 127.38040 },
+    // -------------------------------------------------------
+    // [9구간] 진잠(245) V자 ~ 관저(233)
+    // -------------------------------------------------------
+    { section: '9구간', type: 'waypoint', lat: 36.30157, lng: 127.33324 },
+    { section: '9구간', type: 'waypoint', lat: 36.30162, lng: 127.33155 },
+    { section: '9구간', type: 'waypoint', lat: 36.30153, lng: 127.33028 },
+    { section: '9구간', type: 'waypoint', lat: 36.30102, lng: 127.32863 },
+    { section: '9구간', type: 'waypoint', lat: 36.30044, lng: 127.32697 },
+    { section: '9구간', type: 'waypoint', lat: 36.29984, lng: 127.32525 },
+    { id: 245, section: '9구간', type: 'station', name: '진잠', lat: 36.29932, lng: 127.32423 }, // V자 꼭짓점
+    { section: '9구간', type: 'waypoint', lat: 36.29984, lng: 127.32525 },
+    { section: '9구간', type: 'waypoint', lat: 36.30044, lng: 127.32697 },
+    { section: '9구간', type: 'waypoint', lat: 36.30102, lng: 127.32863 },
+    { section: '9구간', type: 'waypoint', lat: 36.30153, lng: 127.33028 },
+    { section: '9구간', type: 'waypoint', lat: 36.30162, lng: 127.33155 },
+    { section: '9구간', type: 'waypoint', lat: 36.30157, lng: 127.33324 },
+    { section: '9구간', type: 'waypoint', lat: 36.30153, lng: 127.33504 },
+    { id: 233, section: '9구간', type: 'station', name: '롯데시네마', lat: 36.30151, lng: 127.33547 },
+    { section: '9구간', type: 'waypoint', lat: 36.30156, lng: 127.33674 },
+    { section: '9구간', type: 'waypoint', lat: 36.30178, lng: 127.33776 },
+    { section: '9구간', type: 'waypoint', lat: 36.30221, lng: 127.33966 },
+    { section: '9구간', type: 'waypoint', lat: 36.30272, lng: 127.34196 },
+    { section: '9구간', type: 'waypoint', lat: 36.3034, lng: 127.34487 },
+    { id: 234, section: '9구간', type: 'station', name: '대전가원학교', lat: 36.30357, lng: 127.34618 },
+    { section: '9구간', type: 'waypoint', lat: 36.30425, lng: 127.3494 },
+    { id: 235, section: '9구간', type: 'station', name: '가수원교회', lat: 36.30551, lng: 127.35484 },
+    { section: '9구간', type: 'waypoint', lat: 36.30658, lng: 127.35895 },
 
-  { id: 219, section: "5공구", name: "정부청사_북문", lat: 36.36250, lng: 127.38050 },
-  { id: 220, section: "5공구", name: "예술의전당", lat: 36.36920, lng: 127.38080 },
-  { id: 221, section: "5공구", name: "엑스포과학공원", lat: 36.37620, lng: 127.38150 },
+    // -------------------------------------------------------
+    // [10구간] 건양대(234) ~ 가수원교(235) ~ 정림(236) ~ 도마(237)
+    // -------------------------------------------------------
+    { section: '10구간', type: 'waypoint', lat: 36.3071, lng: 127.36137 },
+    { id: 236, section: '10구간', type: 'station', name: '가수원교', lat: 36.30739, lng: 127.36376 },
+    { section: '10구간', type: 'waypoint', lat: 36.30922, lng: 127.36888 },
+    { section: '10구간', type: 'waypoint', lat: 36.31035, lng: 127.37353 },
+    { section: '10구간', type: 'waypoint', lat: 36.31086, lng: 127.37527 },
+    { id: 237, section: '10구간', type: 'station', name: '도마네거리', lat: 36.31268, lng: 127.37919 },
 
-  // ==========================================
-  // [6공구] 엑스포 ~ 유성구청 (카이스트교 S자)
-  // ==========================================
-  // [보정] 다리 진입 전 좌회전 + 다리 위 S자 굴곡
-  { id: 221.2, section: "6공구", type: "waypoint", lat: 36.37650, lng: 127.38000 },
-  { id: 221.5, section: "6공구", type: "waypoint", lat: 36.37580, lng: 127.37700 }, // 다리 중간
-  { id: 221.8, section: "6공구", type: "waypoint", lat: 36.37450, lng: 127.37300 }, // 다리 끝
+    // -------------------------------------------------------
+    // [11구간] 유등교(238) ~ 유천(239)
+    // -------------------------------------------------------
+    { section: '11구간', type: 'waypoint', lat: 36.31387, lng: 127.38177 },
+    { id: 238, section: '11구간', type: 'station', name: '유등교', lat: 36.31507, lng: 127.38455 },
+    { section: '11구간', type: 'waypoint', lat: 36.3153, lng: 127.38536 },
 
-  { id: 222, section: "6공구", name: "KAIST", lat: 36.37250, lng: 127.37100 },
+    // -------------------------------------------------------
+    // [12구간] 오류(240) ~ 서대전(201,202) ~ 대사(203) ~ 부사(204) ~ 인동(205)
+    // -------------------------------------------------------
+    { id: 239, section: '12구간', type: 'station', name: '유천', lat: 36.31618, lng: 127.38879 },
+    { id: 240, section: '12구간', type: 'station', name: '오류', lat: 36.31886, lng: 127.39934 },
+    { id: 201, section: '12구간', type: 'station', name: '서대전역', lat: 36.32109, lng: 127.40789 },
+    { id: 202, section: '12구간', type: 'station', name: '서대전네거리', lat: 36.32237, lng: 127.41233 },
+    { section: '12구간', type: 'waypoint', lat: 36.3223, lng: 127.41269 },
+    { section: '12구간', type: 'waypoint', lat: 36.32204, lng: 127.41299 },
+    { id: 203, section: '12구간', type: 'station', name: '대사', lat: 36.31822, lng: 127.41782 },
+    { section: '12구간', type: 'waypoint', lat: 36.31828, lng: 127.41978 },
+    { id: 204, section: '12구간', type: 'station', name: '부사', lat: 36.3178, lng: 127.42145 },
+    { section: '12구간', type: 'waypoint', lat: 36.31796, lng: 127.42365 },
+    { section: '12구간', type: 'waypoint', lat: 36.31728, lng: 127.42505 },
 
-  // [보정] 카이스트 -> 유성구청 (강변 도로 곡선)
-  { id: 222.5, section: "6공구", type: "waypoint", lat: 36.37000, lng: 127.36500 },
 
-  { id: 223, section: "6공구", name: "유성구청", lat: 36.36700, lng: 127.36000 },
+    // -------------------------------------------------------
+    // [13구간] 대전역(206) ~ 대동(207) ~ 신흥(208) ~ 자양(209)
+    // -------------------------------------------------------
+    { section: '13구간', type: 'waypoint', lat: 36.31713, lng: 127.42564 },
+    { id: 205, section: '13구간', type: 'station', name: '인동', lat: 36.32067, lng: 127.43509 },
+    { section: '13구간', type: 'waypoint', lat: 36.3213, lng: 127.43642 },
+    { section: '13구간', type: 'waypoint', lat: 36.32164, lng: 127.43767 },
+    { section: '13구간', type: 'waypoint', lat: 36.32176, lng: 127.43777 },
+    { section: '13구간', type: 'waypoint', lat: 36.32588, lng: 127.43566 },
+    { id: 206, section: '13구간', type: 'station', name: '대전역', lat: 36.33093, lng: 127.43276 },
+    { section: '13구간', type: 'waypoint', lat: 36.33118, lng: 127.43262 },
+    { section: '13구간', type: 'waypoint', lat: 36.33246, lng: 127.43633 },
+    { section: '13구간', type: 'waypoint', lat: 36.33327, lng: 127.43803 },
+    { id: 207, section: '13구간', type: 'station', name: '중앙동 행정 복지 센터', lat: 36.33354, lng: 127.43925 },
+    { section: '13구간', type: 'waypoint', lat: 36.33355, lng: 127.43943 },
+    { section: '13구간', type: 'waypoint', lat: 36.33348, lng: 127.43964 },
+    { section: '13구간', type: 'waypoint', lat: 36.33258, lng: 127.43997 },
+    { section: '13구간', type: 'waypoint', lat: 36.33214, lng: 127.44017 },
+    { section: '13구간', type: 'waypoint', lat: 36.33186, lng: 127.44038 },
+    { section: '13구간', type: 'waypoint', lat: 36.3309, lng: 127.44117 },
+    { section: '13구간', type: 'waypoint', lat: 36.33053, lng: 127.44167 },
+    { section: '13구간', type: 'waypoint', lat: 36.32963, lng: 127.44272 },
+    { section: '13구간', type: 'waypoint', lat: 36.32954, lng: 127.44294 },
+    { section: '13구간', type: 'waypoint', lat: 36.32967, lng: 127.4431 },
+    { id: 208, section: '13구간', type: 'station', name: '신흥', lat: 36.32985, lng: 127.44323 },
+    { section: '13구간', type: 'waypoint', lat: 36.33092, lng: 127.4439 },
+    { section: '13구간', type: 'waypoint', lat: 36.33627, lng: 127.44722 },
+    { section: '13구간', type: 'waypoint', lat: 36.33893, lng: 127.44872 },
+    { section: '13구간', type: 'waypoint', lat: 36.33996, lng: 127.4489 },
+    { id: 209, section: '13구간', type: 'station', name: '우송대(자양)', lat: 36.34068, lng: 127.44887 },
 
-  // ==========================================
-  // [7공구] 유성구청 ~ 유성온천 (충대 오거리)
-  // ==========================================
-  // [보정] 대학로 직선 유지
-  { id: 223.5, section: "7공구", type: "waypoint", lat: 36.36450, lng: 127.35200 },
-
-  { id: 224, section: "7공구", name: "충남대학교", lat: 36.36150, lng: 127.34500 },
-  
-  // [보정] 충대 오거리 회전 (유성온천 방향으로)
-  { id: 224.5, section: "7공구", type: "waypoint", lat: 36.35800, lng: 127.34320 },
-
-  { id: 225, section: "7공구", name: "유성온천역", lat: 36.35380, lng: 127.34180 },
-  { id: 226, section: "7공구", name: "상대동(도안)", lat: 36.34520, lng: 127.34020 },
-  { id: 227, section: "7공구", name: "원신흥동", lat: 36.33650, lng: 127.33950 },
-
-  // ==========================================
-  // [8공구] 도안신도시 (도안대로 직선)
-  // ==========================================
-  // 직선 구간이라도 중간 점을 찍어 도로 이탈 방지
-  { id: 228, section: "8공구", name: "목원대입구", lat: 36.33150, lng: 127.33850 },
-  { id: 229, section: "8공구", name: "도안고교", lat: 36.32750, lng: 127.33820 },
-  { id: 230, section: "8공구", name: "목원대학교", lat: 36.32350, lng: 127.33800 },
-  { id: 231, section: "8공구", name: "용소수변공원", lat: 36.31950, lng: 127.33780 },
-  { id: 232, section: "8공구", name: "가수원네거리", lat: 36.31550, lng: 127.33750 },
-
-  // ==========================================
-  // [9공구] 진잠 구간 (V자 급커브 정밀)
-  // ==========================================
-  // [보정] 가수원 -> 진잠 (도로 따라 남하)
-  { id: 232.3, section: "9공구", type: "waypoint", lat: 36.31200, lng: 127.33650 },
-  { id: 232.7, section: "9공구", type: "waypoint", lat: 36.30800, lng: 127.33580 },
-
-  // 245: 진잠 (V자 꼭짓점)
-  { id: 245, section: "9공구", name: "진잠(서대전IC)", lat: 36.30350, lng: 127.33500 },
-
-  // [보정] 진잠 -> 관저 (도로 따라 북상)
-  { id: 245.3, section: "9공구", type: "waypoint", lat: 36.30500, lng: 127.34200 },
-  { id: 245.7, section: "9공구", type: "waypoint", lat: 36.30650, lng: 127.35000 },
-
-  { id: 233, section: "9공구", name: "관저네거리", lat: 36.30750, lng: 127.35500 },
-  { id: 234, section: "9공구", name: "건양대병원", lat: 36.31050, lng: 127.36250 },
-
-  // ==========================================
-  // [10~11공구] 가수원교 ~ 서대전 (강변 도로)
-  // ==========================================
-  { id: 235, section: "10공구", name: "가수원교", lat: 36.31350, lng: 127.37050 },
-
-  // [보정] 다리 위 포인트
-  { id: 235.5, section: "10공구", type: "waypoint", lat: 36.31420, lng: 127.37600 },
-
-  { id: 236, section: "10공구", name: "정림동", lat: 36.31450, lng: 127.38200 },
-  { id: 237, section: "10공구", name: "도마네거리", lat: 36.31480, lng: 127.39100 },
-  { id: 238, section: "11공구", name: "유등교", lat: 36.31520, lng: 127.39850 },
-  { id: 239, section: "12공구", name: "유천동", lat: 36.31680, lng: 127.40350 },
-  { id: 240, section: "12공구", name: "오류동", lat: 36.31950, lng: 127.40850 },
-
-  { id: 201, section: "12공구", name: "서대전역(KTX)", lat: 36.32280, lng: 127.41150 },
-  { id: 202, section: "12공구", name: "서대전네거리", lat: 36.32450, lng: 127.41300 },
-  { id: 203, section: "12공구", name: "대사동(충대병원)", lat: 36.32100, lng: 127.41750 },
-  { id: 204, section: "12공구", name: "베이스볼드림파크", lat: 36.31850, lng: 127.42650 },
-
-  // ==========================================
-  // [13공구] 대전역 Z자 구간 (골목길/건물 회피 필수)
-  // ==========================================
-  { id: 205, section: "13공구", name: "인동네거리", lat: 36.32350, lng: 127.43350 },
-
-  // [보정] 인동 -> 대전역 (도로 곡선)
-  { id: 205.4, section: "13공구", type: "waypoint", lat: 36.32700, lng: 127.43340 },
-  { id: 205.8, section: "13공구", type: "waypoint", lat: 36.33000, lng: 127.43310 },
-
-  // 206: 대전역 (광장 진입)
-  { id: 206, section: "13공구", name: "대전역", lat: 36.33250, lng: 127.43320 },
-
-  // [보정] 대전역 -> 대동 (급격한 우회전, 건물 회피)
-  { id: 206.4, section: "13공구", type: "waypoint", lat: 36.33280, lng: 127.43600 },
-  { id: 206.8, section: "13공구", type: "waypoint", lat: 36.33350, lng: 127.44000 },
-
-  { id: 207, section: "13공구", name: "대동역", lat: 36.33500, lng: 127.44250 },
-  { id: 208, section: "13공구", name: "신흥동", lat: 36.33850, lng: 127.44550 },
-  { id: 209, section: "13공구", name: "우송대(자양동)", lat: 36.34400, lng: 127.44650 },
-
-  // ==========================================
-  // [14공구] 가양 ~ 중리 복귀
-  // ==========================================
-  { id: 210, section: "14공구", name: "가양네거리", lat: 36.34850, lng: 127.44050 },
-  { id: 211, section: "14공구", name: "동부네거리(터미널)", lat: 36.35550, lng: 127.43450 },
-
-  // [보정] 터미널 -> 중리 (직선 도로 유지)
-  { id: 211.5, section: "14공구", type: "waypoint", lat: 36.35900, lng: 127.43150 },
-
-  // ★ 순환선 마감: 다시 중리네거리로 연결
-  { id: 212, section: "2공구", name: "중리(공사충남본부)", lat: 36.36210, lng: 127.42850 }
+    // -------------------------------------------------------
+    // [14구간] 가양(210) ~ 동부(211) ~ 중리(212, 순환끝)
+    // -------------------------------------------------------
+    { section: '14구간', type: 'waypoint', lat: 36.34121, lng: 127.44881 },
+    { section: '14구간', type: 'waypoint', lat: 36.34161, lng: 127.44861 },
+    { section: '14구간', type: 'waypoint', lat: 36.34248, lng: 127.44801 },
+    { section: '14구간', type: 'waypoint', lat: 36.34557, lng: 127.44569 },
+    { id: 210, section: '14구간', type: 'station', name: '동부네거리', lat: 36.35111, lng: 127.44206 },
+    { section: '14구간', type: 'waypoint', lat: 36.35819, lng: 127.43355 },
+    { id: 211, section: '14구간', type: 'station', name: '동부네거리', lat: 36.35823, lng: 127.43355 },
+    { section: '14구간', type: 'waypoint', lat: 36.35913, lng: 127.43211 }, // 순환 완성 (2구간 시작과 만남)
 ];
 
 window.TRAM_STATIONS = window.TRAM_ROUTE_FULL_HD;
