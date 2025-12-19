@@ -1,4 +1,16 @@
-/* --- 공통 스타일 --- */
+/* 수정됨: bus-info.html 하단(bus-info-grid/패널/테이블/리스트)에서
+   - 한글 세로쪼개짐(글자 단위 줄바꿈) 방지
+   - 긴 텍스트(정류장명/노선명/nodeId)로 레이아웃 깨짐 방지(ellipsis)
+   - 테이블 폭 흔들림 방지(table-layout: fixed) + 필요 시 가로스크롤만 허용
+   - 기존 스타일 “추가”가 아니라 7-4 구간을 “교체/보강” 형태로 정리 */
+
+/* ==========================================================================
+   0) RESET + BASE
+   ========================================================================== */
+* {
+    box-sizing: border-box;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     margin: 0;
@@ -13,17 +25,32 @@ a {
 
 button {
     border: 1px solid transparent;
-    padding: 8px 15px;
-    border-radius: 4px;
+    padding: 10px 14px;
+    border-radius: 8px;
     cursor: pointer;
-    font-weight: 500;
-    transition: background-color 0.2s;
-}
-button:hover {
-    opacity: 0.9;
+    font-weight: 600;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.05s;
+    line-height: 1.1;
 }
 
-/* --- 로그인 & 회원가입 페이지 스타일 --- */
+button:hover {
+    opacity: 1;
+}
+
+button:active {
+    transform: translateY(1px);
+}
+
+button:disabled,
+button[disabled] {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ==========================================================================
+   1) LOGIN / SIGNUP
+   ========================================================================== */
 .form-page-body {
     display: flex;
     justify-content: center;
@@ -31,15 +58,17 @@ button:hover {
     min-height: 100vh;
     padding: 40px 0;
 }
+
 .form-container {
     width: 100%;
     max-width: 400px;
     padding: 40px;
     background-color: #ffffff;
     border: 1px solid #dee2e6;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    border-radius: 12px;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
 }
+
 .form-container h1 {
     text-align: center;
     font-size: 28px;
@@ -47,372 +76,340 @@ button:hover {
     margin-top: 0;
     margin-bottom: 30px;
 }
+
 .form-group {
     margin-bottom: 20px;
 }
+
 .form-group label {
     display: block;
     margin-bottom: 8px;
-    font-weight: 500;
+    font-weight: 600;
     color: #495057;
 }
+
 .form-group input {
     width: 100%;
     padding: 12px;
     border: 1px solid #ced4da;
-    border-radius: 4px;
-    box-sizing: border-box;
+    border-radius: 10px;
+    background: #fff;
 }
+
+.form-group input:focus {
+    outline: none;
+    border-color: #80bdff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.12);
+}
+
 .error-message {
     color: #dc3545;
     background-color: #f8d7da;
     border: 1px solid #f5c6cb;
     padding: 10px;
-    border-radius: 4px;
+    border-radius: 10px;
     text-align: center;
     margin-bottom: 20px;
 }
+
 .form-actions {
     margin-top: 30px;
 }
+
 .submit-btn,
 .secondary-btn {
     width: 100%;
     padding: 12px;
-    border-radius: 4px;
+    border-radius: 10px;
     cursor: pointer;
-    font-weight: 500;
+    font-weight: 700;
     font-size: 16px;
     border: 1px solid transparent;
     text-align: center;
     display: block;
     text-decoration: none;
-    box-sizing: border-box;
 }
+
 .submit-btn {
     background-color: #007bff;
     color: white;
 }
+
+.submit-btn:hover {
+    background-color: #0069d9;
+}
+
 .secondary-btn {
     background-color: #6c757d;
     color: white;
     margin-top: 10px;
 }
 
-/* --- 메인 페이지 (Angular_http.html) 스타일 --- */
-.main-container {
-    max-width: 1000px;
-    margin: 40px auto;
-    background-color: #ffffff;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+.secondary-btn:hover {
+    background-color: #5a6268;
 }
+
+/* ==========================================================================
+   2) MAIN LAYOUT (angular_http.html)
+   ========================================================================== */
+.main-container {
+    max-width: 1100px;
+    margin: 28px auto;
+    background-color: #ffffff;
+    border: 1px solid #e9ecef;
+    border-radius: 14px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+}
+
 header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px 30px;
-    border-bottom: 1px solid #dee2e6;
+    padding: 18px 22px;
+    border-bottom: 1px solid #e9ecef;
+    background: #fff;
 }
+
 header h1 {
     margin: 0;
-    font-size: 24px;
+    font-size: 22px;
     color: #343a40;
+    font-weight: 800;
 }
+
 .user-info span {
-    margin-right: 15px;
-    font-weight: 500;
+    margin-right: 12px;
+    font-weight: 700;
     color: #495057;
 }
+
 .user-info button {
     background-color: #6c757d;
     color: white;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 10px 12px;
 }
+
+.user-info button:hover {
+    background-color: #5a6268;
+}
+
 .user-info .delete-btn {
     background-color: #dc3545;
-    margin-right: 10px;
+    margin-right: 8px;
 }
+
+.user-info .delete-btn:hover {
+    background-color: #c82333;
+}
+
 .tab-nav {
     display: flex;
-    padding: 0 30px;
-    border-bottom: 2px solid #dee2e6;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid #e9ecef;
+    background: #fff;
 }
+
 .tab-link {
-    padding: 12px 20px;
+    padding: 10px 14px;
     cursor: pointer;
-    border-bottom: 2px solid transparent;
+    border-radius: 10px;
     color: #6c757d;
-    font-weight: 500;
-    margin-bottom: -2px;
-    transition: color 0.2s, border-bottom-color 0.2s;
+    font-weight: 700;
+    transition: background-color 0.15s, color 0.15s;
 }
+
 .tab-link:hover {
     color: #0056b3;
+    background: #f1f3f5;
 }
+
 .tab-link.active {
-    color: #007bff;
-    border-bottom-color: #007bff;
+    color: #0b5ed7;
+    background: #e7f1ff;
 }
+
 .content-view {
-    padding: 30px;
-}
-.user-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-}
-.user-table th,
-.user-table td {
-    border-bottom: 1px solid #dee2e6;
-    padding: 12px;
-    text-align: left;
-}
-.user-table th {
-    background-color: #f8f9fa;
-    font-weight: 600;
-    color: #495057;
-}
-.user-table tbody tr:hover {
-    background-color: #f1f3f5;
+    padding: 22px;
 }
 
-/* --- 새 사용자 등록 페이지 스타일 --- */
-.page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #dee2e6;
-    padding-bottom: 15px;
-    margin-bottom: 30px;
-}
-.page-header h1 {
-    margin: 0;
-    display: flex;
-    align-items: center;
-}
-.cancel-link {
-    font-size: 14px;
-    font-weight: 500;
-}
-.user-entry-card {
-    border: 1px solid #e9ecef;
-    border-radius: 6px;
-    margin-bottom: 20px;
-    background-color: #fff;
-}
-.card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: #f8f9fa;
-    padding: 10px 15px;
-    border-bottom: 1px solid #e9ecef;
-}
-.card-header h4 {
-    margin: 0;
-    font-size: 16px;
-}
-.card-body {
-    padding: 20px;
-}
-.icon-btn {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    font-size: 20px;
-    line-height: 26px;
-    text-align: center;
-    padding: 0;
-}
-.add-btn {
-    background-color: #007bff;
-    color: white;
-    margin-left: 15px;
-}
-.remove-btn {
-    background-color: #dc3545;
-    color: white;
-}
-.submit-btn-full {
-    width: 100%;
-    padding: 12px;
-    font-size: 16px;
-    background-color: #007bff;
-    color: white;
-}
-
-/* --- (user-list.html) 버튼 바 스타일 --- */
-.action-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-.action-btn {
-    display: inline-block;
-    padding: 8px 15px;
-    border-radius: 4px;
-    font-weight: 500;
-    text-align: center;
-    transition: background-color 0.2s;
-}
-.action-btn:hover {
-    opacity: 0.9;
-}
-.create-btn {
-    background-color: #007bff;
-    color: white;
-}
-.action-bar .action-btn:not(.create-btn) {
-    margin-left: auto;
-}
-
-/* --- 게시글 수정 페이지의 버튼 그룹 스타일 --- */
-.button-group {
-    display: flex;
-    gap: 10px;
-    width: 100%;
-}
-.button-group .submit-btn-full,
-.button-group .secondary-btn {
-    flex: 1;
-    width: auto;
-    margin-top: 0;
-}
-
-/* --- (board-detail.html) 댓글 영역 스타일 --- */
-.comments-section {
-    margin-top: 40px;
-}
-.comment-list {
-    margin-bottom: 30px;
-}
-.no-comments {
-    text-align: center;
-    color: #868e96;
-    padding: 40px 0;
-}
-.comment-item {
-    border-bottom: 1px solid #e9ecef;
-    padding: 15px 0;
-}
-.comment-item:last-child {
-    border-bottom: none;
-}
-.comment-header {
-    margin-bottom: 8px;
-    font-size: 14px;
-    color: #495057;
-}
-.comment-date {
-    float: right;
-    font-size: 13px;
-    color: #adb5bd;
-}
-.comment-content {
-    margin: 0 0 10px 0;
-    line-height: 1.6;
-}
-.comment-actions .action-btn-sm {
-    padding: 4px 8px;
-    font-size: 12px;
-    margin-right: 5px;
-    background-color: #f1f3f5;
-    color: #495057;
-    border: 1px solid #dee2e6;
-}
-.comment-actions .action-btn-sm.delete {
-    color: #dc3545;
-}
-.comment-actions .action-btn-sm.save {
-    background-color: #007bff;
-    color: white;
-    border-color: #007bff;
-}
-.comment-form textarea {
-    width: 100%;
-    box-sizing: border-box;
-}
-
-/* --- 드롭다운 메뉴 스타일 --- */
+/* 드롭다운 */
 .tab-link.dropdown {
     position: relative;
     display: inline-block;
     cursor: default;
 }
+
 .dropdown-content {
     display: none;
     position: absolute;
-    top: 100%;
+    top: calc(100% + 6px);
     left: 0;
     z-index: 100;
-    background-color: #f9f9f9;
+    background-color: #ffffff;
     min-width: 160px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+    overflow: hidden;
 }
+
 .dropdown-content a {
-    color: black;
-    padding: 12px 16px;
-    text-decoration: none;
+    color: #212529;
+    padding: 10px 12px;
     display: block;
     text-align: left;
     white-space: nowrap;
+    font-weight: 700;
 }
+
 .dropdown-content a:hover {
-    background-color: #f1f1f1;
+    background-color: #f1f3f5;
 }
+
 .dropdown:hover .dropdown-content {
     display: block;
 }
 
-/* --- 게시글 리스트(첨부파일 아이콘) --- */
-.pinned-post {
-    background-color: #f8f9fa;
-    font-weight: 500;
-}
-.pinned-post td {
-    border-top: 1px solid #dee2e6;
-    border-bottom: 1px solid #dee2e6;
-}
-.liked {
-    color: red;
-}
-.file-cell {
-    text-align: center;
-    vertical-align: middle;
-}
-.file-thumb-wrapper,
-.file-icon-wrapper {
+/* ==========================================================================
+   3) COMMON CARD / PAGE HEADER
+   ========================================================================== */
+.page-header {
     display: flex;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
-}
-.file-thumb-image {
-    width: 40px;
-    height: 40px;
-    object-fit: cover;
-    border-radius: 4px;
-    border: 1px solid #dee2e6;
-}
-.file-icon {
-    font-size: 20px;
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 14px;
+    margin-bottom: 18px;
 }
 
-/* --- 새 글 작성 / 수정 폼 공통 스타일 --- */
-/* board-new.html, board-edit.html 둘 다 이 클래스를 쓰도록 가정 */
+.page-header h1 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    font-weight: 900;
+}
+
+.cancel-link {
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.user-entry-card {
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    background-color: #fff;
+    padding: 18px;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #f8f9fa;
+    padding: 12px 14px;
+    border-bottom: 1px solid #e9ecef;
+    border-radius: 10px;
+    margin-bottom: 14px;
+}
+
+.card-header h4 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 900;
+}
+
+.card-body {
+    padding: 0;
+}
+
+/* ==========================================================================
+   4) TABLES / ACTION BAR
+   ========================================================================== */
+.user-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+}
+
+.user-table th,
+.user-table td {
+    border-bottom: 1px solid #e9ecef;
+    padding: 12px;
+    text-align: left;
+}
+
+.user-table th {
+    background-color: #f8f9fa;
+    font-weight: 800;
+    color: #495057;
+}
+
+/* action-bar */
+.action-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.action-btn {
+    display: inline-block;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-weight: 800;
+    text-align: center;
+    transition: background-color 0.15s, border-color 0.15s;
+    border: 1px solid #dee2e6;
+    background: #f1f3f5;
+    color: #495057;
+}
+
+.action-btn:hover {
+    background: #e9ecef;
+}
+
+.create-btn {
+    background-color: #007bff;
+    color: #fff;
+    border-color: #007bff;
+}
+
+.create-btn:hover {
+    background-color: #0069d9;
+}
+
+.delete-btn {
+    background-color: #dc3545;
+    color: #fff;
+    border-color: #dc3545;
+}
+
+.delete-btn:hover {
+    background-color: #c82333;
+}
+
+/* ==========================================================================
+   5) BOARD / BIGPOST FORM
+   ========================================================================== */
 .board-new-form .form-group,
 .board-edit-form .form-group {
-    margin-bottom: 15px;
+    margin-bottom: 14px;
 }
+
 .board-new-form label,
 .board-edit-form label {
-    font-weight: 500;
-    margin-bottom: 5px;
+    font-weight: 800;
+    margin-bottom: 6px;
     display: inline-block;
 }
 
-/* 제목 input, 내용 textarea 모두 카드 폭 100% 사용 */
 .board-new-form .form-control,
 .board-edit-form .form-control,
 .board-new-form input[type='text'],
@@ -420,125 +417,140 @@ header h1 {
 .board-new-form textarea,
 .board-edit-form textarea {
     width: 100%;
-    padding: 8px 10px;
+    padding: 10px 12px;
     border: 1px solid #ced4da;
-    border-radius: 4px;
+    border-radius: 10px;
     font-size: 14px;
-    box-sizing: border-box;
+    background: #fff;
 }
 
-/* 내용 입력창 기본 높이 (일반 게시판 / 새 글·수정 / postEditor 공통) */
+.board-new-form .form-control:focus,
+.board-edit-form .form-control:focus,
+.board-new-form input[type='text']:focus,
+.board-edit-form input[type='text']:focus,
+.board-new-form textarea:focus,
+.board-edit-form textarea:focus {
+    outline: none;
+    border-color: #80bdff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.12);
+}
+
 .board-new-form textarea,
 .board-edit-form textarea,
 #postEditor {
     min-height: 200px;
-    height: auto;
     resize: vertical;
-    line-height: 1.5;
+    line-height: 1.55;
 }
 
-/* 대용량 게시판 수정 textarea (#postContent) 전용 높이 */
 #postContent {
     min-height: 140px;
-    height: auto;
     resize: vertical;
-    line-height: 1.5;
+    line-height: 1.55;
 }
 
-/* 새 글/수정 페이지 버튼 */
-.button-group .secondary-btn {
-    padding: 12px;
-    font-size: 16px;
-    border: 1px solid #ced4da;
-    background-color: #f8f9fa;
-    color: #495057;
-    border-radius: 4px;
-}
-.button-group .secondary-btn:hover {
-    background-color: #e9ecef;
-}
-
-/* 파일 업로드 목록 (새 글 작성에서 사용) */
 .file-upload-list {
     margin-top: 8px;
     padding-left: 18px;
     font-size: 13px;
     color: #495057;
 }
+
 .file-upload-list li {
     margin-bottom: 2px;
 }
 
-/* --- action-bar 버튼 회색 기본 + 예외 색상 --- */
-.action-bar .action-btn,
-.action-bar button {
-    display: inline-block;
-    padding: 8px 15px;
-    border-radius: 4px;
-    font-weight: 500;
+/* 썸네일/아이콘 */
+.file-cell {
     text-align: center;
-    transition: background-color 0.2s;
-    text-decoration: none;
+    vertical-align: middle;
+}
+
+.file-thumb-wrapper,
+.file-icon-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.file-thumb-image {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+/* 댓글 */
+.comments-section {
+    margin-top: 32px;
+}
+
+.no-comments {
+    text-align: center;
+    color: #868e96;
+    padding: 32px 0;
+}
+
+.comment-item {
+    border-bottom: 1px solid #e9ecef;
+    padding: 14px 0;
+}
+
+.comment-header {
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #495057;
+    font-weight: 700;
+}
+
+.comment-date {
+    float: right;
+    font-size: 13px;
+    color: #adb5bd;
+    font-weight: 700;
+}
+
+.comment-content {
+    margin: 0 0 10px 0;
+    line-height: 1.6;
+}
+
+.comment-actions .action-btn-sm {
+    padding: 6px 8px;
+    font-size: 12px;
+    margin-right: 6px;
     background-color: #f1f3f5;
     color: #495057;
     border: 1px solid #dee2e6;
-    cursor: pointer;
-    margin-right: 5px;
-    font-size: 14px;
-    line-height: 1.2;
-    vertical-align: middle;
+    border-radius: 10px;
+    font-weight: 800;
 }
-.action-bar .action-btn:hover,
-.action-bar button:hover {
-    background-color: #e9ecef;
-    color: #495057;
-    opacity: 1;
+
+.comment-actions .action-btn-sm.delete {
+    color: #dc3545;
 }
-.action-bar .create-btn {
+
+.comment-actions .action-btn-sm.save {
     background-color: #007bff;
     color: white;
     border-color: #007bff;
 }
-.action-bar .create-btn:hover {
-    background-color: #0069d9;
-}
-.action-bar .delete-btn {
-    background-color: #dc3545;
-    color: white;
-    border-color: #dc3545;
-}
-.action-bar .delete-btn:hover {
-    background-color: #c82333;
-}
-.action-bar .action-btn:not(.create-btn) {
-    margin-left: auto;
-}
 
-/* 대용량 게시글 카드 내 입력 필드 공통 스타일 (수정/작성 공통) */
-.user-entry-card input[type='text'],
-.user-entry-card textarea {
+.comment-form textarea {
     width: 100%;
-    padding: 8px 10px;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-    font-size: 14px;
-    box-sizing: border-box;
 }
 
-/* 대용량 내용 영역: 높이는 자동, 최소는 위 공통/전용 규칙으로 해결 */
-.user-entry-card textarea {
-    resize: vertical;
-    line-height: 1.5;
+/* 본문 float 이미지 정리 */
+.post-content::after {
+    content: "";
+    display: block;
+    clear: both;
 }
 
-.user-entry-card {
-    padding: 20px !important; 
-    border-radius: 8px;
-    background: #ffffff;
-    border: 1px solid #e0e0e0;
-}
-
-/* 전역 로딩 오버레이 */
+/* ==========================================================================
+   6) LOADING OVERLAY
+   ========================================================================== */
 .loading-overlay {
     position: fixed;
     top: 0;
@@ -552,19 +564,17 @@ header h1 {
     z-index: 99999;
 }
 
-/* 로딩 박스 */
 .loading-box {
     background: #ffffff;
-    padding: 20px 35px;
-    border-radius: 10px;
+    padding: 18px 28px;
+    border-radius: 14px;
     text-align: center;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
 }
 
-/* 로딩 스피너 */
 .spinner {
-    width: 45px;
-    height: 45px;
+    width: 42px;
+    height: 42px;
     border: 5px solid #e0e0e0;
     border-top: 5px solid #4285f4;
     border-radius: 50%;
@@ -573,404 +583,443 @@ header h1 {
 }
 
 @keyframes spin {
-    0% {
-        transform: rotate(0deg);
-    }
-    100% {
-        transform: rotate(360deg);
-    }
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
-/* --- 버스 노선 정보 검색 영역 --- */
-.bus-search-bar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    max-width: 400px;         /* 입력 영역 최대 폭 */
-    margin: 10px 0 15px 0;
-}
+/* ==========================================================================
+   7) BUS PAGE (bus-info.html) - 핵심 리디자인
+   ========================================================================== */
 
-.bus-search-input {
-    flex: 1;
-    padding: 8px 10px;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-    font-size: 14px;
-    box-sizing: border-box;
-}
-
-.bus-search-input:focus {
-    outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.15);
-}
-
-.bus-search-btn {
-    padding: 8px 16px;
-    border-radius: 4px;
-    background-color: #007bff;
-    color: #ffffff;
-    border: 1px solid #007bff;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.bus-search-btn:hover {
-    background-color: #0069d9;
-}
-
-/* 버스 지도 영역 테두리만 살짝 정리 */
-.bus-map {
+/* 공통 컨테이너(페이지 상단 padding은 HTML inline도 있지만 여기서 안정화) */
+.container {
     width: 100%;
-    height: 600px;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    overflow: hidden;
 }
 
-.post-content::after {
-    content: "";
-    display: block;
-    clear: both;   /* 본문 안에서 떠 있는 이미지(float)를 아래에서 정리 */
-}
-
-/* 버스 대표 차량/정류장 정보 패널 */
-.bus-representative-panel {
-    margin: 10px 0 15px 0;
-    padding: 10px 12px;
-    border-radius: 6px;
-    border: 1px solid #dee2e6;
-    background-color: #f8f9fa;
-    font-size: 14px;
-    line-height: 1.5;
-}
-.bus-representative-panel strong {
-    display: inline-block;
-    min-width: 90px;
-}
-
-/* ... 위쪽은 기존 코드 그대로 유지 ... */
-
-/* ========================================================================== */
-/* ★ 버스 정보 페이지 전용 스타일 (기존 레이아웃 영향 없음 / 추가된 부분) ★ */
-/* ========================================================================== */
-
-/* 1. 버스 검색바 (카드 형태) */
+/* ====== 7-1. 상단 검색바: 한 줄 규칙 ====== */
 .bus-dashboard-search {
     background: #ffffff;
-    padding: 15px 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    border: 1px solid #eaeaea;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
+    margin-bottom: 18px;
+    flex-wrap: nowrap; /* ✅ 기본은 한 줄 */
 }
 
-/* 검색바 내부 입력창 */
-.bus-dashboard-input {
-    flex: 1; /* 남은 공간 차지 */
-    min-width: 250px;
-    padding: 10px 15px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 15px;
-    transition: border-color 0.2s;
-}
-.bus-dashboard-input:focus {
-    outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0,123,255,0.1);
+/* 화면 좁아지면 자연스럽게 줄바꿈 */
+@media (max-width: 900px) {
+    .bus-dashboard-search {
+        flex-wrap: wrap;
+    }
 }
 
-/* 라디오 버튼 그룹 (깔끔한 뱃지 스타일) */
+/* 토글 그룹 */
 .bus-radio-wrap {
     background-color: #f1f3f5;
-    padding: 5px;
-    border-radius: 6px;
+    padding: 6px;
+    border-radius: 12px;
     display: flex;
-    gap: 5px;
+    gap: 6px;
+    align-items: center;
+    flex: 0 0 auto;
 }
+
+/* 라디오 버튼 뱃지 */
 .bus-radio-label {
-    padding: 6px 12px;
-    font-size: 14px;
+    padding: 8px 12px;
+    font-size: 13px;
     color: #495057;
     cursor: pointer;
-    border-radius: 4px;
+    border-radius: 10px;
     margin: 0;
-    transition: all 0.2s;
+    font-weight: 900;
+    transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+    user-select: none;
 }
-/* 라디오 버튼 선택 시 효과 */
+
 .bus-radio-wrap input[type="radio"] {
     display: none;
 }
+
 .bus-radio-wrap input[type="radio"]:checked + span {
-    background-color: #fff;
-    color: #007bff;
-    font-weight: 700;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    background-color: #ffffff;
+    color: #0b5ed7;
+    font-weight: 900;
+    padding: 8px 12px;
+    border-radius: 10px;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+    display: inline-block;
+}
+
+/* 검색 입력 */
+.bus-dashboard-input {
+    flex: 1 1 auto;
+    min-width: 320px;
+    padding: 12px 14px;
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    font-size: 15px;
+    background: #fff;
+}
+
+.bus-dashboard-input:focus {
+    outline: none;
+    border-color: #80bdff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.12);
 }
 
 /* 검색 버튼 */
 .btn-bus-action {
+    flex: 0 0 auto;
     background-color: #007bff;
     color: #fff;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 4px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s;
+    border: 1px solid #007bff;
+    padding: 12px 18px;
+    border-radius: 12px;
+    font-weight: 900;
+    white-space: nowrap;
 }
+
 .btn-bus-action:hover {
     background-color: #0069d9;
 }
 
-/* 2. 상태 대시보드 (대표 버스 + 제어 버튼) */
+/* 트램 토글 버튼 */
+.btn-tram-toggle {
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 900;
+    color: #495057;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.btn-tram-toggle:hover {
+    border-color: #ced4da;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+}
+
+.btn-tram-toggle.active {
+    background-color: #fff3bf;
+    border-color: #ffe066;
+    color: #b8860b;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+}
+
+/* ====== 7-2. 상태/제어 카드 ====== */
 .bus-status-container {
     display: flex;
-    gap: 15px;
-    margin-bottom: 20px;
+    gap: 14px;
+    margin-bottom: 18px;
     flex-wrap: wrap;
 }
 
-/* 상태 카드 공통 */
 .bus-card {
     background: #fff;
-    border-radius: 8px;
-    border: 1px solid #eaeaea;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
-    padding: 15px 20px;
+    border-radius: 14px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
+    padding: 14px 16px;
     display: flex;
     align-items: center;
+    min-height: 74px; /* ✅ 두 카드 높이 통일 느낌 */
 }
 
-/* 정보 표시 카드 (왼쪽) */
+/* 왼쪽 정보 카드 */
 .bus-card.info-section {
     flex: 2;
-    min-width: 320px;
-    border-left: 5px solid #007bff; /* 포인트 컬러 */
+    min-width: 360px;
+    border-left: 6px solid #0b5ed7;
     justify-content: space-between;
 }
 
-/* 제어 버튼 카드 (오른쪽) */
+/* 오른쪽 제어 카드 */
 .bus-card.control-section {
     flex: 1;
-    min-width: 280px;
-    justify-content: flex-end;
+    min-width: 360px;
+    justify-content: flex-start;
     gap: 10px;
     background-color: #fcfcfc;
+    flex-wrap: wrap; /* ✅ 좁아지면 버튼이 줄바꿈 */
 }
 
-/* 정보 아이템 디자인 */
+/* 정보 아이템 */
 .status-item {
     display: flex;
     flex-direction: column;
-}
-.status-label {
-    font-size: 11px;
-    color: #888;
-    text-transform: uppercase;
-    font-weight: 700;
-    margin-bottom: 4px;
-}
-.status-value {
-    font-size: 15px;
-    font-weight: 600;
-    color: #333;
+    gap: 4px;
 }
 
-/* 새로고침 버튼 스타일 */
+.status-label {
+    font-size: 11px;
+    color: #868e96;
+    text-transform: uppercase;
+    font-weight: 900;
+    letter-spacing: 0.2px;
+}
+
+.status-value {
+    font-size: 15px;
+    font-weight: 900;
+    color: #212529;
+}
+
+/* 자동갱신/멈춤 버튼 (세로 찌그러짐 방지) */
 .btn-refresh-toggle {
-    padding: 8px 12px;
+    padding: 10px 12px;
     font-size: 13px;
-    border-radius: 4px;
+    border-radius: 12px;
     cursor: pointer;
     border: 1px solid transparent;
-    font-weight: 600;
+    font-weight: 900;
+    white-space: nowrap;       /* ✅ 글자 세로로 줄바꿈 방지 */
+    min-width: 110px;          /* ✅ 버튼 폭 확보 */
+    text-align: center;
 }
+
 .btn-refresh-toggle.on {
     background-color: #e6fcf5;
     color: #0ca678;
     border-color: #c3fae8;
 }
+
 .btn-refresh-toggle.off {
     background-color: #fff5f5;
     color: #fa5252;
     border-color: #ffc9c9;
 }
 
-/* 3. 지도 영역 (둥근 모서리와 그림자) */
+/* ====== 7-3. 지도 프레임 ====== */
 .bus-map-frame {
     position: relative;
-    border-radius: 8px;
+    border-radius: 14px;
     overflow: hidden;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    border: 1px solid #ddd;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.10);
+    border: 1px solid #e9ecef;
     background: #eee;
 }
+
 .bus-map-canvas {
     width: 100%;
     height: 600px;
 }
 
-/* 지도 위 로딩 뱃지 */
+/* 기존 .bus-map(옛 클래스)도 호환 */
+.bus-map {
+    width: 100%;
+    height: 600px;
+    border: 1px solid #dee2e6;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
 .map-loading-badge {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(33, 37, 41, 0.85);
+    top: 18px;
+    right: 18px;
+    background: rgba(33, 37, 41, 0.88);
     color: #fff;
-    padding: 10px 25px;
-    border-radius: 50px;
-    font-size: 14px;
-    font-weight: 600;
+    padding: 10px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 900;
     z-index: 9999;
     pointer-events: none;
 }
 
-/* 4. 하단 정보 패널 (2단 그리드) */
+/* ====== 7-4. 하단 패널 (bus-info) ====== */
 .bus-info-grid {
     display: flex;
-    gap: 20px;
-    margin-top: 25px;
+    gap: 14px;
+    margin-top: 18px;
     flex-wrap: wrap;
+
+    /* ✅ 한글 세로쪼개짐(글자 단위 줄바꿈) 방지 */
+    word-break: keep-all;
 }
 
+/* 패널 박스 */
 .bus-panel-box {
     flex: 1;
-    min-width: 300px;
+    min-width: 320px;
     background: #fff;
-    border-radius: 8px;
-    border: 1px solid #eaeaea;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    border-radius: 14px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
     display: flex;
     flex-direction: column;
     overflow: hidden;
 }
 
+/* 헤더: 긴 텍스트가 와도 폭을 망치지 않게 */
 .bus-panel-header {
     background-color: #f8f9fa;
-    padding: 12px 15px;
-    border-bottom: 1px solid #eee;
-    font-weight: 700;
+    padding: 12px 14px;
+    border-bottom: 1px solid #e9ecef;
+    font-weight: 900;
     color: #495057;
-    font-size: 15px;
+    font-size: 14px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-}
-.bus-panel-header.accent-blue { border-left: 4px solid #007bff; }
-.bus-panel-header.accent-green { border-left: 4px solid #28a745; }
+    gap: 10px;
 
+    /* ✅ 헤더 자체는 한 줄 유지(세로쪼개짐 방지) */
+    white-space: nowrap;
+    word-break: keep-all;
+}
+
+.bus-panel-header > span {
+    min-width: 0;              /* ✅ ... 처리 조건 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bus-panel-header.accent-blue { border-left: 6px solid #0b5ed7; }
+.bus-panel-header.accent-green { border-left: 6px solid #2f9e44; }
+
+/* 내용: 세로 스크롤은 허용, 가로는 필요할 때만 */
 .bus-panel-content {
     flex: 1;
     padding: 0;
-    max-height: 350px;
+    max-height: 340px;
     overflow-y: auto;
+    overflow-x: auto;          /* ✅ 테이블이 넘치면 가로 스크롤만 */
+
+    /* ✅ 한글 세로쪼개짐 방지 */
+    word-break: keep-all;
 }
 
-/* 정류장 리스트 스타일 */
+/* 정류장 리스트 row */
 .stop-list-row {
-    padding: 12px 15px;
-    border-bottom: 1px solid #f1f1f1;
+    padding: 12px 14px;
+    border-bottom: 1px solid #f1f3f5;
     cursor: pointer;
-    transition: background 0.1s;
+    transition: background-color 0.12s, color 0.12s;
     font-size: 14px;
     display: flex;
     align-items: center;
-}
-.stop-list-row:hover {
-    background-color: #f8f9fa;
-    color: #007bff;
-}
-.stop-list-row.active {
-    background-color: #e7f5ff;
-    color: #007bff;
-    font-weight: 700;
-    border-left: 3px solid #007bff;
+    gap: 10px;
+
+    /* ✅ 글자 단위 줄바꿈 방지 */
+    word-break: keep-all;
 }
 
-/* 도착 정보 테이블 스타일 */
+.stop-list-row:hover {
+    background-color: #f8f9fa;
+    color: #0b5ed7;
+}
+
+.stop-list-row.active {
+    background-color: #e7f1ff;
+    color: #0b5ed7;
+    font-weight: 900;
+    border-left: 4px solid #0b5ed7;
+}
+
+/* ✅ 정류장명은 ... 처리, nodeId 뱃지는 nowrap */
+.stop-list-row > span {
+    min-width: 0;
+}
+.stop-list-row > span:nth-of-type(1) {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.stop-list-row > span:nth-of-type(2) {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+/* 도착정보 테이블 */
 .arrival-info-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 14px;
+
+    /* ✅ 긴 텍스트가 테이블 폭을 망치지 않게 */
+    table-layout: fixed;
 }
+
 .arrival-info-table th {
     background-color: #fafafa;
     color: #666;
-    font-weight: 600;
-    padding: 10px;
-    border-bottom: 1px solid #eee;
+    font-weight: 900;
+    padding: 10px 12px;
+    border-bottom: 1px solid #e9ecef;
     text-align: left;
+
+    /* ✅ 헤더는 한 줄 */
+    white-space: nowrap;
+    word-break: keep-all;
 }
+
 .arrival-info-table td {
-    padding: 12px 10px;
-    border-bottom: 1px solid #f5f5f5;
+    padding: 12px 12px;
+    border-bottom: 1px solid #f1f3f5;
     color: #333;
+
+    /* ✅ 셀 내부 텍스트가 세로쪼개지지 않게 */
+    word-break: keep-all;
 }
+
+/* ✅ 셀 안 텍스트는 기본 ... 처리(폭 고정이라 필요) */
+.arrival-info-table td strong,
+.arrival-info-table td span {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .arrival-highlight {
     color: #d6336c;
-    font-weight: 700;
+    font-weight: 900;
 }
+
 .panel-empty-msg {
-    padding: 40px;
+    padding: 34px 16px;
     text-align: center;
     color: #999;
     font-size: 13px;
-}
-
-/* ========================================================================== */
-/* ★ 트램 노선 보이기/숨기기 버튼 (버스 검색바 전용) ★ */
-/* ========================================================================== */
-
-.btn-tram-toggle {
-    background: transparent;
-    border: 1px solid #dee2e6;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 13px;
     font-weight: 700;
-    color: #495057;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    line-height: 1;
-    white-space: nowrap; /* 버튼 줄바꿈 방지 */
+
+    word-break: keep-all;
 }
 
-/* hover 효과 */
-.btn-tram-toggle:hover {
-    background-color: #ffffff;
-    border-color: #ced4da;
+/* ====== 7-5. (옵션) 버스 대표 차량/정류장 정보 패널 레거시 ====== */
+.bus-representative-panel {
+    margin: 10px 0 15px 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+    background-color: #f8f9fa;
+    font-size: 14px;
+    line-height: 1.5;
 }
 
-/* 활성 상태 (트램 노선 보이는 중) */
-.btn-tram-toggle.active {
-    background-color: #fff3bf;   /* 은은한 노랑 */
-    border-color: #ffe066;
-    color: #b8860b;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+.bus-representative-panel strong {
+    display: inline-block;
+    min-width: 90px;
 }
 
-/* bus-radio-wrap 안에서 버튼/라디오 정렬 보정 */
-.bus-radio-wrap {
-    align-items: center;   /* 세로 정렬 보정 */
-    flex-wrap: wrap;       /* 화면 좁을 때 자연스러운 줄바꿈 */
-}
-
-
-/* ========================================= */
-/* ★ 통계(Stats) 대시보드 전용 스타일 ★ */
-/* ========================================= */
-
+/* ==========================================================================
+   8) STATS DASHBOARD
+   ========================================================================== */
 .stats-container {
     padding-top: 20px;
     padding-bottom: 40px;
@@ -979,17 +1028,17 @@ header h1 {
 .stats-grid-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 20px;
-    margin-bottom: 20px;
+    gap: 14px;
+    margin-bottom: 14px;
 }
 
 .stats-card {
     flex: 1;
     min-width: 320px;
     background: #ffffff;
-    border: 1px solid #eaeaea;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    border: 1px solid #e9ecef;
+    border-radius: 14px;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -1002,18 +1051,18 @@ header h1 {
 
 .stats-header {
     background-color: #f8f9fa;
-    padding: 15px 20px;
-    border-bottom: 1px solid #eee;
+    padding: 12px 14px;
+    border-bottom: 1px solid #e9ecef;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-left: 4px solid #007bff;
+    border-left: 6px solid #0b5ed7;
 }
 
 .stats-title {
     margin: 0;
-    font-size: 16px;
-    font-weight: 700;
+    font-size: 15px;
+    font-weight: 900;
     color: #495057;
     display: flex;
     align-items: center;
@@ -1021,17 +1070,87 @@ header h1 {
 }
 
 .stats-body {
-    padding: 14px;
+    padding: 12px;
     position: relative;
     height: 300px;
     width: 100%;
 }
 
 .stats-card.full-width .stats-body {
-    padding: 16px;
+    padding: 14px;
 }
 
 .stats-body canvas {
     width: 100% !important;
     height: 100% !important;
 }
+/* =========================
+   [버스 관제] 수집(Collector) 영역 UI 보정
+   - 좁은 폭에서 '수집' 글자가 세로로 쪼개지는(글자 단위 줄바꿈) 현상 방지
+   - 버튼/입력/상태 텍스트를 한 줄로 유지, 필요 시 전체 블록만 다음 줄로 내려가도록 처리
+   ========================= */
+.bus-card.control-section .collector-wrap {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 12px;
+    border-left: 1px solid #e9ecef;
+
+    /* ✅ 이 블록 자체만 줄바꿈 대상이 되게 */
+    flex: 1 1 360px;
+    min-width: 320px;
+
+    /* ✅ 글자 단위 줄바꿈 방지 */
+    white-space: nowrap;
+}
+
+.bus-card.control-section .collector-label {
+    font-size: 12px;
+    color: #666;
+    font-weight: 700;
+    white-space: nowrap; /* ✅ '수집:' 세로쪼개짐 방지 */
+}
+
+.bus-card.control-section .collector-batch-input {
+    width: 72px;
+    height: 32px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    padding: 0 8px;
+    font-size: 12px;
+    outline: none;
+}
+
+.bus-card.control-section .collector-run-btn {
+    min-width: 120px;
+}
+
+.bus-card.control-section .collector-status-text {
+    font-size: 12px;
+    color: #888;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap; /* ✅ 상태 문자열도 세로쪼개짐 방지 */
+}
+
+/* 작은 화면에서는 수집 블록을 다음 줄로 자연스럽게 내려서 깨짐 방지 */
+@media (max-width: 980px) {
+    .bus-card.control-section .collector-wrap {
+        flex: 1 1 100%;
+        min-width: 100%;
+        margin-left: 0;
+        border-left: none;
+        padding-left: 0;
+        border-top: 1px solid #e9ecef;
+        padding-top: 10px;
+        margin-top: 6px;
+    }
+
+    .bus-card.control-section .collector-status-text {
+        max-width: 100%;
+    }
+}
+
+/* 수정됨 끝 */
