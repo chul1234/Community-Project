@@ -1153,4 +1153,91 @@ header h1 {
     }
 }
 
+/* 수정됨: bus-info 상단(1번) 경로 버튼 + collector class 기반 스타일 실제 적용 */
+
+/* 상단 "경로 보기/지우기" 버튼 */
+.btn-path-action {
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 900;
+    color: #495057;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1;
+    white-space: nowrap;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.btn-path-action:hover {
+    border-color: #ced4da;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+}
+
+.btn-path-action.danger {
+    background-color: #fff5f5;
+    color: #fa5252;
+    border-color: #ffc9c9;
+}
+
+/* control-section 안 collector 영역: 네가 이미 작성해 둔 CSS가 있는데
+   HTML을 class로 바꿨으니 실제로 먹게 됨 */
+.bus-card.control-section .collector-wrap {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+    word-break: keep-all;
+    max-width: 100%;
+    flex: 1 1 360px;
+    padding-left: 12px;
+    border-left: 1px solid #e9ecef;
+}
+
+.bus-card.control-section .collector-label {
+    font-size: 12px;
+    color: #666;
+    font-weight: 700;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.bus-card.control-section .collector-status-text {
+    font-size: 12px;
+    color: #888;
+    white-space: normal;
+    word-break: keep-all;
+    overflow: visible;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    max-width: 420px;
+    flex: 1 1 220px;
+    min-width: 220px;
+}
+
+@media (max-width: 980px) {
+    .bus-card.control-section .collector-wrap {
+        flex: 1 1 100%;
+        margin-left: 0;
+        border-left: none;
+        padding-left: 0;
+        border-top: 1px solid #e9ecef;
+        padding-top: 10px;
+        margin-top: 6px;
+        white-space: normal;
+    }
+
+    .bus-card.control-section .collector-status-text {
+        max-width: 100%;
+        min-width: 0;
+    }
+}
+
 /* 수정됨 끝 */
+
