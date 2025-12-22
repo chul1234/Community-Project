@@ -1632,12 +1632,10 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     // =========================================================
     $scope.setPathStart = function(stop) {
         $scope.pathStartStop = stop;
-        alert("출발지가 설정되었습니다: " + (stop.nodenm || stop.stationName));
     };
 
     $scope.setPathEnd = function(stop) {
         $scope.pathEndStop = stop;
-        alert("도착지가 설정되었습니다: " + (stop.nodenm || stop.stationName));
     };
 
     $scope.clearResultPath = function() {
