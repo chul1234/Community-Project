@@ -166,6 +166,8 @@ public class PathServiceImpl implements IPathService {
             String toId = asString(r.get("to_id"));
             String routeId = asString(r.get("route_id"));
 
+            int updowncd = asInt(r.get("updowncd"), -1);
+
             if (fromId == null || toId == null) continue;
 
             double fromLatStop = asDouble(r.get("from_lat"));
@@ -183,7 +185,7 @@ public class PathServiceImpl implements IPathService {
             stopPointMap.putIfAbsent(toId, new StopPoint(toId, toLatStop, toLngStop));
 
             // 그래프 간선 추가 (BUS는 실제 운행처럼 유향: from_id -> to_id만 허용)
-            addEdge(graph, fromId, new Edge("BUS", routeId, fromId, toId, minutes));
+            addEdge(graph, fromId, new Edge("BUS", routeId, fromId, toId, minutes, updowncd));
         }
 
         // ---------------------------------------------------------
@@ -204,8 +206,8 @@ public class PathServiceImpl implements IPathService {
                 double distM = haversineMeters(curr.lat, curr.lng, next.lat, next.lng);
                 double min = distM / (TRAM_SPEED_KMPH * 1000.0 / 60.0);
 
-                addEdge(graph, currId, new Edge("TRAM", "2호선", currId, nextId, min));
-                addEdge(graph, nextId, new Edge("TRAM", "2호선", nextId, currId, min));
+                addEdge(graph, currId, new Edge("TRAM", "2호선", currId, nextId, min, -1));
+                addEdge(graph, nextId, new Edge("TRAM", "2호선", nextId, currId, min, -1));
             }
             
             // 2. 순환 연결: 마지막 '211 동부네거리' -> '212 중리네거리' 연결
@@ -222,8 +224,8 @@ public class PathServiceImpl implements IPathService {
                     double min = distM / (TRAM_SPEED_KMPH * 1000.0 / 60.0);
 
                     // 양방향 연결 (순환선)
-                    addEdge(graph, currId, new Edge("TRAM", "2호선", currId, nextId, min));
-                    addEdge(graph, nextId, new Edge("TRAM", "2호선", nextId, currId, min));
+                    addEdge(graph, currId, new Edge("TRAM", "2호선", currId, nextId, min, -1));
+                    addEdge(graph, nextId, new Edge("TRAM", "2호선", nextId, currId, min, -1));
                 }
             }
         }
@@ -249,9 +251,9 @@ public class PathServiceImpl implements IPathService {
                     double walkMin = metersToWalkMinutes(dist);
 
                     // 버스 -> 트램
-                    addEdge(graph, bs.id, new Edge("WALK", "Transfer", bs.id, tramNodeId, walkMin));
+                    addEdge(graph, bs.id, new Edge("WALK", "Transfer", bs.id, tramNodeId, walkMin, -1));
                     // 트램 -> 버스
-                    addEdge(graph, tramNodeId, new Edge("WALK", "Transfer", tramNodeId, bs.id, walkMin));
+                    addEdge(graph, tramNodeId, new Edge("WALK", "Transfer", tramNodeId, bs.id, walkMin, -1));
                 }
             }
         }
@@ -277,14 +279,14 @@ public class PathServiceImpl implements IPathService {
             double dStart = haversineMeters(fromLat, fromLng, sp.lat, sp.lng);
             if (dStart <= snapRadiusM) {
                 double walkMin = metersToWalkMinutes(dStart);
-                addEdge(graph, START_ID, new Edge("WALK", "Start", START_ID, sp.id, walkMin));
+                addEdge(graph, START_ID, new Edge("WALK", "Start", START_ID, sp.id, walkMin, -1));
             }
 
             // [정류장 -> 도착지] 거리 계산
             double dEnd = haversineMeters(sp.lat, sp.lng, toLat, toLng);
             if (dEnd <= snapRadiusM) {
                 double walkMin = metersToWalkMinutes(dEnd);
-                addEdge(graph, sp.id, new Edge("WALK", "End", sp.id, END_ID, walkMin));
+                addEdge(graph, sp.id, new Edge("WALK", "End", sp.id, END_ID, walkMin, -1));
             }
         }
 
@@ -345,6 +347,17 @@ public class PathServiceImpl implements IPathService {
         }
     }
 
+
+    private int asInt(Object o, int def) {
+        if (o == null) return def;
+        if (o instanceof Number) return ((Number) o).intValue();
+        try {
+            return Integer.parseInt(String.valueOf(o));
+        } catch (Exception e) {
+            return def;
+        }
+    }
+
     // =========================
     // 유틸: 도보 시간 및 거리 계산
     // =========================
@@ -402,7 +415,7 @@ private String getTramNameByNodeId(String nodeId) {
 
         PriorityQueue<NodeDist> pq = new PriorityQueue<>(Comparator.comparingDouble(a -> a.dist));
 
-        String startKey = stateKey(startId, "NONE", "", 0);
+        String startKey = stateKey(startId, "NONE", "", -1, 0);
         dist.put(startKey, 0.0);
         pq.add(new NodeDist(startKey, 0.0));
 
@@ -436,9 +449,9 @@ private String getTramNameByNodeId(String nodeId) {
                 if ("BUS".equals(e.mode) || "TRAM".equals(e.mode)) {
                     boolean isSameVehicle =
                         Objects.equals(curState.mode, e.mode) &&
-                        Objects.equals(curState.routeId, e.routeId);
-
-                    if (!isSameVehicle) {
+                        Objects.equals(curState.routeId, e.routeId) &&
+                        (!"BUS".equals(e.mode) || curState.updowncd == e.updowncd);
+if (!isSameVehicle) {
                         // 새로 승차(또는 다른 노선/다른 모드로 환승)
                         nextRides = curState.rideCount + 1;
 
@@ -462,7 +475,8 @@ private String getTramNameByNodeId(String nodeId) {
                     nextRoute = "";
                 }
 
-                String nextKey = stateKey(e.toId, nextMode, nextRoute, nextRides);
+                int nextUpdown = ("BUS".equals(nextMode) ? e.updowncd : -1);
+                String nextKey = stateKey(e.toId, nextMode, nextRoute, nextUpdown, nextRides);
 
                 // (3) 거리(시간) 갱신
                 double step = Math.max(0.0, e.minutes) + penalty;
@@ -501,7 +515,7 @@ private String getTramNameByNodeId(String nodeId) {
         String curKey = result.endStateKey;
 
         // startKey는 dijkstra()에서 시작한 상태와 동일해야 함
-        String startKey = stateKey(startId, "NONE", "", 0);
+        String startKey = stateKey(startId, "NONE", "", -1, 0);
 
         while (!Objects.equals(curKey, startKey)) {
             Edge e = result.prevEdge.get(curKey);
@@ -530,21 +544,26 @@ private String getTramNameByNodeId(String nodeId) {
         Map<String, Object> curSeg = null;
         String curMode = null;
         String curRouteId = null;
+        Integer curUpdowncd = null;
 
         for (Edge e : edges) {
             boolean newSegment = (curSeg == null) 
                 || !Objects.equals(curMode, e.mode)
-                || ("BUS".equals(e.mode) && !Objects.equals(curRouteId, e.routeId));
+                || ("BUS".equals(e.mode) && (!Objects.equals(curRouteId, e.routeId) || !Objects.equals(curUpdowncd, e.updowncd)));
 
             if (newSegment) {
                 if (curSeg != null) segments.add(curSeg);
 
                 curMode = e.mode;
                 curRouteId = e.routeId;
+                curUpdowncd = ("BUS".equals(e.mode) ? Integer.valueOf(e.updowncd) : null);
 
                 curSeg = new HashMap<>();
                 curSeg.put("mode", e.mode);
                 curSeg.put("routeId", e.routeId);
+                if ("BUS".equals(e.mode)) {
+                    curSeg.put("updowncd", e.updowncd);
+                }
                 curSeg.put("minutes", 0.0);
                 curSeg.put("points", new ArrayList<double[]>());
                 curSeg.put("nodeIds", new ArrayList<String>());
@@ -592,9 +611,17 @@ if (to != null) {
     }
 
     private static class Edge {
-        String mode, routeId, fromId, toId; double minutes;
-        Edge(String m, String r, String f, String t, double min) {
-            mode=m; routeId=r; fromId=f; toId=t; minutes=min;
+        String mode, routeId, fromId, toId;
+        double minutes;
+        int updowncd; // BUS 방향(0:상행, 1:하행), BUS가 아니면 -1
+
+        Edge(String m, String r, String f, String t, double min, int updowncd) {
+            this.mode = m;
+            this.routeId = r;
+            this.fromId = f;
+            this.toId = t;
+            this.minutes = min;
+            this.updowncd = updowncd;
         }
     }
 
@@ -602,33 +629,39 @@ if (to != null) {
         String nodeId;
         String mode;
         String routeId;
+        int updowncd; // BUS 방향(0/1). BUS가 아니면 -1
         int rideCount;
 
-        State(String nodeId, String mode, String routeId, int rideCount) {
+        State(String nodeId, String mode, String routeId, int updowncd, int rideCount) {
             this.nodeId = nodeId;
             this.mode = mode;
             this.routeId = routeId;
+            this.updowncd = updowncd;
             this.rideCount = rideCount;
         }
     }
 
-    private String stateKey(String nodeId, String mode, String routeId, int rideCount) {
-        return String.valueOf(nodeId) + "|" + String.valueOf(mode) + "|" + String.valueOf(routeId) + "|" + rideCount;
+    private String stateKey(String nodeId, String mode, String routeId, int updowncd, int rideCount) {
+        return String.valueOf(nodeId) + "|" + String.valueOf(mode) + "|" + String.valueOf(routeId) + "|" + updowncd + "|" + rideCount;
     }
 
     private State parseStateKey(String key) {
-        // key format: nodeId|mode|routeId|rideCount
-        if (key == null) return new State("", "NONE", "", 0);
+        // key format: nodeId|mode|routeId|updowncd|rideCount
+        if (key == null) return new State("", "NONE", "", -1, 0);
 
         String[] parts = key.split("\\|", -1);
         String nodeId = (parts.length > 0 ? parts[0] : "");
         String mode = (parts.length > 1 ? parts[1] : "NONE");
         String routeId = (parts.length > 2 ? parts[2] : "");
-        int rideCount = 0;
+        int updowncd = -1;
         if (parts.length > 3) {
-            try { rideCount = Integer.parseInt(parts[3]); } catch (Exception ignore) {}
+            try { updowncd = Integer.parseInt(parts[3]); } catch (Exception ignore) {}
         }
-        return new State(nodeId, mode, routeId, rideCount);
+        int rideCount = 0;
+        if (parts.length > 4) {
+            try { rideCount = Integer.parseInt(parts[4]); } catch (Exception ignore) {}
+        }
+        return new State(nodeId, mode, routeId, updowncd, rideCount);
     }
 
     private static class NodeDist {

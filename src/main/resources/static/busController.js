@@ -1,5 +1,5 @@
 // =========================================================
-// [최종 수정] busController.js 
+// [최종 수정] busController.js
 // 수정 사항: 최단 경로 화살표 회전 각도 오류 수정 (rotation: -angle)
 // =========================================================
 
@@ -100,10 +100,20 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     // [트램] 구간별 색상 매핑
     // =========================================================
     var TRAM_SECTION_COLOR_MAP = {
-        '1구간': '#AB3937', '2구간': '#AB3937', '3구간': '#202020', '4구간': '#202020',
-        '5구간': '#202020', '6구간': '#202020', '7구간': '#AB3937', '8구간': '#AB3937',
-        '9구간': '#202020', '10구간': '#AB3937', '11구간': '#202020', '12구간': '#202020',
-        '13구간': '#AB3937', '14구간': '#202020',
+        '1구간': '#AB3937',
+        '2구간': '#AB3937',
+        '3구간': '#202020',
+        '4구간': '#202020',
+        '5구간': '#202020',
+        '6구간': '#202020',
+        '7구간': '#AB3937',
+        '8구간': '#AB3937',
+        '9구간': '#202020',
+        '10구간': '#AB3937',
+        '11구간': '#202020',
+        '12구간': '#202020',
+        '13구간': '#AB3937',
+        '14구간': '#202020',
     };
 
     function getTramSectionColor(sectionName) {
@@ -344,10 +354,16 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             // WALK: 회색 점선, BUS: 환승 인덱스 기반 실선(기본 0)
             var busIdx = feature.get('busTransferIndex');
             if (busIdx == null || isNaN(busIdx)) busIdx = 0;
+            var updowncd = feature.get('updowncd'); // BUS 방향(0/1)
 
-            var color = (mode === 'WALK') ? '#555555' : busColors[(busIdx % busColors.length)];
-            var width = (mode === 'WALK') ? 4 : 6;
-            var lineDash = (mode === 'WALK') ? [10, 10] : null;
+            var color = mode === 'WALK' ? '#555555' : busColors[busIdx % busColors.length];
+            var width = mode === 'WALK' ? 4 : 6;
+            var lineDash = mode === 'WALK' ? [10, 10] : null;
+
+            if (mode === 'BUS' && updowncd === 1) {
+                // 하행은 점선으로 구분 (동일한 라인이라도 방향 차이를 눈으로 확인 가능)
+                lineDash = null;
+            }
 
             if (mode === 'TRAM') {
                 color = '#FF69B4'; // 핫핑크
@@ -360,13 +376,12 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                     color: color,
                     width: width,
                     lineDash: lineDash,
-                    lineCap: 'round'
-                })
+                    lineCap: 'round',
+                }),
             });
-        }
+        },
     });
 
-    
     // -------------------------
     // [추가] 최단경로(BUS) routeId -> 버스번호(routenm) 매핑 캐시
     //  - Path API는 BUS 구간에 routeId(DJB...)만 내려주므로,
@@ -461,10 +476,10 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 var arr = extractItemsFromTagoResponse(data);
                 for (var i = 0; i < arr.length; i++) {
                     var it = arr[i] || {};
-                    var nid = it.nodeid != null ? String(it.nodeid) : (it.nodeId != null ? String(it.nodeId) : '');
+                    var nid = it.nodeid != null ? String(it.nodeid) : it.nodeId != null ? String(it.nodeId) : '';
                     if (!nid) continue;
                     if (nid === nodeId) {
-                        var nm = it.nodenm != null ? String(it.nodenm) : (it.nodeNm != null ? String(it.nodeNm) : '');
+                        var nm = it.nodenm != null ? String(it.nodenm) : it.nodeNm != null ? String(it.nodeNm) : '';
                         nm = (nm || '').trim();
                         if (nm) {
                             pathNodeNameCache[nodeId] = nm;
@@ -482,7 +497,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             });
     }
 
-// -------------------------
+    // -------------------------
     // 노선 라인 화살표
     // -------------------------
     var ROUTE_ARROW_EVERY_N_SEGMENTS = 2;
@@ -498,7 +513,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     function getRouteArrowStyle(rotationRad) {
         // [수정] 화살표 회전 각도 보정: 단순히 각도를 반전(-rotationRad)하면 됨
         // (SVG 아이콘이 오른쪽(0도)을 바라보고 있기 때문)
-        var rot = -rotationRad; 
+        var rot = -rotationRad;
 
         var key = (Math.round(rot * 100) / 100).toString();
         if (routeArrowStyleCache[key]) return routeArrowStyleCache[key];
@@ -571,7 +586,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
             var isRouteMode = !!$scope.currentRouteId;
             var isStopSearchMode = !isRouteMode && $scope.stops && $scope.stops.length > 0;
-            var hasPathResult = (pathSource.getFeatures().length > 0);
+            var hasPathResult = pathSource.getFeatures().length > 0;
 
             if (!isRouteMode && !isStopSearchMode && !hasPathResult) {
                 hideHoverTooltip();
@@ -614,22 +629,22 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
                 if (min < 1) min = 1;
 
-                var text = "";
+                var text = '';
                 if (mode === 'WALK') {
-                    text = "🚶 도보 " + min + "분";
+                    text = '🚶 도보 ' + min + '분';
                 } else if (mode === 'BUS') {
                     // routeId -> 버스번호(예: 101)로 변환해서 표기
-                    var busNo = (routeId && pathRouteNoMap && pathRouteNoMap[routeId]) ? String(pathRouteNoMap[routeId]) : null;
+                    var busNo = routeId && pathRouteNoMap && pathRouteNoMap[routeId] ? String(pathRouteNoMap[routeId]) : null;
                     if (busNo) {
-                        text = "🚌 버스(" + busNo + "번) : " + min + "분";
+                        text = '🚌 버스(' + busNo + '번) : ' + min + '분';
                     } else {
                         // 아직 매핑이 없으면 routeId를 임시로 표기
-                        text = "🚌 버스" + (routeId ? "(" + routeId + ")" : "") + " : " + min + "분";
+                        text = '🚌 버스' + (routeId ? '(' + routeId + ')' : '') + ' : ' + min + '분';
                     }
                 } else if (mode === 'TRAM') {
-                    text = "🚋 트램 2호선 : " + min + "분";
+                    text = '🚋 트램 2호선 : ' + min + '분';
                 } else {
-                    text = "이동 " + min + "분";
+                    text = '이동 ' + min + '분';
                 }
 
                 showHoverTooltip(evt.coordinate, text);
@@ -644,20 +659,20 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
                 if (nodeMode === 'TRAM') {
                     // TRAM은 Path API에서 nodeNames로 내려줌
-                    var tramLabel = nodeName ? ("🚋 " + nodeName) : "🚋 트램 정거장";
+                    var tramLabel = nodeName ? '🚋 ' + nodeName : '🚋 트램 정거장';
                     showHoverTooltip(evt.coordinate, tramLabel);
                     return;
                 }
 
                 // BUS 정류장은 이름을 못 받으면(현재 DB에 없음) 좌표 기반 근접 정류장 API로 보완
                 if (nodeName) {
-                    showHoverTooltip(evt.coordinate, "🚏 " + nodeName);
+                    showHoverTooltip(evt.coordinate, '🚏 ' + nodeName);
                     return;
                 }
 
                 var wgsLat = feature.get('wgsLat');
                 var wgsLng = feature.get('wgsLng');
-                showHoverTooltip(evt.coordinate, "🚏 정류장" + (nodeId ? "(" + nodeId + ")" : ""));
+                showHoverTooltip(evt.coordinate, '🚏 정류장' + (nodeId ? '(' + nodeId + ')' : ''));
 
                 resolvePathBusStopName(nodeId, wgsLat, wgsLng, function (resolvedName) {
                     // 현재 hover 중인 동일 feature인 경우에만 갱신(툴팁 점프 방지)
@@ -666,7 +681,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                     } catch (e) {}
 
                     if (lastHoverFeature === feature && lastHoverCoord) {
-                        showHoverTooltip(lastHoverCoord, "🚏 " + resolvedName);
+                        showHoverTooltip(lastHoverCoord, '🚏 ' + resolvedName);
                     }
                 });
                 return;
@@ -987,9 +1002,9 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             olMap.addLayer(stopLayer);
             olMap.addLayer(busLayer);
             olMap.addLayer(repPulseLayer);
-            
+
             // ★ [추가] 최단 경로 레이어 추가
-            olMap.addLayer(pathLayer); 
+            olMap.addLayer(pathLayer);
 
             console.log('레이어 추가 완료 (트램, 최단경로 포함)');
         }
@@ -999,7 +1014,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
         clearTram();
         $scope.isTramVisible = false;
-        
+
         // Collector 상태 초기화
         refreshCollectorStatus();
         startCollectorPoll();
@@ -1736,17 +1751,17 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     // =========================================================
     // ★ [추가] 출발/도착 정류장 선택 기능 (하드코딩 제거용)
     // =========================================================
-    $scope.setPathStart = function(stop) {
+    $scope.setPathStart = function (stop) {
         $scope.pathStartStop = stop;
         $scope.pathTotalMinutes = null;
     };
 
-    $scope.setPathEnd = function(stop) {
+    $scope.setPathEnd = function (stop) {
         $scope.pathEndStop = stop;
         $scope.pathTotalMinutes = null;
     };
 
-    $scope.clearResultPath = function() {
+    $scope.clearResultPath = function () {
         pathSource.clear();
         $scope.pathStartStop = null;
         $scope.pathEndStop = null;
@@ -1759,7 +1774,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     $scope.solvePath = function () {
         // 유효성 검사: 사용자가 출발/도착지를 모두 선택했는지 확인
         if (!$scope.pathStartStop || !$scope.pathEndStop) {
-            alert("먼저 목록에서 [출발] 정류장과 [도착] 정류장을 선택해주세요.");
+            alert('먼저 목록에서 [출발] 정류장과 [도착] 정류장을 선택해주세요.');
             return;
         }
 
@@ -1769,42 +1784,46 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
         var startLat = parseFloat(s.gpslati || s.gpsLati || s.gpsY);
         var startLng = parseFloat(s.gpslong || s.gpsLong || s.gpsX);
-        var endLat   = parseFloat(e.gpslati || e.gpsLati || e.gpsY);
-        var endLng   = parseFloat(e.gpslong || e.gpsLong || e.gpsX);
+        var endLat = parseFloat(e.gpslati || e.gpsLati || e.gpsY);
+        var endLng = parseFloat(e.gpslong || e.gpsLong || e.gpsX);
 
         if (isNaN(startLat) || isNaN(startLng) || isNaN(endLat) || isNaN(endLng)) {
-            alert("선택한 정류장의 좌표 정보가 유효하지 않습니다.");
+            alert('선택한 정류장의 좌표 정보가 유효하지 않습니다.');
             return;
         }
 
         // 파라미터 구성
         var params = {
-            fromLat: startLat, fromLng: startLng,
-            toLat: endLat,     toLng: endLng,
-            snapRadiusM: 450 // 도보 스냅 반경 (450m)
+            fromLat: startLat,
+            fromLng: startLng,
+            toLat: endLat,
+            toLng: endLng,
+            snapRadiusM: 450, // 도보 스냅 반경 (450m)
         };
 
-        $http.get('/api/path/solve', { params: params }).then(function (res) {
-            var data = res.data;
-            if (!data || !data.segments || data.segments.length === 0) {
-                alert("경로를 찾을 수 없습니다.\n(출발/도착지 450m 반경 내에 연결 가능한 버스가 없습니다)");
-                return;
-            }
-            
-            var totalMin = Math.round(data.totalMinutes);
-            console.log("경로 찾기 성공:", data);
-            
-            var sName = s.nodenm || s.stationName;
-            var eName = e.nodenm || e.stationName;
-            $scope.pathTotalMinutes = totalMin;
+        $http
+            .get('/api/path/solve', { params: params })
+            .then(function (res) {
+                var data = res.data;
+                if (!data || !data.segments || data.segments.length === 0) {
+                    alert('경로를 찾을 수 없습니다.\n(출발/도착지 450m 반경 내에 연결 가능한 버스가 없습니다)');
+                    return;
+                }
 
-            // 경로 그리기 호출
-            drawCalculatedPath(data.segments);
+                var totalMin = Math.round(data.totalMinutes);
+                console.log('경로 찾기 성공:', data);
 
-        }).catch(function (err) {
-            console.error("경로 검색 오류:", err);
-            alert("경로 계산 중 오류가 발생했습니다.");
-        });
+                var sName = s.nodenm || s.stationName;
+                var eName = e.nodenm || e.stationName;
+                $scope.pathTotalMinutes = totalMin;
+
+                // 경로 그리기 호출
+                drawCalculatedPath(data.segments);
+            })
+            .catch(function (err) {
+                console.error('경로 검색 오류:', err);
+                alert('경로 계산 중 오류가 발생했습니다.');
+            });
     };
 
     // [수정] 경로 그리기 함수 (화살표 추가 + Hover 데이터 심기 + 정류장 마커 추가)
@@ -1817,7 +1836,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         // BUS 환승(노선 변경) 감지를 위한 상태값
         var prevBusRouteId = null;
         var busTransferIndex = -1; // 첫 BUS 구간에서 0이 되도록 -1로 시작
- // 중복 path_node 방지 (nodeId 기준)
+        // 중복 path_node 방지 (nodeId 기준)
 
         segments.forEach(function (seg, index) {
             if (!seg.points || seg.points.length < 2) return;
@@ -1834,21 +1853,24 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             }
 
             // 2. 좌표 변환 (WGS84 -> 지도 좌표계)
-            var transformedCoords = seg.points.map(function(pt) {
+            var transformedCoords = seg.points.map(function (pt) {
                 return lonLatToMapXY(pt[0], pt[1]);
             });
 
             // 3. 선(Line) 그리기
             var lineFeat = new ol.Feature({
-                geometry: new ol.geom.LineString(transformedCoords)
+                geometry: new ol.geom.LineString(transformedCoords),
             });
-            
+
             // ★ Hover 데이터 저장 (분 단위) ★
-            lineFeat.set('featureType', 'path_segment'); 
+            lineFeat.set('featureType', 'path_segment');
             lineFeat.set('mode', seg.mode); // WALK, BUS, TRAM
             // 백엔드에서 온 minutes 값을 정수로 반올림하여 저장
             lineFeat.set('minutes', seg.minutes ? Math.round(seg.minutes) : 0);
             lineFeat.set('routeId', seg.routeId);
+            if (seg.mode === 'BUS' && seg.updowncd != null) {
+                lineFeat.set('updowncd', parseInt(seg.updowncd, 10));
+            }
 
             // BUS 구간은 노선(routeId)이 바뀌는 순간을 '환승'으로 보고 색 인덱스를 증가시킨다.
             if (seg.mode === 'BUS') {
@@ -1862,14 +1884,13 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 lineFeat.set('busTransferIndex', 0);
             }
 
-            
             pathSource.addFeature(lineFeat);
             ol.extent.extend(extent, lineFeat.getGeometry().getExtent());
 
             // 4. 지나가는 정류장 마커(Node) 그리기
             // - Path API에서 nodeIds/nodeNames를 내려주므로, BUS/TRAM 구간의 모든 정류장(정거장)을 표시한다.
             if (seg.mode === 'BUS' || seg.mode === 'TRAM') {
-                var circleBorderColor = (seg.mode === 'TRAM') ? '#FF69B4' : '#0066ff';
+                var circleBorderColor = seg.mode === 'TRAM' ? '#FF69B4' : '#0066ff';
                 var nodeIds = seg.nodeIds || [];
                 var nodeNames = seg.nodeNames || [];
 
@@ -1877,25 +1898,27 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                     var wgsPt = seg.points[ni];
                     if (!wgsPt || wgsPt.length < 2) continue;
 
-                    var nodeId = (nodeIds && nodeIds[ni]) ? String(nodeIds[ni]) : null;
-                    var nodeName = (nodeNames && nodeNames[ni]) ? String(nodeNames[ni]) : null;
+                    var nodeId = nodeIds && nodeIds[ni] ? String(nodeIds[ni]) : null;
+                    var nodeName = nodeNames && nodeNames[ni] ? String(nodeNames[ni]) : null;
 
-                    var key = nodeId ? nodeId : (wgsPt[0] + ',' + wgsPt[1]);
+                    var key = nodeId ? nodeId : wgsPt[0] + ',' + wgsPt[1];
                     if (seenPathNodeKeys[key]) continue;
                     seenPathNodeKeys[key] = true;
 
                     var mapPt = lonLatToMapXY(wgsPt[0], wgsPt[1]);
                     var nodeFeat = new ol.Feature({
-                        geometry: new ol.geom.Point(mapPt)
+                        geometry: new ol.geom.Point(mapPt),
                     });
 
-                    nodeFeat.setStyle(new ol.style.Style({
-                        image: new ol.style.Circle({
-                            radius: 5,
-                            fill: new ol.style.Fill({ color: '#FFFFFF' }),
-                            stroke: new ol.style.Stroke({ color: circleBorderColor, width: 2 })
+                    nodeFeat.setStyle(
+                        new ol.style.Style({
+                            image: new ol.style.Circle({
+                                radius: 5,
+                                fill: new ol.style.Fill({ color: '#FFFFFF' }),
+                                stroke: new ol.style.Stroke({ color: circleBorderColor, width: 2 }),
+                            }),
                         })
-                    }));
+                    );
 
                     nodeFeat.set('featureType', 'path_node');
                     nodeFeat.set('mode', seg.mode);
@@ -1910,40 +1933,41 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
             // 5. 화살표(Arrow) 그리기 (도보 제외, 긴 구간만)
             if (seg.mode !== 'WALK' && transformedCoords.length > 3) {
-                var arrowStep = 5; 
+                var arrowStep = 5;
                 for (var i = 0; i < transformedCoords.length - 1; i += arrowStep) {
                     var p1 = transformedCoords[i];
                     var p2 = transformedCoords[i + 1];
                     var dx = p2[0] - p1[0];
                     var dy = p2[1] - p1[1];
-                    var len = Math.sqrt(dx*dx + dy*dy);
-                    if (len < 10) continue; 
+                    var len = Math.sqrt(dx * dx + dy * dy);
+                    if (len < 10) continue;
 
                     var angle = Math.atan2(dy, dx);
-                    var mid = [(p1[0] + p2[0])/2, (p1[1] + p2[1])/2];
-                    
+                    var mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+
                     var arrowFeat = new ol.Feature({
-                        geometry: new ol.geom.Point(mid)
+                        geometry: new ol.geom.Point(mid),
                     });
-                    
-                    var arrowColor = (seg.mode === 'TRAM') ? '#FF1493' : '#0000FF';
+
+                    var arrowColor = seg.mode === 'TRAM' ? '#FF1493' : '#0000FF';
 
                     // 화살표 스타일 (SVG 아이콘 사용 + 회전 보정)
-                    arrowFeat.setStyle(new ol.style.Style({
-                        image: new ol.style.Icon({
-                            src: buildRouteArrowSvgDataUri(arrowColor), 
-                            scale: 0.7, 
-                            rotation: -angle, // [수정됨] 단순하게 -angle로 변경
-                            rotateWithView: true
+                    arrowFeat.setStyle(
+                        new ol.style.Style({
+                            image: new ol.style.Icon({
+                                src: buildRouteArrowSvgDataUri(arrowColor),
+                                scale: 0.7,
+                                rotation: -angle, // [수정됨] 단순하게 -angle로 변경
+                                rotateWithView: true,
+                            }),
                         })
-                    }));
-                    
+                    );
+
                     pathSource.addFeature(arrowFeat);
                 }
             }
         });
 
-        
         // BUS 구간 routeId -> 버스번호(routenm) 매핑을 미리 로딩 (툴팁에서 routeId 대신 버스번호 표시)
         try {
             var routeIds = [];
@@ -1969,11 +1993,11 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             console.warn('최단경로 버스번호 매핑 프리패치 실패:', e);
         }
 
-// 6. 경로가 보이도록 지도 줌/이동
+        // 6. 경로가 보이도록 지도 줌/이동
         if (!ol.extent.isEmpty(extent)) {
-            olMap.getView().fit(extent, { 
-                padding: [50, 50, 50, 50], 
-                duration: 800 
+            olMap.getView().fit(extent, {
+                padding: [50, 50, 50, 50],
+                duration: 800,
             });
         }
     }
@@ -2039,5 +2063,4 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
     // 페이지 진입 시: 상태 1회 확인(ON이면 applyCollectorStatus가 폴링 시작)
     refreshCollectorStatus();
-
 });
