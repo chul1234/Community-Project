@@ -65,6 +65,7 @@
         출발: <span style="color: #007bff; font-weight: bold;">{{ pathStartStop.nodenm || pathStartStop.stationName || '미선택' }}</span> 
         → 
         도착: <span style="color: #dc3545; font-weight: bold;">{{ pathEndStop.nodenm || pathEndStop.stationName || '미선택' }}</span>
+        <span ng-if="pathTotalMinutes != null" style="float: right; font-weight: bold; color: #28a745;">약 {{ pathTotalMinutes }}분</span>
         
         <span ng-if="!pathStartStop || !pathEndStop" style="color: #666; margin-left: 10px;">(목록에서 '출발'/'도착' 버튼을 눌러 선택하세요)</span>
     </div>
@@ -143,7 +144,7 @@
         </div>
     </div>
 
-    <div class="bus-info-grid" style="display: flex; gap: 15px; margin-top: 15px; height: 300px;">
+    <div class="bus-info-grid" style="display: flex; gap: 15px; margin-top: 15px; min-height: 300px;">
         
         <div class="bus-panel-box" style="flex: 1; background: white; border: 1px solid #ddd; border-radius: 8px; display: flex; flex-direction: column;">
             <div class="bus-panel-header accent-blue" style="padding: 10px; background: #f8f9fa; border-bottom: 1px solid #ddd; font-weight: bold; border-left: 4px solid #007bff;">

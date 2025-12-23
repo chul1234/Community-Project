@@ -144,6 +144,35 @@ public String getStopsByName(
     return restTemplate.getForObject(url, String.class);
 }
 
+    /**
+     * 6) 좌표 기반 근접 정류장 목록 조회 (getCrdntPrxmtSttnList)
+     *
+     * - 최단경로 결과(segments)의 BUS 정류장 hover에서 "정류장 이름"을 표시하기 위해 사용한다.
+     * - segment_weight에는 정류장 이름이 없어서, (lat,lng) 기준으로 근처 정류장 목록을 받아
+     *   nodeid가 일치하는 항목의 nodenm을 프론트에서 매칭한다.
+     *
+     * 예: /api/bus/stops-nearby?lat=36.36&lng=127.37
+     */
+    @CrossOrigin
+    @GetMapping("/api/bus/stops-nearby")
+    public String getStopsNearby(
+            @RequestParam("lat") String lat,
+            @RequestParam("lng") String lng,
+            @RequestParam(value = "pageNo", defaultValue = "1") String pageNo,
+            @RequestParam(value = "numOfRows", defaultValue = "20") String numOfRows
+    ) {
+
+        String url = "http://apis.data.go.kr/1613000/BusSttnInfoInqireService/getCrdntPrxmtSttnList"
+                + "?serviceKey=" + SERVICE_KEY
+                + "&_type=json"
+                + "&gpsLati=" + lat
+                + "&gpsLong=" + lng
+                + "&pageNo=" + pageNo
+                + "&numOfRows=" + numOfRows;
+
+        return restTemplate.getForObject(url, String.class);
+    }
+
 }
 
 // 수정됨 끝

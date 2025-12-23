@@ -896,11 +896,19 @@ header h1 {
     padding: 0;
     max-height: 340px;
     overflow-y: auto;
-    overflow-x: auto;          /* ✅ 테이블이 넘치면 가로 스크롤만 */
 
-    /* ✅ 한글 세로쪼개짐 방지 */
+    /* ✅ 리스트 패널은 가로스크롤 필요 없음 → 가로스크롤바가 생기면 세로 공간 먹어서 마지막 줄이 더 잘릴 수 있음 */
+    overflow-x: hidden;
+
     word-break: keep-all;
+    padding-bottom: 24px; /* ✅ 여유 조금 더 */
 }
+
+/* ✅ selector는 밖으로 빼야 함 (일반 CSS) */
+.stop-list-row:last-child {
+    margin-bottom: 12px;
+}
+
 
 /* 정류장 리스트 row */
 .stop-list-row {
@@ -1239,5 +1247,15 @@ header h1 {
     }
 }
 
-/* 수정됨 끝 */
+/* 🔴 inline style을 이기기 위해 !important 필수 */
+.bus-panel-content {
+    padding-bottom: 28px !important;
+    overflow-x: hidden !important;
+}
+
+/* 🔴 실제 리스트는 li라서 이 selector가 맞음 */
+.stop-list > li:last-child {
+    margin-bottom: 16px !important;
+}
+
 

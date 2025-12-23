@@ -24,7 +24,7 @@ public class PathServiceImpl implements IPathService {
 
     // 도보 속도: 1.3m/s (성인 평균)
     private static final double WALK_SPEED_MPS = 1.3;
-    // 트램 속도: 22km/h (표정속도)
+    // 트램 속도: 31km/h (표정속도)
     private static final double TRAM_SPEED_KMPH = 22.0;
 
     // START/END 가상 노드 ID
@@ -364,43 +364,126 @@ public class PathServiceImpl implements IPathService {
         return R * c;
     }
 
-    // =========================
+    
+
+// =========================
+// 유틸: TRAM 노드ID("TRAM_244") → 정거장 이름
+// =========================
+private String getTramNameByNodeId(String nodeId) {
+    if (nodeId == null) return null;
+    if (!nodeId.startsWith("TRAM_")) return null;
+    initTramData();
+    for (TramStation ts : tramStations) {
+        String id = "TRAM_" + ts.id;
+        if (id.equals(nodeId)) return ts.name;
+    }
+    return null;
+}
+// =========================
     // 다익스트라 알고리즘
     // =========================
     private DijkstraResult dijkstra(Map<String, List<Edge>> graph, String startId, String endId) {
+        // ---------------------------------------------------------
+        // 상태 기반 다익스트라:
+        // - 현실 제약: 승차(버스/트램) 횟수 상한(MAX_RIDES) 적용
+        // - 현실 반영: 환승/재승차 시 고정 패널티(TRANSFER_PENALTY_MIN) 적용
+        //
+        // 승차(ride) 카운트 규칙:
+        // - BUS/TRAM 간선을 "처음 타는 순간" 또는 "다른 노선/다른 모드로 갈아타는 순간"에 +1
+        // - WALK는 승차 카운트 증가 없음
+        // ---------------------------------------------------------
+        final int MAX_RIDES = 3; // 최대 3대(버스/트램 합산)까지만 허용
+        final double TRANSFER_PENALTY_MIN = 4.0; // 환승/재승차 1회당 페널티(분)
+
         Map<String, Double> dist = new HashMap<>();
+        Map<String, String> prevState = new HashMap<>();
         Map<String, Edge> prevEdge = new HashMap<>();
-        
+
         PriorityQueue<NodeDist> pq = new PriorityQueue<>(Comparator.comparingDouble(a -> a.dist));
 
-        dist.put(startId, 0.0);
-        pq.add(new NodeDist(startId, 0.0));
+        String startKey = stateKey(startId, "NONE", "", 0);
+        dist.put(startKey, 0.0);
+        pq.add(new NodeDist(startKey, 0.0));
+
+        double bestEndDist = Double.POSITIVE_INFINITY;
+        String bestEndKey = null;
 
         while (!pq.isEmpty()) {
             NodeDist cur = pq.poll();
-            
-            if (cur.dist > dist.getOrDefault(cur.nodeId, Double.POSITIVE_INFINITY)) {
+
+            if (cur.dist > dist.getOrDefault(cur.stateKey, Double.POSITIVE_INFINITY)) {
                 continue;
             }
 
-            if (Objects.equals(cur.nodeId, endId)) {
-                break;
+            State curState = parseStateKey(cur.stateKey);
+
+            // endId에 도달한 상태 중 최소를 채택
+            if (Objects.equals(curState.nodeId, endId)) {
+                if (cur.dist < bestEndDist) {
+                    bestEndDist = cur.dist;
+                    bestEndKey = cur.stateKey;
+                }
+                // 우선순위 큐 특성상 더 좋은 end가 나올 수 있어 계속 진행
             }
 
-            List<Edge> neighbors = graph.getOrDefault(cur.nodeId, Collections.emptyList());
+            List<Edge> neighbors = graph.getOrDefault(curState.nodeId, Collections.emptyList());
             for (Edge e : neighbors) {
-                double newDist = cur.dist + Math.max(0.0, e.minutes);
-                
-                if (newDist < dist.getOrDefault(e.toId, Double.POSITIVE_INFINITY)) {
-                    dist.put(e.toId, newDist);
-                    prevEdge.put(e.toId, e);
-                    pq.add(new NodeDist(e.toId, newDist));
+                // (1) 승차 카운트 / 환승 페널티 계산
+                int nextRides = curState.rideCount;
+                double penalty = 0.0;
+
+                if ("BUS".equals(e.mode) || "TRAM".equals(e.mode)) {
+                    boolean isSameVehicle =
+                        Objects.equals(curState.mode, e.mode) &&
+                        Objects.equals(curState.routeId, e.routeId);
+
+                    if (!isSameVehicle) {
+                        // 새로 승차(또는 다른 노선/다른 모드로 환승)
+                        nextRides = curState.rideCount + 1;
+
+                        // 첫 승차는 페널티 없음, 2번째 승차부터 환승 페널티 부여
+                        if (curState.rideCount > 0) {
+                            penalty = TRANSFER_PENALTY_MIN;
+                        }
+                    }
+                }
+
+                if (nextRides > MAX_RIDES) {
+                    continue; // 현실 제약: 승차 횟수 초과
+                }
+
+                // (2) 다음 상태 키 구성
+                String nextMode = e.mode;
+                String nextRoute = (e.routeId == null ? "" : e.routeId);
+                // WALK는 "차량 탑승 상태"를 끊어야 다음 BUS/TRAM에서 승차 카운트가 올라감
+                if ("WALK".equals(nextMode)) {
+                    nextMode = "WALK";
+                    nextRoute = "";
+                }
+
+                String nextKey = stateKey(e.toId, nextMode, nextRoute, nextRides);
+
+                // (3) 거리(시간) 갱신
+                double step = Math.max(0.0, e.minutes) + penalty;
+                double newDist = cur.dist + step;
+
+                if (newDist < dist.getOrDefault(nextKey, Double.POSITIVE_INFINITY)) {
+                    dist.put(nextKey, newDist);
+                    prevState.put(nextKey, cur.stateKey);
+                    prevEdge.put(nextKey, e);
+                    pq.add(new NodeDist(nextKey, newDist));
                 }
             }
         }
 
+        if (bestEndKey == null) {
+            return null;
+        }
+
         DijkstraResult res = new DijkstraResult();
-        res.totalMinutes = dist.getOrDefault(endId, Double.POSITIVE_INFINITY);
+        res.totalMinutes = bestEndDist;
+        res.endStateKey = bestEndKey;
+        res.prevState = prevState;
         res.prevEdge = prevEdge;
         return res;
     }
@@ -409,17 +492,29 @@ public class PathServiceImpl implements IPathService {
     // 경로 역추적 (End -> Start)
     // =========================
     private List<Edge> reconstructEdges(DijkstraResult result, String startId, String endId) {
-        List<Edge> edges = new ArrayList<>();
-        String cur = endId;
+        if (result == null || result.endStateKey == null) {
+            return Collections.emptyList();
+        }
 
-        while (!Objects.equals(cur, startId)) {
-            Edge e = result.prevEdge.get(cur);
-            if (e == null) {
+        List<Edge> edges = new ArrayList<>();
+        String curKey = result.endStateKey;
+
+        // startKey는 dijkstra()에서 시작한 상태와 동일해야 함
+        String startKey = stateKey(startId, "NONE", "", 0);
+
+        while (!Objects.equals(curKey, startKey)) {
+            Edge e = result.prevEdge.get(curKey);
+            String prevKey = result.prevState.get(curKey);
+
+            if (e == null || prevKey == null) {
+                // 역추적 불가(연결 끊김) → 빈 경로
                 return Collections.emptyList();
             }
+
             edges.add(e);
-            cur = e.fromId;
+            curKey = prevKey;
         }
+
         Collections.reverse(edges); // Start -> End 순서로 뒤집기
         return edges;
     }
@@ -451,20 +546,36 @@ public class PathServiceImpl implements IPathService {
                 curSeg.put("routeId", e.routeId);
                 curSeg.put("minutes", 0.0);
                 curSeg.put("points", new ArrayList<double[]>());
-            }
+                curSeg.put("nodeIds", new ArrayList<String>());
+                curSeg.put("nodeNames", new ArrayList<String>());
+}
 
             double oldMin = (double) curSeg.get("minutes");
             curSeg.put("minutes", oldMin + e.minutes);
 
             @SuppressWarnings("unchecked")
-            List<double[]> points = (List<double[]>) curSeg.get("points");
-            
-            StopPoint from = stopPointMap.get(e.fromId);
-            StopPoint to = stopPointMap.get(e.toId);
+List<double[]> points = (List<double[]>) curSeg.get("points");
 
-            if (from != null) points.add(new double[]{from.lng, from.lat});
-            if (to != null) points.add(new double[]{to.lng, to.lat});
-        }
+@SuppressWarnings("unchecked")
+List<String> nodeIds = (List<String>) curSeg.get("nodeIds");
+
+@SuppressWarnings("unchecked")
+List<String> nodeNames = (List<String>) curSeg.get("nodeNames");
+
+StopPoint from = stopPointMap.get(e.fromId);
+StopPoint to = stopPointMap.get(e.toId);
+
+if (from != null) {
+    points.add(new double[]{from.lng, from.lat});
+    nodeIds.add(e.fromId);
+    nodeNames.add("TRAM".equals(e.mode) ? getTramNameByNodeId(e.fromId) : null);
+}
+
+if (to != null) {
+    points.add(new double[]{to.lng, to.lat});
+    nodeIds.add(e.toId);
+    nodeNames.add("TRAM".equals(e.mode) ? getTramNameByNodeId(e.toId) : null);
+}}
 
         if (curSeg != null) segments.add(curSeg);
 
@@ -486,13 +597,53 @@ public class PathServiceImpl implements IPathService {
         }
     }
 
+    private static class State {
+        String nodeId;
+        String mode;
+        String routeId;
+        int rideCount;
+
+        State(String nodeId, String mode, String routeId, int rideCount) {
+            this.nodeId = nodeId;
+            this.mode = mode;
+            this.routeId = routeId;
+            this.rideCount = rideCount;
+        }
+    }
+
+    private String stateKey(String nodeId, String mode, String routeId, int rideCount) {
+        return String.valueOf(nodeId) + "|" + String.valueOf(mode) + "|" + String.valueOf(routeId) + "|" + rideCount;
+    }
+
+    private State parseStateKey(String key) {
+        // key format: nodeId|mode|routeId|rideCount
+        if (key == null) return new State("", "NONE", "", 0);
+
+        String[] parts = key.split("\\|", -1);
+        String nodeId = (parts.length > 0 ? parts[0] : "");
+        String mode = (parts.length > 1 ? parts[1] : "NONE");
+        String routeId = (parts.length > 2 ? parts[2] : "");
+        int rideCount = 0;
+        if (parts.length > 3) {
+            try { rideCount = Integer.parseInt(parts[3]); } catch (Exception ignore) {}
+        }
+        return new State(nodeId, mode, routeId, rideCount);
+    }
+
     private static class NodeDist {
-        String nodeId; double dist;
-        NodeDist(String id, double d) { nodeId=id; dist=d; }
+        String stateKey;
+        double dist;
+
+        NodeDist(String key, double d) {
+            stateKey = key;
+            dist = d;
+        }
     }
 
     private static class DijkstraResult {
         double totalMinutes;
+        String endStateKey;
+        Map<String, String> prevState;
         Map<String, Edge> prevEdge;
     }
 }
