@@ -1,4 +1,4 @@
-// 추가됨: 2번 문제(신성동→유성) 최단경로 계산을 위해 segment_weight(BUS) 구간을 조회하는 DAO
+// 수정됨: segment_weight(BUS) 조회 시 updowncd 컬럼을 함께 가져오도록 반영
 
 package com.example.demo.dao;
 
@@ -62,6 +62,7 @@ public class SegmentWeightDAO {
                     // ---- 기본 식별 컬럼 ----
                     row.put("mode", rs.getString("mode")); // 'BUS'
                     row.put("route_id", rs.getString("route_id")); // 버스 노선 ID
+                    row.put("updowncd", rs.getInt("updowncd")); // 0:상행, 1:하행
                     row.put("from_id", rs.getString("from_id")); // 출발 정류장 ID
                     row.put("to_id", rs.getString("to_id")); // 도착 정류장 ID
 
@@ -89,4 +90,5 @@ public class SegmentWeightDAO {
     }
 }
 
-// 추가됨 끝
+
+// 수정됨 끝

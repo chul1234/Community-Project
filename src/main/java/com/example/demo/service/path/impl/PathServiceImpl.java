@@ -1,3 +1,5 @@
+// 수정됨: BUS 구간을 무방향(양방향)으로 추가하던 로직을 제거하고, DB에 저장된 from_id -> to_id 방향만 유효하도록 유향 그래프로 변경
+
 package com.example.demo.service.path.impl;
 
 import java.util.ArrayList;
@@ -180,9 +182,8 @@ public class PathServiceImpl implements IPathService {
             stopPointMap.putIfAbsent(fromId, new StopPoint(fromId, fromLatStop, fromLngStop));
             stopPointMap.putIfAbsent(toId, new StopPoint(toId, toLatStop, toLngStop));
 
-            // 그래프 간선 추가 (양방향 연결 가정)
+            // 그래프 간선 추가 (BUS는 실제 운행처럼 유향: from_id -> to_id만 허용)
             addEdge(graph, fromId, new Edge("BUS", routeId, fromId, toId, minutes));
-            addEdge(graph, toId, new Edge("BUS", routeId, toId, fromId, minutes));
         }
 
         // ---------------------------------------------------------
@@ -647,3 +648,5 @@ if (to != null) {
         Map<String, Edge> prevEdge;
     }
 }
+
+// 수정됨 끝

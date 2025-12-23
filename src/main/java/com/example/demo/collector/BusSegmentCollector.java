@@ -1,8 +1,5 @@
-// 수정됨: "순환이 안 되는 것처럼 보이는" 문제를 근본 해결(실제로는 1번 노선이 너무 오래 걸려 다음 노선으로 못 넘어감)
-//        - 최적 운영: 1차(Seed)=거리 기반만으로 전체 노선 빠르게 적재 → 2차(Refine)=arrival 기반을 캐시+호출상한으로 안전하게 섞어 정확도 개선
-//        - 해결1: SEED_DISTANCE_ONLY=true이면 arrival API를 아예 호출하지 않음(즉시 전체 노선 순환/적재 가능)
-//        - 해결2: arrival 기반 사용 시, nodeId별 arrivalSeconds 캐시(Map) + 노선당 호출 상한(ARRIVAL_API_LIMIT_PER_ROUTE) 적용
-//        - 로그: routeStart/routeEnd + elapsedMs 유지(멈춤/병목 즉시 확인)
+// 수정됨: BUS 상/하행(updowncd) 반영을 위해 정류장 목록을 updowncd(0/1)별로 분리 수집하고,
+//        segment_weight에 updowncd 컬럼을 함께 저장하도록 변경
 
 package com.example.demo.collector;
 
@@ -147,72 +144,94 @@ public class BusSegmentCollector {
                     continue;
                 }
 
-                // 5-2) routeSeq 순으로 정렬
-                stops.sort(Comparator.comparingInt(s -> s.routeSeq));
+                // 5-2) updowncd(상/하행)별로 그룹핑 후, 각 그룹 내 routeSeq 순으로 정렬하여 세그먼트 생성
+Map<Integer, List<StopOnRoute>> stopsByDir = new HashMap<>();
+for (StopOnRoute s : stops) {
+    // updowncd가 누락된 경우(드물게 발생 가능)는 0(상행)으로 처리한다.
+    int dir = (s == null) ? 0 : s.updowncd;
+    stopsByDir.computeIfAbsent(dir, k -> new ArrayList<>()).add(s);
+}
 
-                int upsertedForRoute = 0;
-                int skippedForRouteNoTime = 0;
-                int triedForRoute = 0;
+int upsertedForRoute = 0;
+int skippedForRouteNoTime = 0;
+int triedForRoute = 0;
 
-                int arrivalUsed = 0;
-                int fallbackUsed = 0;
+int arrivalUsed = 0;
+int fallbackUsed = 0;
 
-                // 5-3) 인접 정류장 쌍을 세그먼트로 처리
-                for (int i = 0; i < stops.size() - 1; i++) {
-                    StopOnRoute from = stops.get(i);
-                    StopOnRoute to   = stops.get(i + 1);
+// 5-3) 방향별로 인접 정류장 쌍을 세그먼트로 처리
+//      - dir=0:상행, dir=1:하행
+for (Map.Entry<Integer, List<StopOnRoute>> e : stopsByDir.entrySet()) {
+    Integer dir = e.getKey();
+    List<StopOnRoute> dirStops = e.getValue();
 
-                    // 거리(m) 계산
-                    double distanceM = haversineMeters(from.lat, from.lng, to.lat, to.lng);
+    if (dirStops == null || dirStops.size() < 2) {
+        continue;
+    }
 
-                    Integer travelSecSample;
+    // 방향 그룹 내부는 routeSeq 순으로 정렬
+    dirStops.sort(Comparator.comparingInt(s -> s.routeSeq));
 
-                    // ✅ 1차(Seed) 모드면 arrival API를 절대 호출하지 않는다(즉시 전체 순환/적재 목적)
-                    if (SEED_DISTANCE_ONLY) {
-                        travelSecSample = estimateTravelSecondsByDistanceFallback(distanceM);
-                        fallbackUsed++;
-                    } else {
-                        // ✅ 2차(Refine): arrival 기반(캐시+상한) → 실패 시 거리 기반 fallback
-                        travelSecSample = estimateTravelSecondsByArrivalDiffCached(
-                            route.routeId,
-                            from.nodeId,
-                            to.nodeId,
-                            arrivalCache,
-                            arrivalApiCalls
-                        );
+    for (int i = 0; i < dirStops.size() - 1; i++) {
+        StopOnRoute from = dirStops.get(i);
+        StopOnRoute to   = dirStops.get(i + 1);
 
-                        if (travelSecSample != null && travelSecSample > 0) {
-                            arrivalUsed++;
-                        }
+        // 거리(m) 계산
+        double distanceM = haversineMeters(from.lat, from.lng, to.lat, to.lng);
 
-                        if (travelSecSample == null || travelSecSample <= 0) {
-                            travelSecSample = estimateTravelSecondsByDistanceFallback(distanceM);
-                            fallbackUsed++;
-                        }
-                    }
+        Integer travelSecSample;
 
-                    // 시간이 끝까지 안 나오면 skip
-                    if (travelSecSample == null || travelSecSample <= 0) {
-                        skippedForRouteNoTime++;
-                        continue;
-                    }
+        // ✅ 1차(Seed) 모드면 arrival API를 절대 호출하지 않는다(즉시 전체 순환/적재 목적)
+        if (SEED_DISTANCE_ONLY) {
+            travelSecSample = estimateTravelSecondsByDistanceFallback(distanceM);
+            fallbackUsed++;
+        } else {
+            // ✅ 2차(Refine): arrival 기반(캐시+상한) → 실패 시 거리 기반 fallback
+            travelSecSample = estimateTravelSecondsByArrivalDiffCached(
+                route.routeId,
+                from.nodeId,
+                to.nodeId,
+                arrivalCache,
+                arrivalApiCalls
+            );
 
-                    // 5-4) DB UPSERT(세그먼트 가중치 누적)
-                    boolean ok = upsertSegmentWeightBus(
-                        route.routeId,
-                        from,
-                        to,
-                        distanceM,
-                        travelSecSample
-                    );
+            if (travelSecSample != null && travelSecSample > 0) {
+                arrivalUsed++;
+            }
 
-                    triedForRoute++;
-                    if (ok) {
-                        upsertedForRoute++;
-                    }
-                }
+            if (travelSecSample == null || travelSecSample <= 0) {
+                travelSecSample = estimateTravelSecondsByDistanceFallback(distanceM);
+                fallbackUsed++;
+            }
+        }
 
-                totalSegmentsUpserted += upsertedForRoute;
+        // 시간이 끝까지 안 나오면 skip
+        if (travelSecSample == null || travelSecSample <= 0) {
+            skippedForRouteNoTime++;
+            continue;
+        }
+
+        // 5-4) DB UPSERT(세그먼트 가중치 누적) - updowncd(상/하행) 포함
+        boolean ok = upsertSegmentWeightBus(
+            route.routeId,
+            dir != null ? dir.intValue() : 0,
+            from,
+            to,
+            distanceM,
+            travelSecSample
+        );
+
+        triedForRoute++;
+        if (ok) {
+            upsertedForRoute++;
+        }
+    }
+}
+
+totalSegmentsUpserted += upsertedForRoute;
+totalSegmentsSkippedNoTime += skippedForRouteNoTime;
+totalSegmentsTried += triedForRoute;
+
                 totalSegmentsSkippedNoTime += skippedForRouteNoTime;
                 totalSegmentsTried += triedForRoute;
 
@@ -465,12 +484,17 @@ public class BusSegmentCollector {
             integer(it, "nodeord"), integer(it, "nodeOrd"),
             integer(it, "ord"), integer(it, "seq")
         );
+Integer updowncd = firstNonNullInt(
+    integer(it, "updowncd"), integer(it, "upDownCd"),
+    integer(it, "updownCd"), integer(it, "upDowncd")
+);
+
 
         if (nodeId == null || lat == null || lng == null || seq == null) {
             return null;
         }
 
-        return new StopOnRoute(nodeId, lat, lng, seq);
+        return new StopOnRoute(nodeId, lat, lng, seq, (updowncd == null ? 0 : updowncd.intValue()));
     }
 
     // =========================================================
@@ -591,6 +615,7 @@ public class BusSegmentCollector {
     // =========================================================
     private boolean upsertSegmentWeightBus(
         String routeId,
+        int updowncd,
         StopOnRoute from,
         StopOnRoute to,
         double distanceM,
@@ -599,11 +624,11 @@ public class BusSegmentCollector {
 
         String sql =
             "INSERT INTO segment_weight (" +
-            "  mode, route_id, from_id, to_id, " +
+            "  mode, route_id, updowncd, from_id, to_id, " +
             "  from_lat, from_lng, to_lat, to_lng, " +
             "  distance_m, travel_sec_avg, sample_count, updated_at" +
             ") VALUES (" +
-            "  'BUS', ?, ?, ?, " +
+            "  'BUS', ?, ?, ?, ?, " +
             "  ?, ?, ?, ?, " +
             "  ?, ?, 1, NOW()" +
             ") " +
@@ -621,16 +646,17 @@ public class BusSegmentCollector {
             conn.setAutoCommit(true);
 
             ps.setString(1, routeId);
-            ps.setString(2, from.nodeId);
-            ps.setString(3, to.nodeId);
+            ps.setInt(2, updowncd);
+            ps.setString(3, from.nodeId);
+            ps.setString(4, to.nodeId);
 
-            ps.setDouble(4, from.lat);
-            ps.setDouble(5, from.lng);
-            ps.setDouble(6, to.lat);
-            ps.setDouble(7, to.lng);
+            ps.setDouble(5, from.lat);
+            ps.setDouble(6, from.lng);
+            ps.setDouble(7, to.lat);
+            ps.setDouble(8, to.lng);
 
-            ps.setDouble(8, distanceM);
-            ps.setDouble(9, travelSecSample);
+            ps.setDouble(9, distanceM);
+            ps.setDouble(10, travelSecSample);
 
             int affected = ps.executeUpdate();
             return affected > 0;
@@ -638,6 +664,7 @@ public class BusSegmentCollector {
         } catch (SQLException e) {
             System.out.println(
                 "[COLLECTOR][DB ERROR] routeId=" + routeId +
+                " updowncd=" + updowncd +
                 " from=" + safeNode(from) +
                 " to=" + safeNode(to) +
                 " sqlState=" + e.getSQLState() +
@@ -738,14 +765,17 @@ public class BusSegmentCollector {
         private final double lat;
         private final double lng;
         private final int routeSeq;
+        private final int updowncd;
 
-        private StopOnRoute(String nodeId, double lat, double lng, int routeSeq) {
+        private StopOnRoute(String nodeId, double lat, double lng, int routeSeq, int updowncd) {
             this.nodeId = nodeId;
             this.lat = lat;
             this.lng = lng;
             this.routeSeq = routeSeq;
+            this.updowncd = updowncd;
         }
     }
 }
+
 
 // 수정됨 끝
