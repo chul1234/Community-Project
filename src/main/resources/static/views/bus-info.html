@@ -1,238 +1,397 @@
-<div class="container" style="padding-top: 20px">
-    <div style="margin-bottom: 20px; border-bottom: 2px solid #343a40; padding-bottom: 10px">
-        <h2 style="margin: 0; font-weight: 700; color: #343a40">버스 노선 관제</h2>
-    </div>
+<!DOCTYPE html>
+<html
+    lang="ko"
+    ng-app="app"
+>
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+        />
+        <title>버스 노선 관리</title>
+    </head>
+    <body>
+        <!--
+    bus-info.html (리레이아웃 버전)
+    목표:
+    - 지도는 좌측에 크게 유지
+    - 우측에 고정 컨트롤 패널(검색/경로설정/목록) 배치
+    - 목록만 내부 스크롤
+    - 도착 예정 정보는 하단 바텀 패널(접기/펼치기)
+-->
 
-    <div class="bus-dashboard-search">
-        <div class="bus-radio-wrap">
-            <label class="bus-radio-label">
-                <input type="radio" ng-model="searchType" value="route" />
-                <span>🚌 버스</span>
-            </label>
+        <div class="container bus-page">
+            <!-- 상단 타이틀 + 상태 배지 -->
+            <div class="bus-topbar">
+                <div class="bus-topbar-left">
+                    <h2 class="bus-page-title">버스 노선 관제</h2>
+                </div>
 
-            <label class="bus-radio-label">
-                <input type="radio" ng-model="searchType" value="stop" />
-                <span>🚏 정류장</span>
-            </label>
-
-            <button
-                type="button"
-                ng-click="toggleTramLayer()"
-                class="btn-tram-toggle"
-                ng-class="{'active': isTramVisible}"
-            >
-                🚋 트램 {{ isTramVisible ? '지우기' : '보이기' }}
-            </button>
-
-            <button
-                type="button"
-                ng-click="solvePath()"
-                class="btn-path-action"
-                style="background-color: #28a745; color: white; border: none; padding: 8px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 10px;"
-                title="선택한 출발/도착 정류장으로 경로 탐색"
-            >
-                🧭 경로 탐색
-            </button>
-
-            <button
-                type="button"
-                ng-click="clearResultPath()"
-                class="btn-path-action danger"
-                style="background-color: #dc3545; color: white; border: none; padding: 8px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 5px;"
-                title="경로 및 선택 초기화"
-            >
-                🧹 초기화
-            </button>
-        </div>
-
-        <div class="bus-search-input-wrap">
-            <input
-                type="text"
-                ng-model="searchKeyword"
-                placeholder="{{ searchType == 'route' ? '버스 번호 입력 (예: 202)' : '정류장 이름 입력' }}"
-                class="bus-dashboard-input"
-                ng-keyup="$event.keyCode == 13 && doSearch()"
-            />
-
-            <button type="button" ng-click="doSearch()" class="btn-bus-action">
-                검색
-            </button>
-        </div>
-    </div>
-
-    <div style="background: #e9ecef; padding: 10px; margin-top: 10px; border-radius: 4px; border: 1px solid #ced4da; font-size: 14px;">
-        <strong>[현재 경로 설정]</strong> 
-        출발: <span style="color: #007bff; font-weight: bold;">{{ pathStartStop.nodenm || pathStartStop.stationName || '미선택' }}</span> 
-        → 
-        도착: <span style="color: #dc3545; font-weight: bold;">{{ pathEndStop.nodenm || pathEndStop.stationName || '미선택' }}</span>
-        <span ng-if="pathTotalMinutes != null" style="float: right; font-weight: bold; color: #28a745;">약 {{ pathTotalMinutes }}분</span>
-        
-        <span ng-if="!pathStartStop || !pathEndStop" style="color: #666; margin-left: 10px;">(목록에서 '출발'/'도착' 버튼을 눌러 선택하세요)</span>
-    </div>
-
-    <div class="bus-status-container" style="display: flex; gap: 15px; margin-top: 15px; margin-bottom: 15px;">
-        <div class="bus-card info-section" style="flex: 1; background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd; display: flex; align-items: center;">
-            <div ng-if="representativeBus" style="display: flex; width: 100%; gap: 20px; align-items: center;">
-                <div class="status-item">
-                    <span class="status-label" style="font-size: 12px; color: #666; display: block;">대표차량</span>
-                    <span class="status-value" style="color: #007bff; font-weight: bold; font-size: 16px;">
-                        {{ representativeBus.vehicleno || '-' }}
+                <div class="bus-topbar-right">
+                    <span
+                        class="badge badge-collector"
+                        ng-class="{'on': (collectorStatus && collectorStatus.running), 'off': !(collectorStatus && collectorStatus.running)}"
+                    >
+                        ● 수집: {{ (collectorStatus && collectorStatus.running) ? 'ON' : 'OFF' }}
+                        <span
+                            class="badge-sub"
+                            ng-if="collectorStatusText"
+                            >({{ collectorStatusText }})</span
+                        >
                     </span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label" style="font-size: 12px; color: #666; display: block;">노선</span>
-                    <span class="status-value" style="font-weight: bold; font-size: 16px;">{{ representativeBus.routenm || '-' }}</span>
-                </div>
-                <div class="status-item" style="flex: 1">
-                    <span class="status-label" style="font-size: 12px; color: #666; display: block;">현재 위치</span>
-                    <span class="status-value" style="font-weight: bold; font-size: 16px;">
-                        {{ (currentStop && currentStop.nodenm) || '주행 중...' }}
+
+                    <span
+                        class="badge badge-refresh"
+                        ng-class="{'on': isAutoRefreshOn, 'off': !isAutoRefreshOn}"
+                    >
+                        ↻ 자동갱신: {{ isAutoRefreshOn ? 'ON' : 'OFF' }}
                     </span>
                 </div>
             </div>
 
-            <div ng-if="!representativeBus" style="color: #999; font-size: 13px; font-style: italic">
-                운행 중인 버스가 없거나 검색되지 않았습니다.
-            </div>
-        </div>
+            <!-- 메인 레이아웃: 좌(지도) + 우(컨트롤) -->
+            <div class="bus-main-grid">
+                <!-- 좌측: 지도 영역 -->
+                <div class="bus-map-area">
+                    <!-- 현재 경로 요약(지도 위) -->
+                    <div class="bus-path-strip">
+                        <strong>[현재 경로 설정]</strong>
+                        출발:
+                        <span class="path-start"> {{ (pathStartStop && (pathStartStop.nodenm || pathStartStop.stationName)) || '미선택' }} </span>
+                        → 도착:
+                        <span class="path-end"> {{ (pathEndStop && (pathEndStop.nodenm || pathEndStop.stationName)) || '미선택' }} </span>
 
-        <div class="bus-card control-section" style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd; display: flex; align-items: center; gap: 10px;">
-            
-            <button
-                type="button"
-                ng-click="enableAutoRefresh()"
-                ng-disabled="isAutoRefreshOn"
-                style="padding: 6px 10px; border-radius: 4px; border: 1px solid #28a745; background: white; color: #28a745; cursor: pointer;"
-                ng-style="isAutoRefreshOn ? {'background':'#28a745', 'color':'white'} : {}"
-            >
-                ▶ 자동갱신
-            </button>
+                        <span
+                            class="path-hint"
+                            ng-if="!pathStartStop || !pathEndStop"
+                        >
+                            (목록에서 '출발'/'도착' 버튼을 눌러 선택)
+                        </span>
 
-            <button
-                type="button"
-                ng-click="disableAutoRefresh()"
-                ng-disabled="!isAutoRefreshOn"
-                style="padding: 6px 10px; border-radius: 4px; border: 1px solid #dc3545; background: white; color: #dc3545; cursor: pointer;"
-            >
-                ⏸ 멈춤
-            </button>
+                        <span
+                            class="path-total"
+                            ng-if="pathTotalMinutes != null"
+                        >
+                            약 {{ pathTotalMinutes }}분
+                        </span>
+                    </div>
 
-            <div class="collector-wrap" style="padding-left: 15px; border-left: 1px solid #eee; display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 12px; font-weight: bold; color: #555;">수집:</span>
-                <button
-                    type="button"
-                    ng-click="toggleCollector()"
-                    style="padding: 6px 10px; border-radius: 4px; cursor: pointer; border: 1px solid #6610f2; color: #6610f2; background: white;"
-                    ng-class="collectorStatus && collectorStatus.running ? 'off' : 'on'"
-                    ng-style="collectorStatus.running ? {'background':'#6610f2', 'color':'white'} : {}"
-                >
-                    {{ (collectorStatus && collectorStatus.running) ? '⏹ 중지' : '▶ 시작' }}
-                </button>
-                <div class="collector-status-text" style="font-size: 12px; color: #888;">
-                    {{ collectorStatusText }}
+                    <!-- 지도 프레임 -->
+                    <div class="bus-map-frame">
+                        <div
+                            id="map1"
+                            class="bus-map-canvas"
+                        ></div>
+
+                        <div
+                            class="map-loading-badge"
+                            ng-show="isMapLoading"
+                        >
+                            데이터를 불러오는 중입니다...
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-    </div>
 
-    <div class="bus-map-frame" style="position: relative; width: 100%; height: 600px; border: 1px solid #ccc; border-radius: 4px; overflow: hidden;">
-        <div id="map1" class="bus-map-canvas" style="width: 100%; height: 100%;"></div>
+                <!-- 우측: 컨트롤 패널(고정/스크롤 최소) -->
+                <aside class="bus-sidebar">
+                    <!-- 1) 검색 & 필터 -->
+                    <section class="sidebar-block">
+                        <div class="sidebar-title">1. 검색 & 필터</div>
 
-        <div class="map-loading-badge" ng-show="isMapLoading"
-             style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); color: white; padding: 10px 20px; border-radius: 20px; z-index: 1000;">
-            데이터를 불러오는 중입니다...
-        </div>
-    </div>
+                        <div class="sidebar-row">
+                            <label class="bus-radio-label">
+                                <input
+                                    type="radio"
+                                    ng-model="searchType"
+                                    value="route"
+                                />
+                                <span>🚌 버스</span>
+                            </label>
 
-    <div class="bus-info-grid" style="display: flex; gap: 15px; margin-top: 15px; min-height: 300px;">
-        
-        <div class="bus-panel-box" style="flex: 1; background: white; border: 1px solid #ddd; border-radius: 8px; display: flex; flex-direction: column;">
-            <div class="bus-panel-header accent-blue" style="padding: 10px; background: #f8f9fa; border-bottom: 1px solid #ddd; font-weight: bold; border-left: 4px solid #007bff;">
-                <span>📍 목록</span>
-                <span style="font-size: 12px; font-weight: 400; color: #666; margin-left: 5px;" ng-if="stops.length">
-                    (총 {{ stops.length }}개)
-                </span>
-            </div>
+                            <label class="bus-radio-label">
+                                <input
+                                    type="radio"
+                                    ng-model="searchType"
+                                    value="stop"
+                                />
+                                <span>🚏 정류장</span>
+                            </label>
 
-            <div class="bus-panel-content" style="flex: 1; overflow-y: auto; padding: 0;">
-                <ul class="stop-list" ng-if="stops && stops.length" style="list-style: none; padding: 0; margin: 0;">
-                    <li ng-repeat="s in stops track by $index"
-                        ng-click="selectStop(s)"
-                        style="padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; align-items: center;"
-                        ng-style="selectedStop === s ? {'background':'#e7f1ff'} : {}">
-                        
-                        <strong style="margin-right: 5px; color: #007bff; min-width: 20px;">{{$index + 1}}.</strong>
-                        
-                        <span style="flex: 1;">{{ s.nodenm || s.stationName || '이름 없음' }}</span>
-                        
-                        <div style="display: flex; gap: 5px; margin-right: 10px;">
-                            <button type="button" 
-                                    ng-click="$event.stopPropagation(); setPathStart(s)" 
-                                    style="padding: 2px 6px; font-size: 11px; border: 1px solid #007bff; background: white; color: #007bff; border-radius: 4px; cursor: pointer;">
-                                출발
-                            </button>
-                            <button type="button" 
-                                    ng-click="$event.stopPropagation(); setPathEnd(s)" 
-                                    style="padding: 2px 6px; font-size: 11px; border: 1px solid #dc3545; background: white; color: #dc3545; border-radius: 4px; cursor: pointer;">
-                                도착
+                            <button
+                                type="button"
+                                ng-click="toggleTramLayer()"
+                                class="btn-tram-toggle"
+                                ng-class="{'active': isTramVisible}"
+                            >
+                                🚋 트램 {{ isTramVisible ? '지우기' : '보이기' }}
                             </button>
                         </div>
 
-                        <small style="color: #999;">{{ s.nodeid || s.nodeId }}</small>
-                    </li>
-                </ul>
+                        <div class="sidebar-row sidebar-search">
+                            <input
+                                type="text"
+                                ng-model="searchKeyword"
+                                class="bus-dashboard-input"
+                                placeholder="{{ searchType == 'route' ? '버스 번호 입력 (예: 202)' : '정류장 이름 입력' }}"
+                                ng-keyup="$event.keyCode == 13 && doSearch()"
+                            />
 
-                <div class="panel-empty-msg" ng-if="!stops || !stops.length" style="padding: 20px; text-align: center; color: #999;">
-                    검색 결과가 없습니다.
+                            <button
+                                type="button"
+                                ng-click="doSearch()"
+                                class="btn-bus-action"
+                            >
+                                검색
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- 2) 경로 설정 -->
+                    <section class="sidebar-block">
+                        <div class="sidebar-title">2. 경로 설정</div>
+
+                        <div class="path-config">
+                            <div class="path-line">
+                                <span class="path-label">출발</span>
+                                <span class="path-value"> {{ (pathStartStop && (pathStartStop.nodenm || pathStartStop.stationName)) || '미선택' }} </span>
+                                <button
+                                    type="button"
+                                    class="btn-mini"
+                                    ng-click="clearPathStart && clearPathStart()"
+                                    title="출발 선택 해제"
+                                >
+                                    X
+                                </button>
+                            </div>
+
+                            <div class="path-line">
+                                <span class="path-label">도착</span>
+                                <span class="path-value"> {{ (pathEndStop && (pathEndStop.nodenm || pathEndStop.stationName)) || '미선택' }} </span>
+                                <button
+                                    type="button"
+                                    class="btn-mini"
+                                    ng-click="clearPathEnd && clearPathEnd()"
+                                    title="도착 선택 해제"
+                                >
+                                    X
+                                </button>
+                            </div>
+
+                            <div class="path-actions">
+                                <button
+                                    type="button"
+                                    ng-click="solvePath()"
+                                    class="btn-path-action primary"
+                                    title="선택한 출발/도착 정류장으로 경로 탐색"
+                                >
+                                    ▶ 경로 탐색
+                                </button>
+
+                                <button
+                                    type="button"
+                                    ng-click="clearResultPath()"
+                                    class="btn-path-action danger"
+                                    title="경로 및 선택 초기화"
+                                >
+                                    ↺ 초기화
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 3) 상태 & 제어 -->
+                    <section class="sidebar-block">
+                        <div class="sidebar-title">3. 상태 & 제어</div>
+
+                        <div
+                            class="status-card"
+                            ng-if="representativeBus"
+                        >
+                            <div class="status-item">
+                                <div class="status-label">대표차량</div>
+                                <div class="status-value highlight-blue">{{ representativeBus.vehicleno || '-' }}</div>
+                            </div>
+
+                            <div class="status-item">
+                                <div class="status-label">노선</div>
+                                <div class="status-value">{{ representativeBus.routenm || '-' }}</div>
+                            </div>
+
+                            <div class="status-item">
+                                <div class="status-label">현재 위치</div>
+                                <div class="status-value">{{ (currentStop && currentStop.nodenm) || '주행 중...' }}</div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="status-empty"
+                            ng-if="!representativeBus"
+                        >
+                            운행 중인 버스가 없거나 검색되지 않았습니다.
+                        </div>
+
+                        <div class="control-row">
+                            <button
+                                type="button"
+                                ng-click="enableAutoRefresh()"
+                                ng-disabled="isAutoRefreshOn"
+                                class="btn-refresh on"
+                            >
+                                ▶ 자동갱신
+                            </button>
+
+                            <button
+                                type="button"
+                                ng-click="disableAutoRefresh()"
+                                ng-disabled="!isAutoRefreshOn"
+                                class="btn-refresh off"
+                            >
+                                ⏸ 멈춤
+                            </button>
+                        </div>
+
+                        <div class="control-row">
+                            <button
+                                type="button"
+                                ng-click="toggleCollector()"
+                                class="btn-collector"
+                                ng-class="{'running': (collectorStatus && collectorStatus.running)}"
+                            >
+                                {{ (collectorStatus && collectorStatus.running) ? '⏹ 수집 중지' : '▶ 수집 시작' }}
+                            </button>
+                        </div>
+
+                        <div class="collector-help">{{ collectorStatusText }}</div>
+                    </section>
+
+                    <!-- 4) 목록 리스트(여기만 스크롤) -->
+                    <section class="sidebar-block sidebar-list-block">
+                        <div class="sidebar-title">
+                            4. 목록 리스트
+                            <span
+                                class="sidebar-sub"
+                                ng-if="stops && stops.length"
+                                >(총 {{ stops.length }}개)</span
+                            >
+                        </div>
+
+                        <div class="sidebar-list">
+                            <ul
+                                class="stop-list"
+                                ng-if="stops && stops.length"
+                            >
+                                <li
+                                    ng-repeat="s in stops track by $index"
+                                    ng-click="selectStop(s)"
+                                    ng-class="{'active': (selectedStop === s)}"
+                                >
+                                    <div class="stop-left">
+                                        <div class="stop-name">
+                                            <span class="stop-index">{{$index + 1}}.</span>
+                                            <span class="stop-title">{{ s.nodenm || s.stationName || '이름 없음' }}</span>
+                                        </div>
+                                        <div class="stop-id">{{ s.nodeid || s.nodeId }}</div>
+                                    </div>
+
+                                    <div class="stop-actions">
+                                        <button
+                                            type="button"
+                                            class="btn-mini start"
+                                            ng-click="$event.stopPropagation(); setPathStart(s)"
+                                        >
+                                            출발
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="btn-mini end"
+                                            ng-click="$event.stopPropagation(); setPathEnd(s)"
+                                        >
+                                            도착
+                                        </button>
+                                    </div>
+                                </li>
+                            </ul>
+
+                            <div
+                                class="panel-empty-msg"
+                                ng-if="!stops || !stops.length"
+                            >
+                                검색 결과가 없습니다.
+                            </div>
+                        </div>
+                    </section>
+                </aside>
+            </div>
+
+            <!-- 하단 정보 패널: 도착 예정 정보 (바텀 패널) -->
+            <div class="bus-bottom-sheet">
+                <!-- CSS-only 토글 -->
+                <input
+                    id="arrivalSheetToggle"
+                    type="checkbox"
+                    class="sheet-toggle"
+                />
+
+                <label
+                    class="sheet-handle"
+                    for="arrivalSheetToggle"
+                >
+                    <span class="sheet-title">⏱️ 도착 예정 정보</span>
+                    <span
+                        class="sheet-sub"
+                        ng-if="currentStop"
+                        >- {{ currentStop.nodenm }}</span
+                    >
+                    <span class="sheet-hint">클릭하여 열기/닫기</span>
+                </label>
+
+                <div class="sheet-body">
+                    <table
+                        class="arrival-info-table"
+                        ng-if="arrivalList && arrivalList.length"
+                    >
+                        <thead>
+                            <tr>
+                                <th>노선</th>
+                                <th style="text-align: center">위치</th>
+                                <th style="text-align: right">도착 예정</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr ng-repeat="a in arrivalList">
+                                <td><strong>{{ a.routeno || a.routenm || '-' }}</strong></td>
+                                <td style="text-align: center">
+                                    <span class="pill"> {{ a.remainStops != null ? a.remainStops + '번째 전' : '-' }} </span>
+                                </td>
+                                <td style="text-align: right">
+                                    <span
+                                        class="arrival-highlight"
+                                        ng-if="a.remainMinutes != null"
+                                    >
+                                        약 {{ a.remainMinutes }}분 후
+                                    </span>
+                                    <span ng-if="a.remainMinutes == null"> {{ a.arrtime ? (a.arrtime + '초 후') : '-' }} </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div
+                        class="panel-empty-msg"
+                        ng-if="!currentStop"
+                    >
+                        우측 목록에서 정류장을 선택해주세요.
+                    </div>
+
+                    <div
+                        class="panel-empty-msg"
+                        ng-if="currentStop && (!arrivalList || !arrivalList.length)"
+                    >
+                        현재 도착 예정인 버스 정보가 없습니다.
+                    </div>
                 </div>
             </div>
         </div>
-
-        <div class="bus-panel-box" style="flex: 1; background: white; border: 1px solid #ddd; border-radius: 8px; display: flex; flex-direction: column;">
-            <div class="bus-panel-header accent-green" style="padding: 10px; background: #f8f9fa; border-bottom: 1px solid #ddd; font-weight: bold; border-left: 4px solid #28a745;">
-                <span>⏱️ 도착 예정 정보</span>
-                <span style="font-size: 12px; font-weight: 400; color: #666; margin-left: 5px;" ng-if="currentStop">
-                    - {{ currentStop.nodenm }}
-                </span>
-            </div>
-
-            <div class="bus-panel-content" style="flex: 1; overflow-y: auto; padding: 0;">
-                <table class="arrival-info-table" ng-if="arrivalList && arrivalList.length" style="width: 100%; border-collapse: collapse;">
-                    <thead style="background: #f8f9fa; font-size: 13px; color: #555;">
-                        <tr>
-                            <th style="padding: 8px; text-align: left;">노선</th>
-                            <th style="padding: 8px; text-align: center;">위치</th>
-                            <th style="padding: 8px; text-align: right;">도착 예정</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr ng-repeat="a in arrivalList" style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 8px;"><strong>{{ a.routeno || a.routenm || '-' }}</strong></td>
-                            <td style="padding: 8px; text-align: center;">
-                                <span style="font-size: 12px; background: #f1f3f5; padding: 3px 6px; border-radius: 4px; color: #555;">
-                                    {{ a.remainStops != null ? a.remainStops + '번째 전' : '-' }}
-                                </span>
-                            </td>
-                            <td style="padding: 8px; text-align: right;">
-                                <span style="color: #d63384; font-weight: bold;" ng-if="a.remainMinutes != null">
-                                    약 {{ a.remainMinutes }}분 후
-                                </span>
-                                <span ng-if="a.remainMinutes == null">
-                                    {{ a.arrtime ? (a.arrtime + '초 후') : '-' }}
-                                </span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <div class="panel-empty-msg" ng-if="!currentStop" style="padding: 20px; text-align: center; color: #999;">
-                    왼쪽 목록에서 정류장을 선택해주세요.
-                </div>
-
-                <div class="panel-empty-msg" ng-if="currentStop && (!arrivalList || !arrivalList.length)" style="padding: 20px; text-align: center; color: #999;">
-                    현재 도착 예정인 버스 정보가 없습니다.
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+    </body>
+</html>

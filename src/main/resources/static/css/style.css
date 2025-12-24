@@ -1259,3 +1259,549 @@ header h1 {
 }
 
 
+/* ============================================================================
+   7-N) BUS PAGE (bus-info.html) - 리레이아웃(좌:지도 / 우:컨트롤 / 하단:바텀시트)
+   - 다른 페이지/탭 영향 방지를 위해 .bus-page 범위로만 스타일을 적용한다.
+   - 기존 디자인 톤(카드/라운드/그림자/블루 포인트)을 유지한다.
+   ============================================================================ */
+
+/* bus-info 전용 루트(스코프) */
+.bus-page {
+    width: 100%;
+}
+
+/* 상단 타이틀/배지 */
+.bus-page .bus-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 12px 0;
+}
+
+.bus-page .bus-page-title {
+    margin: 0;
+    font-weight: 800;
+    color: #343a40;
+}
+
+.bus-page .bus-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.bus-page .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid #e9ecef;
+    background: #ffffff;
+    font-size: 12px;
+    font-weight: 900;
+    color: #495057;
+    white-space: nowrap;
+}
+
+.bus-page .badge .badge-sub {
+    font-weight: 700;
+    color: #868e96;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bus-page .badge.on {
+    border-color: #c3fae8;
+    background: #e6fcf5;
+    color: #0ca678;
+}
+
+.bus-page .badge.off {
+    border-color: #ffe3e3;
+    background: #fff5f5;
+    color: #fa5252;
+}
+
+/* 메인 레이아웃(좌 지도 / 우 사이드바) */
+.bus-page .bus-main-grid {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 14px;
+    align-items: start;
+}
+
+@media (max-width: 1100px) {
+    .bus-page .bus-main-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 좌측 지도 영역 */
+.bus-page .bus-map-area {
+    min-width: 0;
+}
+
+.bus-page .bus-path-strip {
+    background: #e9ecef;
+    border: 1px solid #ced4da;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    word-break: keep-all;
+}
+
+.bus-page .bus-path-strip .path-start {
+    color: #0b5ed7;
+    font-weight: 900;
+}
+
+.bus-page .bus-path-strip .path-end {
+    color: #dc3545;
+    font-weight: 900;
+}
+
+.bus-page .bus-path-strip .path-hint {
+    color: #666;
+}
+
+.bus-page .bus-path-strip .path-total {
+    margin-left: auto;
+    font-weight: 900;
+    color: #2f9e44;
+    white-space: nowrap;
+}
+
+/* 지도 프레임(기존 .bus-map-frame 룩 유지, 크기만 안정화) */
+.bus-page .bus-map-frame {
+    height: 600px;
+}
+
+.bus-page .bus-map-canvas {
+    height: 100%;
+}
+
+/* 우측 사이드바(고정 폭 느낌 + 내부 스크롤 최소) */
+.bus-page .bus-sidebar {
+    position: sticky;
+    top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+
+@media (max-width: 1100px) {
+    .bus-page .bus-sidebar {
+        position: static;
+    }
+}
+
+/* 사이드바 블록(카드) */
+.bus-page .sidebar-block {
+    background: #ffffff;
+    border: 1px solid #e9ecef;
+    border-radius: 14px;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
+    padding: 12px;
+}
+
+.bus-page .sidebar-title {
+    font-weight: 900;
+    color: #495057;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.bus-page .sidebar-sub {
+    font-size: 12px;
+    font-weight: 700;
+    color: #868e96;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bus-page .sidebar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.bus-page .sidebar-search {
+    margin-top: 10px;
+}
+
+.bus-page .sidebar-search .bus-dashboard-input {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* 라디오(기존 .bus-radio-label을 사용하지만, 이 페이지에서도 클릭감/정렬 보강) */
+.bus-page .bus-radio-label {
+    display: inline-flex;
+    align-items: center;
+}
+
+.bus-page input[type="radio"] {
+    display: none;
+}
+
+.bus-page input[type="radio"] + span {
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: #f1f3f5;
+    border: 1px solid #e9ecef;
+    font-weight: 900;
+    color: #495057;
+}
+
+.bus-page input[type="radio"]:checked + span {
+    background: #ffffff;
+    color: #0b5ed7;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+    border-color: #dee2e6;
+}
+
+/* 경로 설정 블록 */
+.bus-page .path-config {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bus-page .path-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 10px 10px;
+    min-width: 0;
+}
+
+.bus-page .path-label {
+    font-size: 12px;
+    font-weight: 900;
+    color: #868e96;
+    flex: 0 0 auto;
+    width: 40px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.bus-page .path-value {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 900;
+    color: #343a40;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bus-page .path-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.bus-page .btn-mini {
+    border: 1px solid #dee2e6;
+    background: #ffffff;
+    color: #495057;
+    padding: 6px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.bus-page .btn-mini:hover {
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+}
+
+.bus-page .btn-mini.start {
+    border-color: #0b5ed7;
+    color: #0b5ed7;
+}
+
+.bus-page .btn-mini.end {
+    border-color: #dc3545;
+    color: #dc3545;
+}
+
+.bus-page .btn-path-action.primary {
+    background: #e7f1ff;
+    border-color: #b6d4fe;
+    color: #0b5ed7;
+}
+
+.bus-page .btn-path-action.primary:hover {
+    background: #dbeafe;
+}
+
+/* 상태 카드 */
+.bus-page .status-card {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    background: #ffffff;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.bus-page .highlight-blue {
+    color: #0b5ed7;
+}
+
+.bus-page .status-empty {
+    color: #999;
+    font-size: 13px;
+    font-style: italic;
+    padding: 8px 0 12px;
+}
+
+/* 자동갱신/수집 버튼(사이드바 버전) */
+.bus-page .control-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.bus-page .btn-refresh {
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    font-size: 13px;
+    font-weight: 900;
+    white-space: nowrap;
+    min-width: 120px;
+    text-align: center;
+}
+
+.bus-page .btn-refresh.on {
+    background-color: #e6fcf5;
+    color: #0ca678;
+    border-color: #c3fae8;
+}
+
+.bus-page .btn-refresh.off {
+    background-color: #fff5f5;
+    color: #fa5252;
+    border-color: #ffc9c9;
+}
+
+.bus-page .btn-collector {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid #dee2e6;
+    background: #ffffff;
+    color: #495057;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.bus-page .btn-collector.running {
+    background: #f3f0ff;
+    border-color: #d0bfff;
+    color: #6610f2;
+}
+
+.bus-page .collector-help {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #868e96;
+    word-break: keep-all;
+}
+
+/* 목록(여기만 스크롤) */
+.bus-page .sidebar-list-block {
+    padding: 0;
+    overflow: hidden;
+}
+
+.bus-page .sidebar-list-block .sidebar-title {
+    padding: 12px;
+    margin: 0;
+    border-bottom: 1px solid #e9ecef;
+    background: #f8f9fa;
+}
+
+.bus-page .sidebar-list {
+    max-height: 360px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    word-break: keep-all;
+}
+
+.bus-page .stop-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.bus-page .stop-list > li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px;
+    border-bottom: 1px solid #f1f3f5;
+    cursor: pointer;
+}
+
+.bus-page .stop-list > li:hover {
+    background: #f8f9fa;
+}
+
+.bus-page .stop-list > li.active {
+    background: #e7f1ff;
+    border-left: 4px solid #0b5ed7;
+}
+
+.bus-page .stop-left {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.bus-page .stop-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.bus-page .stop-index {
+    color: #0b5ed7;
+    font-weight: 900;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.bus-page .stop-title {
+    font-weight: 900;
+    color: #343a40;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bus-page .stop-id {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #adb5bd;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bus-page .stop-actions {
+    display: flex;
+    gap: 6px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+/* 바텀 시트(도착 예정 정보) */
+.bus-page .bus-bottom-sheet {
+    position: sticky;
+    bottom: 0;
+    margin-top: 14px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.10);
+    background: #ffffff;
+    z-index: 50;
+}
+
+.bus-page .sheet-toggle {
+    display: none;
+}
+
+.bus-page .sheet-handle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    background: #f8f9fa;
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid #e9ecef;
+    white-space: nowrap;
+}
+
+.bus-page .sheet-title {
+    font-weight: 900;
+    color: #495057;
+}
+
+.bus-page .sheet-sub {
+    font-size: 12px;
+    font-weight: 700;
+    color: #868e96;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bus-page .sheet-hint {
+    margin-left: auto;
+    font-size: 12px;
+    font-weight: 800;
+    color: #0b5ed7;
+}
+
+.bus-page .sheet-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.22s ease;
+}
+
+/* 기본은 닫힘, 체크 시 펼침 */
+.bus-page .sheet-toggle:checked ~ .sheet-body {
+    max-height: 280px;
+}
+
+/* 바텀 시트 안 컨텐츠 패딩 */
+.bus-page .sheet-body {
+    padding: 0;
+}
+
+.bus-page .sheet-body .arrival-info-table {
+    margin: 0;
+}
+
+.bus-page .pill {
+    font-size: 12px;
+    background: #f1f3f5;
+    padding: 3px 8px;
+    border-radius: 999px;
+    color: #555;
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+
