@@ -159,7 +159,7 @@ button[disabled] {
     border: 1px solid #e9ecef;
     border-radius: 14px;
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.06);
-    overflow: hidden;
+    overflow: visible;
 }
 
 header {
@@ -272,6 +272,25 @@ header h1 {
 
 .dropdown:hover .dropdown-content {
     display: block;
+}
+
+
+
+/* 수정됨: 상단 탭 드롭다운(소메뉴) 가림 방지
+   - 원인: .main-container overflow:hidden 이 드롭다운을 잘라먹음(클리핑)
+   - 해결: .main-container overflow를 visible로 변경 + tab-nav/드롭다운 z-index 상향 */
+.tab-nav {
+    position: relative;
+    z-index: 60000;
+}
+
+.tab-link.dropdown {
+    position: relative;
+    z-index: 60001;
+}
+
+.dropdown-content {
+    z-index: 60002;
 }
 
 /* ==========================================================================
@@ -1151,7 +1170,7 @@ header h1 {
         margin-left: 0;
         border-left: none;
         padding-left: 0;
-        border-top: 1px solid #e9ecef;
+    border-top: 1px solid #e9ecef;
         padding-top: 10px;
         margin-top: 6px;
     }
@@ -1270,29 +1289,52 @@ header h1 {
     width: 100%;
 }
 
-/* 상단 타이틀/배지 */
+/* 수정됨: 상단(topbar)을 무조건 '한 줄'로 고정
+   - 타이틀(좌) + 배지/버튼(우)이 같은 라인에 유지되도록 강제
+   - 우측 요소가 길어지면 '우측 영역만' 가로 스크롤로 처리(줄바꿈 금지) */
 .bus-page .bus-topbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 12px;
     margin: 0 0 12px 0;
+    flex-wrap: nowrap;      /* ✅ 한 줄 고정 */
+    min-width: 0;
 }
 
 .bus-page .bus-page-title {
     margin: 0;
     font-weight: 800;
     color: #343a40;
+    white-space: nowrap;    /* ✅ 타이틀 줄바꿈 금지 */
+    flex: 0 0 auto;
 }
 
+/* 우측 영역: 줄바꿈 금지 + 필요 시 가로 스크롤 */
 .bus-page .bus-topbar-right {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;      /* ✅ 한 줄 고정 */
     justify-content: flex-end;
+    min-width: 0;
+    flex: 1 1 auto;
+
+    overflow-x: auto;       /* ✅ 길면 우측만 스크롤 */
+    overflow-y: hidden;
+    white-space: nowrap;
 }
 
+/* (선택) 스크롤바가 거슬리면 얇게 */
+.bus-page .bus-topbar-right::-webkit-scrollbar {
+    height: 6px;
+}
+.bus-page .bus-topbar-right::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 999px;
+}
+
+/* 배지 */
 .bus-page .badge {
     display: inline-flex;
     align-items: center;
@@ -1305,6 +1347,7 @@ header h1 {
     font-weight: 900;
     color: #495057;
     white-space: nowrap;
+    flex: 0 0 auto;
 }
 
 .bus-page .badge .badge-sub {
@@ -1802,6 +1845,3 @@ header h1 {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-
-
-

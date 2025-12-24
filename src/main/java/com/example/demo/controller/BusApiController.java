@@ -1,11 +1,15 @@
-// 수정됨: TAGO 노선 + 정류장 + 버스 위치(JSON) + 정류장 도착정보 API + 정류장 이름 검색 API 추가
+// 수정됨: /api/bus/route-stops 호출 시 RestTemplate 예외로 서버가 500을 내리며 라인 좌표(정류장 목록)가 전달되지 않는 문제 대응
+//        - TAGO가 4xx/5xx를 반환해도 예외로 터지지 않도록 처리
+//        - 에러 응답 본문을 그대로 프론트로 반환하여 Network/Response에서 원인 확인 가능하게 함
 
 package com.example.demo.controller;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 /**
@@ -50,7 +54,7 @@ public class BusApiController {
      */
     @CrossOrigin
     @GetMapping("/api/bus/route-stops")
-    public String getRouteStops(@RequestParam("routeId") String routeId) {
+    public ResponseEntity<String> getRouteStops(@RequestParam("routeId") String routeId) {
 
         String url = "http://apis.data.go.kr/1613000/BusRouteInfoInqireService/getRouteAcctoThrghSttnList"
                 + "?serviceKey=" + SERVICE_KEY
@@ -60,7 +64,17 @@ public class BusApiController {
                 + "&pageNo=1"
                 + "&numOfRows=150";
 
-        return restTemplate.getForObject(url, String.class);
+        try {
+            String body = restTemplate.getForObject(url, String.class);
+            return ResponseEntity.ok(body);
+        } catch (HttpStatusCodeException ex) {
+            // TAGO가 4xx/5xx를 내려도 서버가 500으로 죽지 않게 하고,
+            // 실제 에러 본문을 그대로 반환해서 프론트(Network Response)에서 원인을 확인 가능하게 한다.
+            return ResponseEntity.status(ex.getStatusCode()).body(ex.getResponseBodyAsString());
+        } catch (Exception ex) {
+            // 예상치 못한 예외도 메시지를 반환해 원인 추적 가능하게 한다.
+            return ResponseEntity.status(500).body("{\"error\":\"route-stops proxy failed\",\"message\":\"" + ex.getMessage() + "\"}");
+        }
     }
 
     /**
@@ -120,36 +134,29 @@ public class BusApiController {
      */
     // 수정됨: 정류장 이름 검색 시 URLEncoder 제거하여 원본 문자열 그대로 전달
 
-@CrossOrigin
-@GetMapping("/api/bus/stops-by-name")
-public String getStopsByName(
-        @RequestParam("nodeName") String nodeName,
-        @RequestParam(value = "pageNo", defaultValue = "1") String pageNo,
-        @RequestParam(value = "numOfRows", defaultValue = "100") String numOfRows
-) {
+    @CrossOrigin
+    @GetMapping("/api/bus/stops-by-name")
+    public String getStopsByName(
+            @RequestParam("nodeName") String nodeName,
+            @RequestParam(value = "pageNo", defaultValue = "1") String pageNo,
+            @RequestParam(value = "numOfRows", defaultValue = "100") String numOfRows
+    ) {
 
-    // ※ 기존: String encodedName = URLEncoder.encode(nodeName, StandardCharsets.UTF_8);
-    // TAGO API가 실제로 URL 인코딩을 이중으로 기대하지 않을 가능성이 있어 제거함
+        String url = "http://apis.data.go.kr/1613000/BusSttnInfoInqireService/getSttnNoList"
+                + "?serviceKey=" + SERVICE_KEY
+                + "&_type=json"
+                + "&cityCode=" + CITY_CODE
+                + "&nodeNm=" + nodeName
+                + "&pageNo=" + pageNo
+                + "&numOfRows=" + numOfRows;
 
-    String url = "http://apis.data.go.kr/1613000/BusSttnInfoInqireService/getSttnNoList"
-            + "?serviceKey=" + SERVICE_KEY
-            + "&_type=json"
-            + "&cityCode=" + CITY_CODE
-            + "&nodeNm=" + nodeName   // ★ 인코딩 제거!
-            + "&pageNo=" + pageNo
-            + "&numOfRows=" + numOfRows;
+        System.out.println("DEBUG GET URL = " + url);
 
-    System.out.println("DEBUG GET URL = " + url);
-
-    return restTemplate.getForObject(url, String.class);
-}
+        return restTemplate.getForObject(url, String.class);
+    }
 
     /**
      * 6) 좌표 기반 근접 정류장 목록 조회 (getCrdntPrxmtSttnList)
-     *
-     * - 최단경로 결과(segments)의 BUS 정류장 hover에서 "정류장 이름"을 표시하기 위해 사용한다.
-     * - segment_weight에는 정류장 이름이 없어서, (lat,lng) 기준으로 근처 정류장 목록을 받아
-     *   nodeid가 일치하는 항목의 nodenm을 프론트에서 매칭한다.
      *
      * 예: /api/bus/stops-nearby?lat=36.36&lng=127.37
      */
