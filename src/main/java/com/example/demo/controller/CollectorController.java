@@ -1,13 +1,13 @@
-// 수정됨: "데이터 수집" 버튼 1개로 ON/OFF 토글 + 서버 자동 순환(라운드로빈) + batchSize 자동 조절(적응형)
-//        - /collector/toggle : ON이면 OFF로, OFF면 ON으로 전환
-//        - /collector/status : 현재 ON/OFF, 현재 batchSize, intervalMs, lastElapsedMs 제공
-//        - 자동 배치: 실행 시간이 길면 batch 감소, 짧으면 batch 증가 (3~10 범위)
-//        - 개선: intervalMs 변경이 즉시 반영되도록 fixedDelay 스케줄 대신 "단일 루프 + sleep" 구조로 안정화
-//        - 개선: 토글 연타/중복 실행 방지(단일 future 보장, inProgress 보호 유지)
+// 수정됨: 웹페이지가 꺼져도(브라우저 닫아도) 서버가 살아 있으면 자동 수집이 계속되도록 변경
+//        - 서버 부팅 시 자동으로 수집 ON 시작(@PostConstruct)
+//        - /collector/toggle : 수집 ON/OFF 토글(버튼 1개)
+//        - /collector/status : ON/OFF + batch/interval + 운행 시간창(04:00~23:30) 상태(withinWindow) 제공
+//        - CollectorSwitch(ON/OFF 스위치)를 분리하여 수집 제어를 단일 책임으로 관리
 
 package com.example.demo.controller;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import jakarta.annotation.PreDestroy;
+import jakarta.annotation.PostConstruct;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.demo.collector.BusSegmentCollector;
+import com.example.demo.collector.CollectorSwitch;
 
 @RestController
 public class CollectorController {
@@ -34,10 +36,14 @@ public class CollectorController {
     @Autowired
     private BusSegmentCollector busSegmentCollector;
 
+    @Autowired
+    private CollectorSwitch collectorSwitch;
+
     // =========================
     // 자동 수집(서버 백그라운드) 상태
     // =========================
-    private final AtomicBoolean running = new AtomicBoolean(false);
+    // 주의: 실제 ON/OFF는 CollectorSwitch가 기준이다.
+    //       (프론트는 "running" 필드를 보므로 status에선 switch 상태를 그대로 내려준다.)
 
     // interval(다음 실행까지 쉬는 시간)
     private final AtomicInteger intervalMs = new AtomicInteger(5000);
@@ -53,6 +59,12 @@ public class CollectorController {
 
     // 수집 실행이 겹치지 않게 보호(혹시라도 호출이 중첩되면 스킵)
     private final AtomicBoolean inProgress = new AtomicBoolean(false);
+
+    // =========================
+    // 운행 시간창 (04:00 ~ 23:30)
+    // =========================
+    private static final LocalTime WINDOW_START = LocalTime.of(4, 0);
+    private static final LocalTime WINDOW_END = LocalTime.of(23, 30);
 
     // 단일 스레드 스케줄러(절대 동시 실행 안 되게)
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
@@ -88,14 +100,13 @@ public class CollectorController {
     // =========================
     @GetMapping(value = "/collector/toggle", produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> toggle() {
+        boolean enabledNow = collectorSwitch.toggle();
 
-        // OFF -> ON
-        if (running.compareAndSet(false, true)) {
+        if (enabledNow) {
             startAutoLoop();
             return statusWithMessage("collector auto started");
         }
 
-        // ON -> OFF
         stopAutoLoop();
         return statusWithMessage("collector auto stopped");
     }
@@ -104,11 +115,17 @@ public class CollectorController {
     public Map<String, Object> status() {
         Map<String, Object> res = new LinkedHashMap<>();
         res.put("ok", true);
-        res.put("running", running.get());
+        res.put("running", collectorSwitch.isEnabled());
         res.put("batchSize", batchSize.get());
         res.put("intervalMs", intervalMs.get());
         res.put("lastElapsedMs", lastElapsedMs.get());
         res.put("inProgress", inProgress.get());
+
+        boolean withinWindow = isWithinOperatingWindow();
+        res.put("withinWindow", withinWindow);
+        res.put("windowStart", WINDOW_START.toString());
+        res.put("windowEnd", WINDOW_END.toString());
+
         res.put("ts", LocalDateTime.now().toString());
         return res;
     }
@@ -126,7 +143,13 @@ public class CollectorController {
         // "루프"는 1개만 존재: 0ms에 시작해서 내부에서 sleep으로 interval 반영
         future = scheduler.schedule(() -> {
 
-            while (running.get()) {
+            while (collectorSwitch.isEnabled()) {
+
+                // 운행 시간창 밖이면 수집은 하지 않고 주기적으로만 체크
+                if (!isWithinOperatingWindow()) {
+                    sleepQuietly(intervalMs.get());
+                    continue;
+                }
 
                 // 겹침 방지(혹시라도 중첩되면 스킵)
                 if (!inProgress.compareAndSet(false, true)) {
@@ -159,12 +182,24 @@ public class CollectorController {
     }
 
     private synchronized void stopAutoLoop() {
-        running.set(false);
-
         if (future != null) {
             try { future.cancel(false); } catch (Exception ignore) {}
             future = null;
         }
+    }
+
+    @PostConstruct
+    public void autoStartOnBoot() {
+        // 서버가 켜져 있으면 웹페이지 없이도 자동 수집되도록 기본 ON
+        // (사용자가 /collector/toggle로 언제든 OFF 가능)
+        if (collectorSwitch.isEnabled()) {
+            startAutoLoop();
+        }
+    }
+
+    private boolean isWithinOperatingWindow() {
+        LocalTime now = LocalTime.now();
+        return !now.isBefore(WINDOW_START) && now.isBefore(WINDOW_END);
     }
 
     private void autoTuneBatch(int elapsedMs) {
