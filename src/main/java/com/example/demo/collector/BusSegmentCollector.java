@@ -1,5 +1,6 @@
-// 수정됨: BUS 상/하행(updowncd) 반영을 위해 정류장 목록을 updowncd(0/1)별로 분리 수집하고,
-//        segment_weight에 updowncd 컬럼을 함께 저장하도록 변경
+// 수정됨: route-stops(노선별 경유정류장 목록) API를 노선(routeId)당 "최초 1회만" 호출하도록 메모리 캐시(ROUTE_STOPS_CACHE) 적용
+//        - Collector 주기 실행 시 동일 routeId에 대해 route-stops를 반복 호출하지 않음(트래픽 폭발 방지)
+//        - 실패/빈 결과도 캐시에 저장하여 동일 노선에 대한 재시도 호출을 막음(서버 재기동 전까지)
 
 package com.example.demo.collector;
 
@@ -8,6 +9,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -75,6 +77,13 @@ public class BusSegmentCollector {
     private static final AtomicInteger ROUND_ROBIN_INDEX = new AtomicInteger(0);
     private static final Set<String> VISITED_ROUTES = ConcurrentHashMap.newKeySet();
 
+    // =========================
+    // route-stops 캐시(핵심)
+    // =========================
+    // routeId -> 정류장 목록(서버 생명주기 동안 1회 호출 후 재사용)
+    // - 빈/실패 결과도 캐시에 저장하여 같은 노선에 대한 재호출을 방지한다.
+    private static final Map<String, List<StopOnRoute>> ROUTE_STOPS_CACHE = new ConcurrentHashMap<>();
+
     @Autowired
     private DataSource dataSource;
 
@@ -119,7 +128,8 @@ public class BusSegmentCollector {
             + ", target(batchSize)=" + targetRoutes.size()
             + ", rrIndex(now)=" + ROUND_ROBIN_INDEX.get()
             + ", visited(now)=" + VISITED_ROUTES.size()
-            + ", seedDistanceOnly=" + SEED_DISTANCE_ONLY);
+            + ", seedDistanceOnly=" + SEED_DISTANCE_ONLY
+            + ", routeStopsCacheSize(now)=" + ROUTE_STOPS_CACHE.size());
 
         int totalSegmentsUpserted = 0;
         int totalSegmentsSkippedNoTime = 0;
@@ -135,7 +145,7 @@ public class BusSegmentCollector {
             int[] arrivalApiCalls = new int[] { 0 };
 
             try {
-                // 5-1) 노선별 정류장 목록 조회
+                // 5-1) 노선별 정류장 목록 조회 (✅ 캐시 적용: routeId당 최초 1회만 API 호출)
                 List<StopOnRoute> stops = fetchStopsByRoute(route.routeId);
                 if (stops.size() < 2) {
                     System.out.println("[COLLECTOR] routeId=" + route.routeId + " stops < 2. skip.");
@@ -145,93 +155,90 @@ public class BusSegmentCollector {
                 }
 
                 // 5-2) updowncd(상/하행)별로 그룹핑 후, 각 그룹 내 routeSeq 순으로 정렬하여 세그먼트 생성
-Map<Integer, List<StopOnRoute>> stopsByDir = new HashMap<>();
-for (StopOnRoute s : stops) {
-    // updowncd가 누락된 경우(드물게 발생 가능)는 0(상행)으로 처리한다.
-    int dir = (s == null) ? 0 : s.updowncd;
-    stopsByDir.computeIfAbsent(dir, k -> new ArrayList<>()).add(s);
-}
+                Map<Integer, List<StopOnRoute>> stopsByDir = new HashMap<>();
+                for (StopOnRoute s : stops) {
+                    // updowncd가 누락된 경우(드물게 발생 가능)는 0(상행)으로 처리한다.
+                    int dir = (s == null) ? 0 : s.updowncd;
+                    stopsByDir.computeIfAbsent(dir, k -> new ArrayList<>()).add(s);
+                }
 
-int upsertedForRoute = 0;
-int skippedForRouteNoTime = 0;
-int triedForRoute = 0;
+                int upsertedForRoute = 0;
+                int skippedForRouteNoTime = 0;
+                int triedForRoute = 0;
 
-int arrivalUsed = 0;
-int fallbackUsed = 0;
+                int arrivalUsed = 0;
+                int fallbackUsed = 0;
 
-// 5-3) 방향별로 인접 정류장 쌍을 세그먼트로 처리
-//      - dir=0:상행, dir=1:하행
-for (Map.Entry<Integer, List<StopOnRoute>> e : stopsByDir.entrySet()) {
-    Integer dir = e.getKey();
-    List<StopOnRoute> dirStops = e.getValue();
+                // 5-3) 방향별로 인접 정류장 쌍을 세그먼트로 처리
+                //      - dir=0:상행, dir=1:하행
+                for (Map.Entry<Integer, List<StopOnRoute>> e : stopsByDir.entrySet()) {
+                    Integer dir = e.getKey();
+                    List<StopOnRoute> dirStops = e.getValue();
 
-    if (dirStops == null || dirStops.size() < 2) {
-        continue;
-    }
+                    if (dirStops == null || dirStops.size() < 2) {
+                        continue;
+                    }
 
-    // 방향 그룹 내부는 routeSeq 순으로 정렬
-    dirStops.sort(Comparator.comparingInt(s -> s.routeSeq));
+                    // 방향 그룹 내부는 routeSeq 순으로 정렬
+                    dirStops.sort(Comparator.comparingInt(s -> s.routeSeq));
 
-    for (int i = 0; i < dirStops.size() - 1; i++) {
-        StopOnRoute from = dirStops.get(i);
-        StopOnRoute to   = dirStops.get(i + 1);
+                    for (int i = 0; i < dirStops.size() - 1; i++) {
+                        StopOnRoute from = dirStops.get(i);
+                        StopOnRoute to   = dirStops.get(i + 1);
 
-        // 거리(m) 계산
-        double distanceM = haversineMeters(from.lat, from.lng, to.lat, to.lng);
+                        // 거리(m) 계산
+                        double distanceM = haversineMeters(from.lat, from.lng, to.lat, to.lng);
 
-        Integer travelSecSample;
+                        Integer travelSecSample;
 
-        // ✅ 1차(Seed) 모드면 arrival API를 절대 호출하지 않는다(즉시 전체 순환/적재 목적)
-        if (SEED_DISTANCE_ONLY) {
-            travelSecSample = estimateTravelSecondsByDistanceFallback(distanceM);
-            fallbackUsed++;
-        } else {
-            // ✅ 2차(Refine): arrival 기반(캐시+상한) → 실패 시 거리 기반 fallback
-            travelSecSample = estimateTravelSecondsByArrivalDiffCached(
-                route.routeId,
-                from.nodeId,
-                to.nodeId,
-                arrivalCache,
-                arrivalApiCalls
-            );
+                        // ✅ 1차(Seed) 모드면 arrival API를 절대 호출하지 않는다(즉시 전체 순환/적재 목적)
+                        if (SEED_DISTANCE_ONLY) {
+                            travelSecSample = estimateTravelSecondsByDistanceFallback(distanceM);
+                            fallbackUsed++;
+                        } else {
+                            // ✅ 2차(Refine): arrival 기반(캐시+상한) → 실패 시 거리 기반 fallback
+                            travelSecSample = estimateTravelSecondsByArrivalDiffCached(
+                                route.routeId,
+                                from.nodeId,
+                                to.nodeId,
+                                arrivalCache,
+                                arrivalApiCalls
+                            );
 
-            if (travelSecSample != null && travelSecSample > 0) {
-                arrivalUsed++;
-            }
+                            if (travelSecSample != null && travelSecSample > 0) {
+                                arrivalUsed++;
+                            }
 
-            if (travelSecSample == null || travelSecSample <= 0) {
-                travelSecSample = estimateTravelSecondsByDistanceFallback(distanceM);
-                fallbackUsed++;
-            }
-        }
+                            if (travelSecSample == null || travelSecSample <= 0) {
+                                travelSecSample = estimateTravelSecondsByDistanceFallback(distanceM);
+                                fallbackUsed++;
+                            }
+                        }
 
-        // 시간이 끝까지 안 나오면 skip
-        if (travelSecSample == null || travelSecSample <= 0) {
-            skippedForRouteNoTime++;
-            continue;
-        }
+                        // 시간이 끝까지 안 나오면 skip
+                        if (travelSecSample == null || travelSecSample <= 0) {
+                            skippedForRouteNoTime++;
+                            continue;
+                        }
 
-        // 5-4) DB UPSERT(세그먼트 가중치 누적) - updowncd(상/하행) 포함
-        boolean ok = upsertSegmentWeightBus(
-            route.routeId,
-            dir != null ? dir.intValue() : 0,
-            from,
-            to,
-            distanceM,
-            travelSecSample
-        );
+                        // 5-4) DB UPSERT(세그먼트 가중치 누적) - updowncd(상/하행) 포함
+                        boolean ok = upsertSegmentWeightBus(
+                            route.routeId,
+                            dir != null ? dir.intValue() : 0,
+                            from,
+                            to,
+                            distanceM,
+                            travelSecSample
+                        );
 
-        triedForRoute++;
-        if (ok) {
-            upsertedForRoute++;
-        }
-    }
-}
+                        triedForRoute++;
+                        if (ok) {
+                            upsertedForRoute++;
+                        }
+                    }
+                }
 
-totalSegmentsUpserted += upsertedForRoute;
-totalSegmentsSkippedNoTime += skippedForRouteNoTime;
-totalSegmentsTried += triedForRoute;
-
+                totalSegmentsUpserted += upsertedForRoute;
                 totalSegmentsSkippedNoTime += skippedForRouteNoTime;
                 totalSegmentsTried += triedForRoute;
 
@@ -381,20 +388,36 @@ totalSegmentsTried += triedForRoute;
     }
 
     // =========================================================
-    // 2) 노선별 정류장 목록 조회
+    // 2) 노선별 정류장 목록 조회 (✅ routeId당 최초 1회만 API 호출하도록 캐시 적용)
     // =========================================================
     private List<StopOnRoute> fetchStopsByRoute(String routeId) {
         if (routeId == null || routeId.isBlank()) {
             return List.of();
         }
 
-        List<StopOnRoute> primary = fetchStopsByRouteInternal(routeId, "routeId");
-        if (primary.size() >= 2) {
-            return primary;
+        // ✅ 1) 캐시에 있으면 즉시 반환(트래픽 0)
+        List<StopOnRoute> cached = ROUTE_STOPS_CACHE.get(routeId);
+        if (cached != null) {
+            return cached;
         }
 
-        List<StopOnRoute> fallback = fetchStopsByRouteInternal(routeId, "routeid");
-        return fallback;
+        // ✅ 2) 캐시에 없을 때만 실제 TAGO route-stops 호출(최초 1회)
+        List<StopOnRoute> primary = fetchStopsByRouteInternal(routeId, "routeId");
+        List<StopOnRoute> result;
+
+        if (primary.size() >= 2) {
+            result = primary;
+        } else {
+            List<StopOnRoute> fallback = fetchStopsByRouteInternal(routeId, "routeid");
+            result = fallback;
+        }
+
+        // ✅ 3) 실패/빈 결과도 캐시에 저장하여 동일 노선 재호출을 막는다.
+        //      (route-stops는 정적 데이터 성격이라 서버 생명주기 동안 재시도 필요성이 낮다)
+        List<StopOnRoute> toCache = (result == null) ? List.of() : Collections.unmodifiableList(result);
+        ROUTE_STOPS_CACHE.put(routeId, toCache);
+
+        return toCache;
     }
 
     private List<StopOnRoute> fetchStopsByRouteInternal(String routeId, String routeIdParamKey) {
@@ -484,11 +507,11 @@ totalSegmentsTried += triedForRoute;
             integer(it, "nodeord"), integer(it, "nodeOrd"),
             integer(it, "ord"), integer(it, "seq")
         );
-Integer updowncd = firstNonNullInt(
-    integer(it, "updowncd"), integer(it, "upDownCd"),
-    integer(it, "updownCd"), integer(it, "upDowncd")
-);
 
+        Integer updowncd = firstNonNullInt(
+            integer(it, "updowncd"), integer(it, "upDownCd"),
+            integer(it, "updownCd"), integer(it, "upDowncd")
+        );
 
         if (nodeId == null || lat == null || lng == null || seq == null) {
             return null;
@@ -776,6 +799,5 @@ Integer updowncd = firstNonNullInt(
         }
     }
 }
-
 
 // 수정됨 끝
