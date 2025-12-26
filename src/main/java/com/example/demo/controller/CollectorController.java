@@ -46,7 +46,7 @@ public class CollectorController {
     //       (프론트는 "running" 필드를 보므로 status에선 switch 상태를 그대로 내려준다.)
 
     // interval(다음 실행까지 쉬는 시간)
-    private final AtomicInteger intervalMs = new AtomicInteger(5000);
+    private final AtomicInteger intervalMs = new AtomicInteger(8000);
 
     // ✅ batchSize는 서버가 자동으로 조절
     private final AtomicInteger batchSize = new AtomicInteger(5);
