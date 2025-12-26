@@ -1,11 +1,8 @@
-// 수정됨: 웹페이지가 꺼져도(브라우저 닫아도) 서버가 살아 있으면 자동 수집이 계속되도록 변경
-//        - 서버 부팅 시 자동으로 수집 ON 시작(@PostConstruct)
-//        - /collector/toggle : 수집 ON/OFF 토글(버튼 1개)
-//        - /collector/status : ON/OFF + batch/interval + 운행 시간창(04:00~23:30) 상태(withinWindow) 제공
-//        - CollectorSwitch(ON/OFF 스위치)를 분리하여 수집 제어를 단일 책임으로 관리
+// 수정됨: /collector/status 응답에 순환(cycleCount) 관련 필드 추가 + 운행시간 23:30 포함 처리 + (메서드 유무 불명) 리플렉션으로 안전 조회
 
 package com.example.demo.controller;
 
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.LinkedHashMap;
@@ -29,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.demo.collector.BusSegmentCollector;
 import com.example.demo.collector.CollectorSwitch;
+import com.example.demo.collector.ApiQuotaManager;
 
 @RestController
 public class CollectorController {
@@ -37,6 +35,8 @@ public class CollectorController {
     private BusSegmentCollector busSegmentCollector;
 
     @Autowired
+    private ApiQuotaManager apiQuotaManager;
+@Autowired
     private CollectorSwitch collectorSwitch;
 
     // =========================
@@ -46,10 +46,13 @@ public class CollectorController {
     //       (프론트는 "running" 필드를 보므로 status에선 switch 상태를 그대로 내려준다.)
 
     // interval(다음 실행까지 쉬는 시간)
-    private final AtomicInteger intervalMs = new AtomicInteger(8000);
+    private final AtomicInteger intervalMs = new AtomicInteger(60000);
 
     // ✅ batchSize는 서버가 자동으로 조절
-    private final AtomicInteger batchSize = new AtomicInteger(5);
+    private final AtomicInteger batchSize = new AtomicInteger(6);
+
+    // ✅ arrtime(도착예정시간) 샘플 수집 상한(1회 루프당 호출 수)
+    private final AtomicInteger refineCallsPerLoop = new AtomicInteger(6);
 
     // 마지막 실행 시간(ms) - 배치 자동 조절 판단 기준
     private final AtomicInteger lastElapsedMs = new AtomicInteger(0);
@@ -95,6 +98,25 @@ public class CollectorController {
         return res;
     }
 
+
+    // =========================
+    // Refine 1회 실행 (arrtime diff 기반으로 travel_sec_avg 누적)
+    // =========================
+    @GetMapping(value = "/collector/runRefineOnce", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> runRefineOnce(@RequestParam(defaultValue = "6") int calls) {
+
+        long st = System.currentTimeMillis();
+        invokeRefineOnceSafely(calls);
+        int elapsed = (int) (System.currentTimeMillis() - st);
+
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("ok", true);
+        res.put("mode", "REFINE");
+        res.put("arrivalCallsBudget", calls);
+        res.put("elapsedMs", elapsed);
+        return res;
+    }
+
     // =========================
     // ✅ 토글: "데이터 수집" 버튼용
     // =========================
@@ -118,8 +140,19 @@ public class CollectorController {
         res.put("running", collectorSwitch.isEnabled());
         res.put("batchSize", batchSize.get());
         res.put("intervalMs", intervalMs.get());
+        if (apiQuotaManager != null) {
+            res.put("quotaUsedToday", apiQuotaManager.getUsedToday());
+            res.put("quotaRemainingToday", apiQuotaManager.getRemainingToday());
+        }
         res.put("lastElapsedMs", lastElapsedMs.get());
         res.put("inProgress", inProgress.get());
+
+        // ✅ 순환/라운드로빈 상태(존재하면 내려주고, 없으면 null)
+        // - BusSegmentCollector에 getCycleCount/getVisitedRoutesCount/getRoundRobinIndex 가 없을 수도 있으므로
+        //   컴파일/런타임 안정성을 위해 리플렉션으로 안전 조회한다.
+        res.put("cycleCount", safeInvokeInt(busSegmentCollector, "getCycleCount"));
+        res.put("visitedRoutesNow", safeInvokeInt(busSegmentCollector, "getVisitedRoutesCount"));
+        res.put("rrIndexNow", safeInvokeInt(busSegmentCollector, "getRoundRobinIndex"));
 
         boolean withinWindow = isWithinOperatingWindow();
         res.put("withinWindow", withinWindow);
@@ -162,6 +195,8 @@ public class CollectorController {
 
                 try {
                     busSegmentCollector.collectOnce(usedBatch);
+                    // ✅ 배치 루프마다 arrtime 기반 샘플을 함께 누적하여 travel_sec_avg를 실제값에 가깝게 보정한다.
+                    busSegmentCollector.refineOnce(refineCallsPerLoop.get());
                 } catch (Exception e) {
                     System.out.println("[COLLECTOR][AUTO ERROR] " + e.getMessage());
                 } finally {
@@ -199,7 +234,8 @@ public class CollectorController {
 
     private boolean isWithinOperatingWindow() {
         LocalTime now = LocalTime.now();
-        return !now.isBefore(WINDOW_START) && now.isBefore(WINDOW_END);
+        // ✅ 23:30 "포함" 처리: now가 END보다 "이후"가 아니면 허용
+        return !now.isBefore(WINDOW_START) && !now.isAfter(WINDOW_END);
     }
 
     private void autoTuneBatch(int elapsedMs) {
@@ -231,7 +267,47 @@ public class CollectorController {
         return res;
     }
 
-    @PreDestroy
+    // =========================
+    // ✅ 리플렉션 기반 안전 int 조회 (없으면 null)
+    // =========================
+    private Integer safeInvokeInt(Object target, String methodName) {
+        if (target == null || methodName == null || methodName.trim().isEmpty()) {
+            return null;
+        }
+
+        try {
+            Method m = target.getClass().getMethod(methodName);
+            Object v = m.invoke(target);
+
+            if (v == null) return null;
+            if (v instanceof Integer) return (Integer) v;
+            if (v instanceof Number) return ((Number) v).intValue();
+
+            return null;
+        } catch (Exception ignore) {
+            return null;
+        }
+    }
+
+    
+    /**
+     * BusSegmentCollector에 refineOnce(int)가 없을 수도 있으므로(버전 차이/브랜치 차이),
+     * 리플렉션으로 존재 여부를 확인한 뒤 안전하게 호출한다.
+     * - 존재하지 않으면 아무 작업도 하지 않는다.
+     * - 존재하지만 호출 중 예외가 나면 로그만 남기고 루프는 계속 진행한다.
+     */
+    private void invokeRefineOnceSafely(int calls) {
+        try {
+            Method m = busSegmentCollector.getClass().getMethod("refineOnce", int.class);
+            m.invoke(busSegmentCollector, calls);
+        } catch (NoSuchMethodException e) {
+            // refineOnce 미구현 버전: 무시
+        } catch (Exception e) {
+            System.out.println("[COLLECTOR][ERROR] refineOnce invoke msg=" + e.getMessage());
+        }
+    }
+
+@PreDestroy
     public void shutdown() {
         try {
             stopAutoLoop();

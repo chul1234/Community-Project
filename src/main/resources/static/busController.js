@@ -2027,7 +2027,11 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         $scope.collectorStatus = d;
 
         if (d && d.running) {
-            $scope.collectorStatusText = '상태: ON · batch ' + d.batchSize + (d.inProgress ? ' · 실행중' : '');
+            $scope.collectorStatusText =
+                '상태: ON · batch ' +
+                d.batchSize +
+                (d.cycleCount != null ? ' · 순환 ' + d.cycleCount + '회' : '') +
+                (d.inProgress ? ' · 실행중' : '');
             startCollectorPoll();
         } else {
             $scope.collectorStatusText = '상태: OFF';

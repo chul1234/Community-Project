@@ -75,7 +75,19 @@ public class BusSegmentCollector {
     // 라운드로빈 상태(메모리)
     // =========================
     private static final AtomicInteger ROUND_ROBIN_INDEX = new AtomicInteger(0);
+    // 전체 노선 1바퀴(모든 routeId를 1회씩 처리) 완료 횟수
+    // - VISITED_ROUTES가 routes.size()에 도달하여 clear()될 때 1 증가한다.
+    private static final AtomicInteger CYCLE_COUNT = new AtomicInteger(0);
     private static final Set<String> VISITED_ROUTES = ConcurrentHashMap.newKeySet();
+
+    // =========================
+    // 최근 collectOnce에서 처리한 routeId 목록(Refine 단계에서 재사용)
+    // =========================
+    // - CollectorController가 collectOnce() 다음 refineOnce()를 호출할 때,
+    //   같은 루프에서 처리한 노선들만 대상으로 arrtime 샘플을 누적하기 위한 상태이다.
+    // - route-stops는 ROUTE_STOPS_CACHE가 잡고 있으므로 추가 트래픽은 arrival API만 발생한다.
+    // - volatile로 두어 다른 스레드에서도 최신 참조를 보게 한다(단일 스레드 운영이지만 안전하게).
+    private static volatile List<String> LAST_TARGET_ROUTE_IDS = Collections.emptyList();
 
     // =========================
     // route-stops 캐시(핵심)
@@ -94,6 +106,105 @@ public class BusSegmentCollector {
         collectOnce(5);
     }
 
+    /**
+     * arrtime(도착예정시간) 기반 샘플로 travel_sec_avg를 보정하는 2차(Refine) 루프이다.
+     *
+     * 동작 요약:
+     * - 직전 collectOnce()에서 처리한 routeId 목록(LAST_TARGET_ROUTE_IDS)만 대상으로 한다.
+     * - route-stops는 캐시(ROUTE_STOPS_CACHE)가 있으므로 추가 트래픽은 arrival API가 대부분이다.
+     * - calls는 "이번 refine 호출에서 최대 몇 개의 세그먼트(인접 정류장 쌍)"을 샘플링할지 상한이다.
+     */
+    public void refineOnce(int calls) {
+        if (calls <= 0) {
+            System.out.println("[COLLECTOR] refineOnce calls must be > 0");
+            return;
+        }
+
+        List<String> targetRouteIds = LAST_TARGET_ROUTE_IDS;
+        if (targetRouteIds == null || targetRouteIds.isEmpty()) {
+            System.out.println("[COLLECTOR] refineOnce: no last target routes. skip.");
+            return;
+        }
+
+        int remaining = calls;
+        int refined = 0;
+        int skippedNoTime = 0;
+
+        for (String routeId : targetRouteIds) {
+            if (remaining <= 0) break;
+            if (isBlank(routeId)) continue;
+
+            // 노선 1개 단위로는 nodeId 중복 호출 제거(캐시)
+            Map<String, Integer> arrivalCache = new HashMap<>();
+            int[] arrivalApiCalls = new int[] { 0 };
+
+            try {
+                List<StopOnRoute> stops = fetchStopsByRoute(routeId);
+                if (stops == null || stops.size() < 2) {
+                    continue;
+                }
+
+                // updowncd별로 그룹핑 후 routeSeq 정렬
+                Map<Integer, List<StopOnRoute>> stopsByDir = new HashMap<>();
+                for (StopOnRoute s : stops) {
+                    if (s == null) continue;
+                    int dir = s.updowncd;
+                    stopsByDir.computeIfAbsent(Integer.valueOf(dir), k -> new ArrayList<>()).add(s);
+                }
+
+                for (Map.Entry<Integer, List<StopOnRoute>> e : stopsByDir.entrySet()) {
+                    if (remaining <= 0) break;
+                    Integer dirObj = e.getKey();
+                    int dir = (dirObj == null ? 0 : dirObj.intValue());
+                    List<StopOnRoute> dirStops = e.getValue();
+                    if (dirStops == null || dirStops.size() < 2) continue;
+
+                    dirStops.sort(Comparator.comparingInt(s -> s.routeSeq));
+
+                    for (int i = 0; i < dirStops.size() - 1 && remaining > 0; i++) {
+                        StopOnRoute from = dirStops.get(i);
+                        StopOnRoute to = dirStops.get(i + 1);
+                        if (from == null || to == null) continue;
+
+                        double distanceM = haversineMeters(from.lat, from.lng, to.lat, to.lng);
+
+                        Integer travelSecSample = estimateTravelSecondsByArrivalDiffCached(
+                            routeId,
+                            from.nodeId,
+                            to.nodeId,
+                            arrivalCache,
+                            arrivalApiCalls
+                        );
+
+                        if (travelSecSample == null || travelSecSample <= 0) {
+                            skippedNoTime++;
+                            continue;
+                        }
+
+                        boolean ok = upsertSegmentWeightBus(
+                            routeId,
+                            dir,
+                            from,
+                            to,
+                            distanceM,
+                            travelSecSample
+                        );
+
+                        if (ok) {
+                            refined++;
+                            remaining--;
+                        }
+                    }
+                }
+
+            } catch (Exception ex) {
+                System.out.println("[COLLECTOR][ERROR] refineOnce routeId=" + routeId + " msg=" + ex.getMessage());
+            }
+        }
+
+        System.out.println("[COLLECTOR] refineOnce done. calls=" + calls + " refined=" + refined + " skippedNoTime=" + skippedNoTime);
+    }
+
     public void collectOnce(int batchSize) {
         if (batchSize <= 0) {
             System.out.println("[COLLECTOR] batchSize must be > 0");
@@ -110,11 +221,22 @@ public class BusSegmentCollector {
         // 2) 사이클 완료 시 방문 집합 초기화(다음 사이클 준비)
         if (VISITED_ROUTES.size() >= routes.size()) {
             System.out.println("[COLLECTOR] cycle complete (visited=" + VISITED_ROUTES.size() + "/" + routes.size() + "). reset visited.");
+            CYCLE_COUNT.incrementAndGet();
             VISITED_ROUTES.clear();
         }
 
         // 3) 이번 호출에서 처리할 노선 선택(라운드로빈)
         List<RouteInfo> targetRoutes = selectRoundRobinSlice(routes, batchSize);
+
+        // ✅ Refine 단계에서 같은 루프의 대상 노선만 다시 쓰기 위해 routeId 목록을 저장한다.
+        //    (CollectorController가 collectOnce() 직후 refineOnce()를 호출하는 구조에 맞춤)
+        List<String> lastIds = new ArrayList<>(targetRoutes.size());
+        for (RouteInfo r : targetRoutes) {
+            if (r != null && !isBlank(r.routeId)) {
+                lastIds.add(r.routeId);
+            }
+        }
+        LAST_TARGET_ROUTE_IDS = Collections.unmodifiableList(lastIds);
 
         // 4) 이번에 실제 처리 대상 routeId 출력(눈으로 순환 확인)
         StringBuilder targetIds = new StringBuilder();
@@ -290,7 +412,7 @@ public class BusSegmentCollector {
         while (scanned < n && slice.size() < batchSize) {
             RouteInfo r = routes.get(idx);
 
-            if (r != null && r.routeId != null && !r.routeId.isBlank()) {
+            if (r != null && !isBlank(r.routeId)) {
                 if (!VISITED_ROUTES.contains(r.routeId)) {
                     VISITED_ROUTES.add(r.routeId);
                     slice.add(r);
@@ -308,6 +430,21 @@ public class BusSegmentCollector {
     // =========================================================
     // 1) 전체 노선 목록 조회
     // =========================================================
+    // =========================
+    // 라운드로빈 순환(사이클) 상태 조회용
+    // =========================
+    public int getCycleCount() {
+        return CYCLE_COUNT.get();
+    }
+
+    public int getVisitedRoutesCount() {
+        return VISITED_ROUTES.size();
+    }
+
+    public int getRoundRobinIndex() {
+        return ROUND_ROBIN_INDEX.get();
+    }
+
     private List<RouteInfo> fetchAllRoutes() {
         try {
             URI uri = UriComponentsBuilder
@@ -323,9 +460,9 @@ public class BusSegmentCollector {
             String json = restTemplate.getForObject(uri, String.class);
             sleepApi();
 
-            if (json == null || json.isBlank()) {
+            if (isBlank(json)) {
                 System.out.println("[COLLECTOR] fetchAllRoutes: empty response");
-                return List.of();
+                return Collections.emptyList();
             }
 
             JsonNode root = objectMapper.readTree(json);
@@ -348,7 +485,7 @@ public class BusSegmentCollector {
                         text(it, "routeId"),
                         text(it, "route_id")
                     );
-                    if (routeId != null && !routeId.isBlank()) {
+                    if (!isBlank(routeId)) {
                         routeIdSet.add(routeId);
                     }
                 }
@@ -358,7 +495,7 @@ public class BusSegmentCollector {
                     text(items, "routeId"),
                     text(items, "route_id")
                 );
-                if (routeId != null && !routeId.isBlank()) {
+                if (!isBlank(routeId)) {
                     routeIdSet.add(routeId);
                 }
             }
@@ -383,7 +520,7 @@ public class BusSegmentCollector {
 
         } catch (Exception e) {
             System.out.println("[COLLECTOR][ERROR] fetchAllRoutes msg=" + e.getMessage());
-            return List.of();
+            return Collections.emptyList();
         }
     }
 
@@ -391,8 +528,8 @@ public class BusSegmentCollector {
     // 2) 노선별 정류장 목록 조회 (✅ routeId당 최초 1회만 API 호출하도록 캐시 적용)
     // =========================================================
     private List<StopOnRoute> fetchStopsByRoute(String routeId) {
-        if (routeId == null || routeId.isBlank()) {
-            return List.of();
+        if (isBlank(routeId)) {
+            return Collections.emptyList();
         }
 
         // ✅ 1) 캐시에 있으면 즉시 반환(트래픽 0)
@@ -414,7 +551,7 @@ public class BusSegmentCollector {
 
         // ✅ 3) 실패/빈 결과도 캐시에 저장하여 동일 노선 재호출을 막는다.
         //      (route-stops는 정적 데이터 성격이라 서버 생명주기 동안 재시도 필요성이 낮다)
-        List<StopOnRoute> toCache = (result == null) ? List.of() : Collections.unmodifiableList(result);
+        List<StopOnRoute> toCache = (result == null) ? Collections.emptyList() : Collections.unmodifiableList(result);
         ROUTE_STOPS_CACHE.put(routeId, toCache);
 
         return toCache;
@@ -436,9 +573,9 @@ public class BusSegmentCollector {
             String json = restTemplate.getForObject(uri, String.class);
             sleepApi();
 
-            if (json == null || json.isBlank()) {
+            if (isBlank(json)) {
                 System.out.println("[COLLECTOR] fetchStopsByRoute: empty response routeId=" + routeId + " key=" + routeIdParamKey);
-                return List.of();
+                return Collections.emptyList();
             }
 
             JsonNode root = objectMapper.readTree(json);
@@ -470,7 +607,7 @@ public class BusSegmentCollector {
 
         } catch (Exception e) {
             System.out.println("[COLLECTOR][ERROR] fetchStopsByRoute routeId=" + routeId + " key=" + routeIdParamKey + " msg=" + e.getMessage());
-            return List.of();
+            return Collections.emptyList();
         }
     }
 
@@ -530,9 +667,9 @@ public class BusSegmentCollector {
         Map<String, Integer> arrivalCache,
         int[] arrivalApiCalls
     ) {
-        if (routeId == null || routeId.isBlank()) return null;
-        if (fromNodeId == null || fromNodeId.isBlank()) return null;
-        if (toNodeId == null || toNodeId.isBlank()) return null;
+        if (isBlank(routeId)) return null;
+        if (isBlank(fromNodeId)) return null;
+        if (isBlank(toNodeId)) return null;
 
         Integer fromArr = fetchArrivalSecondsCached(routeId, fromNodeId, arrivalCache, arrivalApiCalls);
         Integer toArr   = fetchArrivalSecondsCached(routeId, toNodeId, arrivalCache, arrivalApiCalls);
@@ -551,7 +688,7 @@ public class BusSegmentCollector {
         Map<String, Integer> arrivalCache,
         int[] arrivalApiCalls
     ) {
-        if (nodeId == null || nodeId.isBlank()) return null;
+        if (isBlank(nodeId)) return null;
 
         if (arrivalCache.containsKey(nodeId)) {
             return arrivalCache.get(nodeId);
@@ -586,7 +723,7 @@ public class BusSegmentCollector {
             String json = restTemplate.getForObject(uri, String.class);
             sleepApi();
 
-            if (json == null || json.isBlank()) return null;
+            if (isBlank(json)) return null;
 
             JsonNode root = objectMapper.readTree(json);
             JsonNode items = root.path("response").path("body").path("items").path("item");
@@ -722,6 +859,11 @@ public class BusSegmentCollector {
 
     // =========================================================
     // 7) 공통 유틸
+
+private static boolean isBlank(String s) {
+    return s == null || s.trim().isEmpty();
+}
+
     // =========================================================
     private static String text(JsonNode node, String field) {
         if (node == null) return null;
@@ -736,7 +878,7 @@ public class BusSegmentCollector {
         if (v == null || v.isNull()) return null;
         if (v.isNumber()) return v.asDouble();
         String s = v.asText();
-        if (s == null || s.isBlank()) return null;
+        if (isBlank(s)) return null;
         try { return Double.parseDouble(s); } catch (Exception e) { return null; }
     }
 
@@ -746,14 +888,14 @@ public class BusSegmentCollector {
         if (v == null || v.isNull()) return null;
         if (v.isInt() || v.isLong() || v.isNumber()) return v.asInt();
         String s = v.asText();
-        if (s == null || s.isBlank()) return null;
+        if (isBlank(s)) return null;
         try { return Integer.parseInt(s); } catch (Exception e) { return null; }
     }
 
     private static String firstNonBlank(String... values) {
         if (values == null) return null;
         for (String v : values) {
-            if (v != null && !v.isBlank()) return v;
+            if (!isBlank(v)) return v;
         }
         return null;
     }

@@ -27,7 +27,7 @@ public class PathServiceImpl implements IPathService {
     // 도보 속도: 1.3m/s (성인 평균)
     private static final double WALK_SPEED_MPS = 1.3;
     // 트램 속도: 31km/h (표정속도)
-    private static final double TRAM_SPEED_KMPH = 22.0;
+    private static final double TRAM_SPEED_KMPH = 40.0;
 
     // START/END 가상 노드 ID
     private static final String START_ID = "__START__";
