@@ -1,4 +1,4 @@
-// 수정됨: route-stops(노선별 경유정류장 목록) API를 노선(routeId)당 "최초 1회만" 호출하도록 메모리 캐시(ROUTE_STOPS_CACHE) 적용
+// 수정됨: CollectorController '수집 멈춤' 시 collect/refine 루프도 즉시 탈출하도록 CollectorSwitch/인터럽트 체크 추가
 //        - Collector 주기 실행 시 동일 routeId에 대해 route-stops를 반복 호출하지 않음(트래픽 폭발 방지)
 //        - 실패/빈 결과도 캐시에 저장하여 동일 노선에 대한 재시도 호출을 막음(서버 재기동 전까지)
 
@@ -97,6 +97,21 @@ public class BusSegmentCollector {
     private static final Map<String, List<StopOnRoute>> ROUTE_STOPS_CACHE = new ConcurrentHashMap<>();
 
     @Autowired
+    private CollectorSwitch collectorSwitch;
+
+    /**
+     * 현재 수집이 중단 요청(토글 OFF)되었거나 스레드 인터럽트가 걸렸는지 확인한다.
+     * - 웹에서 '수집 멈춤'을 누르면 CollectorController가 cancel(true)로 인터럽트를 건다.
+     * - CollectorSwitch가 OFF면 즉시 true를 반환하여 루프를 탈출한다.
+     */
+    private boolean shouldStopNow() {
+        if (collectorSwitch != null && !collectorSwitch.isEnabled()) {
+            return true;
+        }
+        return Thread.currentThread().isInterrupted();
+    }
+
+    @Autowired
     private DataSource dataSource;
 
     private final RestTemplate restTemplate = new RestTemplate();
@@ -115,7 +130,13 @@ public class BusSegmentCollector {
      * - calls는 "이번 refine 호출에서 최대 몇 개의 세그먼트(인접 정류장 쌍)"을 샘플링할지 상한이다.
      */
     public void refineOnce(int calls) {
-        if (calls <= 0) {
+        // ✅ 즉시 중단: 수집 OFF 또는 인터럽트 상태면 바로 반환한다.
+        if (shouldStopNow()) {
+            System.out.println("[COLLECTOR] refineOnce stop requested");
+            return;
+        }
+
+if (calls <= 0) {
             System.out.println("[COLLECTOR] refineOnce calls must be > 0");
             return;
         }
@@ -131,6 +152,11 @@ public class BusSegmentCollector {
         int skippedNoTime = 0;
 
         for (String routeId : targetRouteIds) {
+            // ✅ 즉시 중단: 루프 도중 OFF/인터럽트가 오면 바로 탈출한다.
+            if (shouldStopNow()) {
+                System.out.println("[COLLECTOR] refineOnce stop requested (mid-loop)");
+                break;
+            }
             if (remaining <= 0) break;
             if (isBlank(routeId)) continue;
 
@@ -206,7 +232,13 @@ public class BusSegmentCollector {
     }
 
     public void collectOnce(int batchSize) {
-        if (batchSize <= 0) {
+        // ✅ 즉시 중단: 수집 OFF 또는 인터럽트 상태면 바로 반환한다.
+        if (shouldStopNow()) {
+            System.out.println("[COLLECTOR] collectOnce stop requested");
+            return;
+        }
+
+if (batchSize <= 0) {
             System.out.println("[COLLECTOR] batchSize must be > 0");
             return;
         }
@@ -259,6 +291,11 @@ public class BusSegmentCollector {
 
         // 5) 노선별 처리
         for (RouteInfo route : targetRoutes) {
+            // ✅ 즉시 중단: 루프 도중 OFF/인터럽트가 오면 바로 탈출한다.
+            if (shouldStopNow()) {
+                System.out.println("[COLLECTOR] collectOnce stop requested (mid-loop)");
+                break;
+            }
             long routeStartMs = System.currentTimeMillis();
             System.out.println("[COLLECTOR] routeStart=" + route.routeId);
 

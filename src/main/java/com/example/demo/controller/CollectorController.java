@@ -1,4 +1,4 @@
-// 수정됨: /collector/status 응답에 순환(cycleCount) 관련 필드 추가 + 운행시간 23:30 포함 처리 + (메서드 유무 불명) 리플렉션으로 안전 조회
+// 수정됨: 웹에서 '수집 멈춤' 시 즉시 중단되도록 cancel(true) + 인터럽트 감지 + sleep 인터럽트 처리 개선 (컴파일 깨지는 중괄호/try-catch 구조 오류 수정 포함)
 
 package com.example.demo.controller;
 
@@ -15,8 +15,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import jakarta.annotation.PreDestroy;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -24,9 +24,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.demo.collector.ApiQuotaManager;
 import com.example.demo.collector.BusSegmentCollector;
 import com.example.demo.collector.CollectorSwitch;
-import com.example.demo.collector.ApiQuotaManager;
 
 @RestController
 public class CollectorController {
@@ -36,7 +36,8 @@ public class CollectorController {
 
     @Autowired
     private ApiQuotaManager apiQuotaManager;
-@Autowired
+
+    @Autowired
     private CollectorSwitch collectorSwitch;
 
     // =========================
@@ -98,7 +99,6 @@ public class CollectorController {
         return res;
     }
 
-
     // =========================
     // Refine 1회 실행 (arrtime diff 기반으로 travel_sec_avg 누적)
     // =========================
@@ -140,10 +140,12 @@ public class CollectorController {
         res.put("running", collectorSwitch.isEnabled());
         res.put("batchSize", batchSize.get());
         res.put("intervalMs", intervalMs.get());
+
         if (apiQuotaManager != null) {
             res.put("quotaUsedToday", apiQuotaManager.getUsedToday());
             res.put("quotaRemainingToday", apiQuotaManager.getRemainingToday());
         }
+
         res.put("lastElapsedMs", lastElapsedMs.get());
         res.put("inProgress", inProgress.get());
 
@@ -178,15 +180,24 @@ public class CollectorController {
 
             while (collectorSwitch.isEnabled()) {
 
+                // ✅ stopAutoLoop()에서 cancel(true)로 인터럽트를 걸면 즉시 루프를 탈출한다.
+                if (Thread.currentThread().isInterrupted()) {
+                    break;
+                }
+
                 // 운행 시간창 밖이면 수집은 하지 않고 주기적으로만 체크
                 if (!isWithinOperatingWindow()) {
-                    sleepQuietly(intervalMs.get());
+                    if (!sleepQuietly(intervalMs.get())) {
+                        break;
+                    }
                     continue;
                 }
 
                 // 겹침 방지(혹시라도 중첩되면 스킵)
                 if (!inProgress.compareAndSet(false, true)) {
-                    sleepQuietly(intervalMs.get());
+                    if (!sleepQuietly(intervalMs.get())) {
+                        break;
+                    }
                     continue;
                 }
 
@@ -196,7 +207,7 @@ public class CollectorController {
                 try {
                     busSegmentCollector.collectOnce(usedBatch);
                     // ✅ 배치 루프마다 arrtime 기반 샘플을 함께 누적하여 travel_sec_avg를 실제값에 가깝게 보정한다.
-                    busSegmentCollector.refineOnce(refineCallsPerLoop.get());
+                    invokeRefineOnceSafely(refineCallsPerLoop.get());
                 } catch (Exception e) {
                     System.out.println("[COLLECTOR][AUTO ERROR] " + e.getMessage());
                 } finally {
@@ -210,7 +221,9 @@ public class CollectorController {
                 }
 
                 // ✅ intervalMs는 매 루프마다 읽어서 즉시 반영
-                sleepQuietly(intervalMs.get());
+                if (!sleepQuietly(intervalMs.get())) {
+                    break;
+                }
             }
 
         }, 0, TimeUnit.MILLISECONDS);
@@ -218,8 +231,13 @@ public class CollectorController {
 
     private synchronized void stopAutoLoop() {
         if (future != null) {
-            try { future.cancel(false); } catch (Exception ignore) {}
+            try {
+                // ✅ 실행 중인 루프 스레드에 인터럽트를 건다(즉시 중단 유도)
+                future.cancel(true);
+            } catch (Exception ignore) {
+            }
             future = null;
+            inProgress.set(false);
         }
     }
 
@@ -256,9 +274,19 @@ public class CollectorController {
         batchSize.set(b);
     }
 
-    private void sleepQuietly(int ms) {
-        if (ms <= 0) ms = 1;
-        try { Thread.sleep(ms); } catch (InterruptedException ignore) { }
+    private boolean sleepQuietly(int ms) {
+        // ms가 0 이하로 들어오면 Thread.sleep이 예외를 던질 수 있으므로 최소 1ms로 보정한다.
+        if (ms <= 0) {
+            ms = 1;
+        }
+        try {
+            Thread.sleep(ms);
+            return true;
+        } catch (InterruptedException e) {
+            // ✅ 즉시 중단: 인터럽트 플래그를 복구하고, 호출자가 루프를 탈출하도록 false를 반환한다.
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 
     private Map<String, Object> statusWithMessage(String msg) {
@@ -289,7 +317,6 @@ public class CollectorController {
         }
     }
 
-    
     /**
      * BusSegmentCollector에 refineOnce(int)가 없을 수도 있으므로(버전 차이/브랜치 차이),
      * 리플렉션으로 존재 여부를 확인한 뒤 안전하게 호출한다.
@@ -307,15 +334,17 @@ public class CollectorController {
         }
     }
 
-@PreDestroy
+    @PreDestroy
     public void shutdown() {
         try {
             stopAutoLoop();
-        } catch (Exception ignore) {}
+        } catch (Exception ignore) {
+        }
 
         try {
             scheduler.shutdownNow();
-        } catch (Exception ignore) {}
+        } catch (Exception ignore) {
+        }
     }
 }
 
