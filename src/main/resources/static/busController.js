@@ -53,6 +53,10 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     $scope.pathStartStop = null;
     $scope.pathTotalMinutes = null; // 최단 경로 총 소요시간(분)
 
+    $scope.pathPreTransferMinutes = null;  // 환승 전(첫 탑승 블록) 총 시간(분)
+    $scope.pathWalkMinutes = null;         // 도보(환승 보행) 총 시간(분)
+    $scope.pathPostTransferMinutes = null; // 환승 후(두 번째 탑승 블록 이후) 총 시간(분)
+
     $scope.pathEndStop = null;
 
     // =========================================================
@@ -1766,11 +1770,144 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         $scope.pathStartStop = null;
         $scope.pathEndStop = null;
         $scope.pathTotalMinutes = null;
+        $scope.pathPreTransferMinutes = null;
+        $scope.pathWalkMinutes = null;
+        $scope.pathPostTransferMinutes = null;
     };
 
     // =========================================================
     // [수정됨] 2번 문제 최단 경로 검색 기능 (선택된 좌표 사용)
     // =========================================================
+
+    // =========================================================
+    // [추가] 경로 시간 분해(환승 전/도보/환승 후) 계산 유틸
+    // =========================================================
+    function computePathTimeBreakdown(segments) {
+        if (!segments || segments.length === 0) {
+            return { pre: null, walk: null, post: null };
+        }
+
+        function isWalk(seg) {
+            return seg && String(seg.mode || '').toUpperCase() === 'WALK';
+        }
+
+        function isRide(seg) {
+            var m = String(seg.mode || '').toUpperCase();
+            return m === 'BUS' || m === 'TRAM';
+        }
+
+        // 탑승 세그먼트가 2개 미만이면 환승 없음으로 처리
+        var rideIndices = [];
+        segments.forEach(function (seg, i) {
+            if (isRide(seg)) rideIndices.push(i);
+        });
+
+        if (rideIndices.length < 2) {
+            var total = 0;
+            segments.forEach(function (seg) {
+                total += Number(seg.minutes || 0);
+            });
+            return { pre: Math.round(total), walk: 0, post: 0 };
+        }
+
+        // 첫 탑승 이후 등장하는 첫 WALK(그리고 그 뒤에 다시 탑승이 존재) 구간을 환승 보행으로 간주
+        var firstRideIdx = rideIndices[0];
+        var transferWalkStart = -1;
+
+        for (var i = firstRideIdx + 1; i < segments.length; i++) {
+            if (isWalk(segments[i])) {
+                var hasRideAfter = false;
+                for (var j = i + 1; j < segments.length; j++) {
+                    if (isRide(segments[j])) {
+                        hasRideAfter = true;
+                        break;
+                    }
+                }
+                if (hasRideAfter) {
+                    transferWalkStart = i;
+                    break;
+                }
+            }
+        }
+
+        // WALK가 없다면 fallback(도보 없는 환승):
+        // - BUS↔TRAM 모드 변경 시점을 환승 경계로 간주
+        // - BUS인데 routeId가 바뀌는 시점도 환승 경계로 간주
+        var fallbackBoundary = -1;
+        if (transferWalkStart === -1) {
+            for (var k = firstRideIdx + 1; k < segments.length; k++) {
+                var prev = segments[k - 1];
+                var cur = segments[k];
+
+                if (isRide(prev) && isRide(cur)) {
+                    var prevMode = String(prev.mode || '').toUpperCase();
+                    var curMode = String(cur.mode || '').toUpperCase();
+
+                    if (prevMode !== curMode) {
+                        fallbackBoundary = k;
+                        break;
+                    }
+
+                    if (curMode === 'BUS') {
+                        var prevRoute = String(prev.routeId || '');
+                        var curRoute = String(cur.routeId || '');
+                        if (prevRoute && curRoute && prevRoute !== curRoute) {
+                            fallbackBoundary = k;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        var pre = 0,
+            walk = 0,
+            post = 0;
+
+        if (transferWalkStart !== -1) {
+            var transferWalkEnd = transferWalkStart;
+            while (
+                transferWalkEnd < segments.length &&
+                isWalk(segments[transferWalkEnd])
+            ) {
+                transferWalkEnd++;
+            }
+
+            for (var a = 0; a < transferWalkStart; a++) {
+                pre += Number(segments[a].minutes || 0);
+            }
+            for (var b = transferWalkStart; b < transferWalkEnd; b++) {
+                walk += Number(segments[b].minutes || 0);
+            }
+            for (var c = transferWalkEnd; c < segments.length; c++) {
+                post += Number(segments[c].minutes || 0);
+            }
+
+            return {
+                pre: Math.round(pre),
+                walk: Math.round(walk),
+                post: Math.round(post),
+            };
+        }
+
+        if (fallbackBoundary !== -1) {
+            for (var d = 0; d < fallbackBoundary; d++) {
+                pre += Number(segments[d].minutes || 0);
+            }
+            for (var e = fallbackBoundary; e < segments.length; e++) {
+                post += Number(segments[e].minutes || 0);
+            }
+            return { pre: Math.round(pre), walk: 0, post: Math.round(post) };
+        }
+
+        // 예외: 전체를 환승 전(pre)로 처리
+        var total2 = 0;
+        segments.forEach(function (seg) {
+            total2 += Number(seg.minutes || 0);
+        });
+        return { pre: Math.round(total2), walk: 0, post: 0 };
+    }
+
     $scope.solvePath = function () {
         // 유효성 검사: 사용자가 출발/도착지를 모두 선택했는지 확인
         if (!$scope.pathStartStop || !$scope.pathEndStop) {
@@ -1816,6 +1953,11 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 var sName = s.nodenm || s.stationName;
                 var eName = e.nodenm || e.stationName;
                 $scope.pathTotalMinutes = totalMin;
+
+                var breakdown = computePathTimeBreakdown(data.segments);
+                $scope.pathPreTransferMinutes = breakdown.pre;
+                $scope.pathWalkMinutes = breakdown.walk;
+                $scope.pathPostTransferMinutes = breakdown.post;
 
                 // 경로 그리기 호출
                 drawCalculatedPath(data.segments);

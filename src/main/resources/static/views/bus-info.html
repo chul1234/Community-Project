@@ -81,7 +81,12 @@
                 <span class="path-total" ng-if="pathTotalMinutes != null">
                     약 {{ pathTotalMinutes }}분
                 </span>
-            </div>
+            
+
+                <span class="path-breakdown" ng-if="pathPreTransferMinutes != null">
+                    (환승 전 {{ pathPreTransferMinutes }}분 / 도보 {{ pathWalkMinutes }}분 / 환승 후 {{ pathPostTransferMinutes }}분)
+                </span>
+</div>
 
             <!-- 지도 프레임 -->
             <div class="bus-map-frame">
