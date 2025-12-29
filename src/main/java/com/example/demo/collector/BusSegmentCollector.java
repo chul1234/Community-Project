@@ -41,7 +41,7 @@ public class BusSegmentCollector {
     // ✅ 1차(Seed) 모드: true면 arrival API를 전혀 호출하지 않고 거리 기반만으로 적재한다.
     //    - 지금 "DJB30300001만 늘어나는" 문제를 가장 빠르게 끝내는 스위치
     //    - 전체 route_id가 DB에 들어가고 순환이 눈으로 확인되면 false로 바꿔서 2차(Refine) 수행
-    private static final boolean SEED_DISTANCE_ONLY = true;
+    private static final boolean SEED_DISTANCE_ONLY = false;
 
     // ✅ 2차(Refine) 모드에서 arrival API 호출을 너무 많이 하지 않도록 노선당 호출 상한
     //    - 상한을 넘으면 해당 노선은 남은 구간을 거리 기반 fallback으로 처리한다(멈춤 방지)
