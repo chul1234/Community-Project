@@ -42,7 +42,7 @@ public class CollectorController {
     @Autowired
     private CollectorSwitch collectorSwitch;
 
-    private final AtomicInteger intervalMs = new AtomicInteger(15000);
+    private final AtomicInteger intervalMs = new AtomicInteger(25000);
     private final AtomicInteger batchSize = new AtomicInteger(6);
     private final AtomicInteger refineCallsPerLoop = new AtomicInteger(6);
     private final AtomicInteger lastElapsedMs = new AtomicInteger(0);
@@ -125,6 +125,11 @@ public class CollectorController {
         res.put("cycleCount", safeInvokeInt(busSegmentCollector, "getCycleCount"));
         res.put("visitedRoutesNow", safeInvokeInt(busSegmentCollector, "getVisitedRoutesCount"));
         res.put("rrIndexNow", safeInvokeInt(busSegmentCollector, "getRoundRobinIndex"));
+
+        // B안: refineOnce 진단(스킵 원인 분리) 요약
+        if (busSegmentCollector != null) {
+            res.put("lastRefineDiag", busSegmentCollector.getLastRefineDiagSummary());
+        }
 
         boolean withinWindow = isWithinOperatingWindow();
         res.put("withinWindow", withinWindow);
