@@ -42,7 +42,7 @@ public class CollectorController {
     @Autowired
     private CollectorSwitch collectorSwitch;
 
-    private final AtomicInteger intervalMs = new AtomicInteger(60000);
+    private final AtomicInteger intervalMs = new AtomicInteger(15000);
     private final AtomicInteger batchSize = new AtomicInteger(6);
     private final AtomicInteger refineCallsPerLoop = new AtomicInteger(6);
     private final AtomicInteger lastElapsedMs = new AtomicInteger(0);
