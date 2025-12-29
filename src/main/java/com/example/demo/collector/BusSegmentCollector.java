@@ -1,6 +1,6 @@
-// 수정됨: CollectorController '수집 멈춤' 시 collect/refine 루프도 즉시 탈출하도록 CollectorSwitch/인터럽트 체크 추가
-//        - Collector 주기 실행 시 동일 routeId에 대해 route-stops를 반복 호출하지 않음(트래픽 폭발 방지)
-//        - 실패/빈 결과도 캐시에 저장하여 동일 노선에 대한 재시도 호출을 막음(서버 재기동 전까지)
+// 수정됨: (1) DB 풀 종료/커넥션 불가 감지를 msg 단일 문자열("has been closed")에만 의존하지 않도록 강화
+//        (2) SQLState(08xxx, Connection Exception) + 다중 메시지 패턴으로 치명 상태(DB_CLOSED_FATAL) 전환
+//        (3) 치명 상태 전환 시 Thread.interrupt()로 즉시 수집 루프 중단
 
 package com.example.demo.collector;
 
@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.sql.DataSource;
@@ -96,15 +97,20 @@ public class BusSegmentCollector {
     // - 빈/실패 결과도 캐시에 저장하여 같은 노선에 대한 재호출을 방지한다.
     private static final Map<String, List<StopOnRoute>> ROUTE_STOPS_CACHE = new ConcurrentHashMap<>();
 
+    // ✅ DB 풀 종료를 한 번이라도 감지하면, 이후 모든 작업을 즉시 멈추기 위한 치명 상태 플래그
+    private static final AtomicBoolean DB_CLOSED_FATAL = new AtomicBoolean(false);
+
     @Autowired
     private CollectorSwitch collectorSwitch;
 
     /**
      * 현재 수집이 중단 요청(토글 OFF)되었거나 스레드 인터럽트가 걸렸는지 확인한다.
-     * - 웹에서 '수집 멈춤'을 누르면 CollectorController가 cancel(true)로 인터럽트를 건다.
-     * - CollectorSwitch가 OFF면 즉시 true를 반환하여 루프를 탈출한다.
+     * + DB 풀 종료 치명 상태(DB_CLOSED_FATAL)면 무조건 중단한다.
      */
     private boolean shouldStopNow() {
+        if (DB_CLOSED_FATAL.get()) {
+            return true;
+        }
         if (collectorSwitch != null && !collectorSwitch.isEnabled()) {
             return true;
         }
@@ -121,22 +127,13 @@ public class BusSegmentCollector {
         collectOnce(5);
     }
 
-    /**
-     * arrtime(도착예정시간) 기반 샘플로 travel_sec_avg를 보정하는 2차(Refine) 루프이다.
-     *
-     * 동작 요약:
-     * - 직전 collectOnce()에서 처리한 routeId 목록(LAST_TARGET_ROUTE_IDS)만 대상으로 한다.
-     * - route-stops는 캐시(ROUTE_STOPS_CACHE)가 있으므로 추가 트래픽은 arrival API가 대부분이다.
-     * - calls는 "이번 refine 호출에서 최대 몇 개의 세그먼트(인접 정류장 쌍)"을 샘플링할지 상한이다.
-     */
     public void refineOnce(int calls) {
-        // ✅ 즉시 중단: 수집 OFF 또는 인터럽트 상태면 바로 반환한다.
         if (shouldStopNow()) {
             System.out.println("[COLLECTOR] refineOnce stop requested");
             return;
         }
 
-if (calls <= 0) {
+        if (calls <= 0) {
             System.out.println("[COLLECTOR] refineOnce calls must be > 0");
             return;
         }
@@ -152,7 +149,6 @@ if (calls <= 0) {
         int skippedNoTime = 0;
 
         for (String routeId : targetRouteIds) {
-            // ✅ 즉시 중단: 루프 도중 OFF/인터럽트가 오면 바로 탈출한다.
             if (shouldStopNow()) {
                 System.out.println("[COLLECTOR] refineOnce stop requested (mid-loop)");
                 break;
@@ -160,17 +156,17 @@ if (calls <= 0) {
             if (remaining <= 0) break;
             if (isBlank(routeId)) continue;
 
-            // 노선 1개 단위로는 nodeId 중복 호출 제거(캐시)
             Map<String, Integer> arrivalCache = new HashMap<>();
             int[] arrivalApiCalls = new int[] { 0 };
 
             try {
+                if (shouldStopNow()) break;
+
                 List<StopOnRoute> stops = fetchStopsByRoute(routeId);
                 if (stops == null || stops.size() < 2) {
                     continue;
                 }
 
-                // updowncd별로 그룹핑 후 routeSeq 정렬
                 Map<Integer, List<StopOnRoute>> stopsByDir = new HashMap<>();
                 for (StopOnRoute s : stops) {
                     if (s == null) continue;
@@ -180,6 +176,12 @@ if (calls <= 0) {
 
                 for (Map.Entry<Integer, List<StopOnRoute>> e : stopsByDir.entrySet()) {
                     if (remaining <= 0) break;
+                    if (shouldStopNow()) {
+                        System.out.println("[COLLECTOR] refineOnce stop requested (mid-loop/dir)");
+                        remaining = 0;
+                        break;
+                    }
+
                     Integer dirObj = e.getKey();
                     int dir = (dirObj == null ? 0 : dirObj.intValue());
                     List<StopOnRoute> dirStops = e.getValue();
@@ -188,6 +190,12 @@ if (calls <= 0) {
                     dirStops.sort(Comparator.comparingInt(s -> s.routeSeq));
 
                     for (int i = 0; i < dirStops.size() - 1 && remaining > 0; i++) {
+                        if (shouldStopNow()) {
+                            System.out.println("[COLLECTOR] refineOnce stop requested (mid-loop/segment)");
+                            remaining = 0;
+                            break;
+                        }
+
                         StopOnRoute from = dirStops.get(i);
                         StopOnRoute to = dirStops.get(i + 1);
                         if (from == null || to == null) continue;
@@ -232,36 +240,30 @@ if (calls <= 0) {
     }
 
     public void collectOnce(int batchSize) {
-        // ✅ 즉시 중단: 수집 OFF 또는 인터럽트 상태면 바로 반환한다.
         if (shouldStopNow()) {
             System.out.println("[COLLECTOR] collectOnce stop requested");
             return;
         }
 
-if (batchSize <= 0) {
+        if (batchSize <= 0) {
             System.out.println("[COLLECTOR] batchSize must be > 0");
             return;
         }
 
-        // 1) 전체 노선 목록 조회
         List<RouteInfo> routes = fetchAllRoutes();
         if (routes.isEmpty()) {
             System.out.println("[COLLECTOR] route list is empty. stop.");
             return;
         }
 
-        // 2) 사이클 완료 시 방문 집합 초기화(다음 사이클 준비)
         if (VISITED_ROUTES.size() >= routes.size()) {
             System.out.println("[COLLECTOR] cycle complete (visited=" + VISITED_ROUTES.size() + "/" + routes.size() + "). reset visited.");
             CYCLE_COUNT.incrementAndGet();
             VISITED_ROUTES.clear();
         }
 
-        // 3) 이번 호출에서 처리할 노선 선택(라운드로빈)
         List<RouteInfo> targetRoutes = selectRoundRobinSlice(routes, batchSize);
 
-        // ✅ Refine 단계에서 같은 루프의 대상 노선만 다시 쓰기 위해 routeId 목록을 저장한다.
-        //    (CollectorController가 collectOnce() 직후 refineOnce()를 호출하는 구조에 맞춤)
         List<String> lastIds = new ArrayList<>(targetRoutes.size());
         for (RouteInfo r : targetRoutes) {
             if (r != null && !isBlank(r.routeId)) {
@@ -270,7 +272,6 @@ if (batchSize <= 0) {
         }
         LAST_TARGET_ROUTE_IDS = Collections.unmodifiableList(lastIds);
 
-        // 4) 이번에 실제 처리 대상 routeId 출력(눈으로 순환 확인)
         StringBuilder targetIds = new StringBuilder();
         for (int i = 0; i < targetRoutes.size(); i++) {
             if (i > 0) targetIds.append(", ");
@@ -289,9 +290,7 @@ if (batchSize <= 0) {
         int totalSegmentsSkippedNoTime = 0;
         int totalSegmentsTried = 0;
 
-        // 5) 노선별 처리
         for (RouteInfo route : targetRoutes) {
-            // ✅ 즉시 중단: 루프 도중 OFF/인터럽트가 오면 바로 탈출한다.
             if (shouldStopNow()) {
                 System.out.println("[COLLECTOR] collectOnce stop requested (mid-loop)");
                 break;
@@ -299,12 +298,12 @@ if (batchSize <= 0) {
             long routeStartMs = System.currentTimeMillis();
             System.out.println("[COLLECTOR] routeStart=" + route.routeId);
 
-            // ✅ 2차(Refine) 때만 쓰는 arrival 캐시(노선 1개 처리 동안 nodeId 중복 호출 제거)
             Map<String, Integer> arrivalCache = new HashMap<>();
             int[] arrivalApiCalls = new int[] { 0 };
 
             try {
-                // 5-1) 노선별 정류장 목록 조회 (✅ 캐시 적용: routeId당 최초 1회만 API 호출)
+                if (shouldStopNow()) break;
+
                 List<StopOnRoute> stops = fetchStopsByRoute(route.routeId);
                 if (stops.size() < 2) {
                     System.out.println("[COLLECTOR] routeId=" + route.routeId + " stops < 2. skip.");
@@ -313,10 +312,8 @@ if (batchSize <= 0) {
                     continue;
                 }
 
-                // 5-2) updowncd(상/하행)별로 그룹핑 후, 각 그룹 내 routeSeq 순으로 정렬하여 세그먼트 생성
                 Map<Integer, List<StopOnRoute>> stopsByDir = new HashMap<>();
                 for (StopOnRoute s : stops) {
-                    // updowncd가 누락된 경우(드물게 발생 가능)는 0(상행)으로 처리한다.
                     int dir = (s == null) ? 0 : s.updowncd;
                     stopsByDir.computeIfAbsent(dir, k -> new ArrayList<>()).add(s);
                 }
@@ -328,9 +325,12 @@ if (batchSize <= 0) {
                 int arrivalUsed = 0;
                 int fallbackUsed = 0;
 
-                // 5-3) 방향별로 인접 정류장 쌍을 세그먼트로 처리
-                //      - dir=0:상행, dir=1:하행
                 for (Map.Entry<Integer, List<StopOnRoute>> e : stopsByDir.entrySet()) {
+                    if (shouldStopNow()) {
+                        System.out.println("[COLLECTOR] collectOnce stop requested (mid-loop/dir)");
+                        break;
+                    }
+
                     Integer dir = e.getKey();
                     List<StopOnRoute> dirStops = e.getValue();
 
@@ -338,24 +338,25 @@ if (batchSize <= 0) {
                         continue;
                     }
 
-                    // 방향 그룹 내부는 routeSeq 순으로 정렬
                     dirStops.sort(Comparator.comparingInt(s -> s.routeSeq));
 
                     for (int i = 0; i < dirStops.size() - 1; i++) {
+                        if (shouldStopNow()) {
+                            System.out.println("[COLLECTOR] collectOnce stop requested (mid-loop/segment)");
+                            break;
+                        }
+
                         StopOnRoute from = dirStops.get(i);
                         StopOnRoute to   = dirStops.get(i + 1);
 
-                        // 거리(m) 계산
                         double distanceM = haversineMeters(from.lat, from.lng, to.lat, to.lng);
 
                         Integer travelSecSample;
 
-                        // ✅ 1차(Seed) 모드면 arrival API를 절대 호출하지 않는다(즉시 전체 순환/적재 목적)
                         if (SEED_DISTANCE_ONLY) {
                             travelSecSample = estimateTravelSecondsByDistanceFallback(distanceM);
                             fallbackUsed++;
                         } else {
-                            // ✅ 2차(Refine): arrival 기반(캐시+상한) → 실패 시 거리 기반 fallback
                             travelSecSample = estimateTravelSecondsByArrivalDiffCached(
                                 route.routeId,
                                 from.nodeId,
@@ -374,13 +375,11 @@ if (batchSize <= 0) {
                             }
                         }
 
-                        // 시간이 끝까지 안 나오면 skip
                         if (travelSecSample == null || travelSecSample <= 0) {
                             skippedForRouteNoTime++;
                             continue;
                         }
 
-                        // 5-4) DB UPSERT(세그먼트 가중치 누적) - updowncd(상/하행) 포함
                         boolean ok = upsertSegmentWeightBus(
                             route.routeId,
                             dir != null ? dir.intValue() : 0,
@@ -420,7 +419,6 @@ if (batchSize <= 0) {
             }
         }
 
-        // 6) 사이클 완료 시점 안내
         if (VISITED_ROUTES.size() >= routes.size()) {
             System.out.println("[COLLECTOR] ALL ROUTES VISITED (visited=" + VISITED_ROUTES.size() + "/" + routes.size() + "). next call will start new cycle.");
         }
@@ -431,12 +429,6 @@ if (batchSize <= 0) {
             + ", totalSkippedNoTime=" + totalSegmentsSkippedNoTime);
     }
 
-    /**
-     * 라운드로빈 슬라이스:
-     * - ROUND_ROBIN_INDEX부터 한 바퀴까지 스캔하면서
-     * - 이번 사이클에서 아직 처리 안 한 routeId만 batchSize개 모은다.
-     * - 다음 호출 시작 인덱스로 ROUND_ROBIN_INDEX를 갱신한다.
-     */
     private List<RouteInfo> selectRoundRobinSlice(List<RouteInfo> routes, int batchSize) {
         int n = routes.size();
         int start = ROUND_ROBIN_INDEX.get();
@@ -447,6 +439,10 @@ if (batchSize <= 0) {
         int scanned = 0;
 
         while (scanned < n && slice.size() < batchSize) {
+            if (shouldStopNow()) {
+                break;
+            }
+
             RouteInfo r = routes.get(idx);
 
             if (r != null && !isBlank(r.routeId)) {
@@ -464,12 +460,6 @@ if (batchSize <= 0) {
         return slice;
     }
 
-    // =========================================================
-    // 1) 전체 노선 목록 조회
-    // =========================================================
-    // =========================
-    // 라운드로빈 순환(사이클) 상태 조회용
-    // =========================
     public int getCycleCount() {
         return CYCLE_COUNT.get();
     }
@@ -484,6 +474,10 @@ if (batchSize <= 0) {
 
     private List<RouteInfo> fetchAllRoutes() {
         try {
+            if (shouldStopNow()) {
+                return Collections.emptyList();
+            }
+
             URI uri = UriComponentsBuilder
                 .fromHttpUrl(TAGO_ROUTE_BASE_URL + OP_GET_ROUTE_NO_LIST)
                 .queryParam("serviceKey", SERVICE_KEY)
@@ -496,6 +490,10 @@ if (batchSize <= 0) {
 
             String json = restTemplate.getForObject(uri, String.class);
             sleepApi();
+
+            if (shouldStopNow()) {
+                return Collections.emptyList();
+            }
 
             if (isBlank(json)) {
                 System.out.println("[COLLECTOR] fetchAllRoutes: empty response");
@@ -512,11 +510,12 @@ if (batchSize <= 0) {
             System.out.println("[COLLECTOR] routesApi resultCode=" + code + " resultMsg=" + msg);
             System.out.println("[COLLECTOR] routesApi itemsType=" + items.getNodeType());
 
-            // routeId 중복 제거 + 순서 유지
             Set<String> routeIdSet = new LinkedHashSet<>();
 
             if (items.isArray()) {
                 for (JsonNode it : items) {
+                    if (shouldStopNow()) break;
+
                     String routeId = firstNonBlank(
                         text(it, "routeid"),
                         text(it, "routeId"),
@@ -550,6 +549,7 @@ if (batchSize <= 0) {
 
             List<RouteInfo> result = new ArrayList<>(routeIdSet.size());
             for (String rid : routeIdSet) {
+                if (shouldStopNow()) break;
                 result.add(new RouteInfo(rid));
             }
 
@@ -561,21 +561,20 @@ if (batchSize <= 0) {
         }
     }
 
-    // =========================================================
-    // 2) 노선별 정류장 목록 조회 (✅ routeId당 최초 1회만 API 호출하도록 캐시 적용)
-    // =========================================================
     private List<StopOnRoute> fetchStopsByRoute(String routeId) {
         if (isBlank(routeId)) {
             return Collections.emptyList();
         }
 
-        // ✅ 1) 캐시에 있으면 즉시 반환(트래픽 0)
+        if (shouldStopNow()) {
+            return Collections.emptyList();
+        }
+
         List<StopOnRoute> cached = ROUTE_STOPS_CACHE.get(routeId);
         if (cached != null) {
             return cached;
         }
 
-        // ✅ 2) 캐시에 없을 때만 실제 TAGO route-stops 호출(최초 1회)
         List<StopOnRoute> primary = fetchStopsByRouteInternal(routeId, "routeId");
         List<StopOnRoute> result;
 
@@ -586,8 +585,6 @@ if (batchSize <= 0) {
             result = fallback;
         }
 
-        // ✅ 3) 실패/빈 결과도 캐시에 저장하여 동일 노선 재호출을 막는다.
-        //      (route-stops는 정적 데이터 성격이라 서버 생명주기 동안 재시도 필요성이 낮다)
         List<StopOnRoute> toCache = (result == null) ? Collections.emptyList() : Collections.unmodifiableList(result);
         ROUTE_STOPS_CACHE.put(routeId, toCache);
 
@@ -596,6 +593,10 @@ if (batchSize <= 0) {
 
     private List<StopOnRoute> fetchStopsByRouteInternal(String routeId, String routeIdParamKey) {
         try {
+            if (shouldStopNow()) {
+                return Collections.emptyList();
+            }
+
             URI uri = UriComponentsBuilder
                 .fromHttpUrl(TAGO_ROUTE_BASE_URL + OP_GET_ROUTE_STOPS)
                 .queryParam("serviceKey", SERVICE_KEY)
@@ -609,6 +610,10 @@ if (batchSize <= 0) {
 
             String json = restTemplate.getForObject(uri, String.class);
             sleepApi();
+
+            if (shouldStopNow()) {
+                return Collections.emptyList();
+            }
 
             if (isBlank(json)) {
                 System.out.println("[COLLECTOR] fetchStopsByRoute: empty response routeId=" + routeId + " key=" + routeIdParamKey);
@@ -632,6 +637,8 @@ if (batchSize <= 0) {
 
             if (items.isArray()) {
                 for (JsonNode it : items) {
+                    if (shouldStopNow()) break;
+
                     StopOnRoute s = parseStopOnRoute(it);
                     if (s != null) result.add(s);
                 }
@@ -694,9 +701,6 @@ if (batchSize <= 0) {
         return new StopOnRoute(nodeId, lat, lng, seq, (updowncd == null ? 0 : updowncd.intValue()));
     }
 
-    // =========================================================
-    // 3) arrival 기반 시간(2차 Refine) - 캐시 + 호출 상한
-    // =========================================================
     private Integer estimateTravelSecondsByArrivalDiffCached(
         String routeId,
         String fromNodeId,
@@ -704,6 +708,8 @@ if (batchSize <= 0) {
         Map<String, Integer> arrivalCache,
         int[] arrivalApiCalls
     ) {
+        if (shouldStopNow()) return null;
+
         if (isBlank(routeId)) return null;
         if (isBlank(fromNodeId)) return null;
         if (isBlank(toNodeId)) return null;
@@ -725,6 +731,8 @@ if (batchSize <= 0) {
         Map<String, Integer> arrivalCache,
         int[] arrivalApiCalls
     ) {
+        if (shouldStopNow()) return null;
+
         if (isBlank(nodeId)) return null;
 
         if (arrivalCache.containsKey(nodeId)) {
@@ -746,6 +754,8 @@ if (batchSize <= 0) {
 
     private Integer fetchArrivalSeconds(String routeId, String nodeId) {
         try {
+            if (shouldStopNow()) return null;
+
             URI uri = UriComponentsBuilder
                 .fromHttpUrl(TAGO_ARRIVAL_BASE_URL + OP_GET_ARRIVAL_BY_STTN)
                 .queryParam("serviceKey", SERVICE_KEY)
@@ -760,6 +770,8 @@ if (batchSize <= 0) {
             String json = restTemplate.getForObject(uri, String.class);
             sleepApi();
 
+            if (shouldStopNow()) return null;
+
             if (isBlank(json)) return null;
 
             JsonNode root = objectMapper.readTree(json);
@@ -767,6 +779,8 @@ if (batchSize <= 0) {
 
             if (items.isArray()) {
                 for (JsonNode it : items) {
+                    if (shouldStopNow()) return null;
+
                     String rid = firstNonBlank(text(it, "routeid"), text(it, "routeId"));
                     if (!Objects.equals(routeId, rid)) continue;
 
@@ -790,9 +804,6 @@ if (batchSize <= 0) {
         }
     }
 
-    // =========================================================
-    // 4) 거리 기반 fallback 시간(1차 Seed 핵심)
-    // =========================================================
     private Integer estimateTravelSecondsByDistanceFallback(double distanceM) {
         if (distanceM <= 0) return null;
 
@@ -807,9 +818,6 @@ if (batchSize <= 0) {
         return sec;
     }
 
-    // =========================================================
-    // 5) DB UPSERT
-    // =========================================================
     private boolean upsertSegmentWeightBus(
         String routeId,
         int updowncd,
@@ -818,6 +826,10 @@ if (batchSize <= 0) {
         double distanceM,
         int travelSecSample
     ) {
+
+        if (shouldStopNow()) {
+            return false;
+        }
 
         String sql =
             "INSERT INTO segment_weight (" +
@@ -859,15 +871,40 @@ if (batchSize <= 0) {
             return affected > 0;
 
         } catch (SQLException e) {
+            String msg = e.getMessage();
+            String sqlState = e.getSQLState();
+
             System.out.println(
                 "[COLLECTOR][DB ERROR] routeId=" + routeId +
                 " updowncd=" + updowncd +
                 " from=" + safeNode(from) +
                 " to=" + safeNode(to) +
-                " sqlState=" + e.getSQLState() +
+                " sqlState=" + sqlState +
                 " vendorCode=" + e.getErrorCode() +
-                " msg=" + e.getMessage()
+                " msg=" + msg
             );
+
+            // ✅ 핵심: "has been closed" 단일 문자열에 의존하면 DB/드라이버/풀 구현체에 따라 놓친다.
+            // - SQLState 08xxx: Connection Exception 계열
+            // - msg 다중 패턴: 풀/커넥션 종료/통신 장애 케이스 포함
+            boolean connectionExceptionState = (sqlState != null && sqlState.startsWith("08"));
+
+            boolean poolClosedMsg =
+                msg != null && (
+                    msg.contains("has been closed") ||
+                    msg.contains("HikariDataSource") ||
+                    msg.contains("HikariPool") ||
+                    (msg.contains("Pool") && msg.contains("closed")) ||
+                    msg.contains("Connection is closed") ||
+                    msg.contains("connection is closed") ||
+                    msg.contains("Communications link failure")
+                );
+
+            if (connectionExceptionState || poolClosedMsg) {
+                DB_CLOSED_FATAL.set(true);
+                Thread.currentThread().interrupt();
+            }
+
             return false;
         }
     }
@@ -877,9 +914,6 @@ if (batchSize <= 0) {
         return s.nodeId;
     }
 
-    // =========================================================
-    // 6) 거리 계산
-    // =========================================================
     private static double haversineMeters(double lat1, double lon1, double lat2, double lon2) {
         final double R = 6371000.0;
         double dLat = Math.toRadians(lat2 - lat1);
@@ -894,14 +928,10 @@ if (batchSize <= 0) {
         return R * c;
     }
 
-    // =========================================================
-    // 7) 공통 유틸
+    private static boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
+    }
 
-private static boolean isBlank(String s) {
-    return s == null || s.trim().isEmpty();
-}
-
-    // =========================================================
     private static String text(JsonNode node, String field) {
         if (node == null) return null;
         JsonNode v = node.get(field);
@@ -954,7 +984,11 @@ private static boolean isBlank(String s) {
     }
 
     private static void sleepApi() {
-        try { Thread.sleep(API_SLEEP_MS); } catch (InterruptedException ignore) { }
+        try {
+            Thread.sleep(API_SLEEP_MS);
+        } catch (InterruptedException ignore) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private static class RouteInfo {
