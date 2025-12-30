@@ -1,6 +1,9 @@
-// 수정됨: (1) DB 풀 종료/커넥션 불가 감지를 msg 단일 문자열("has been closed")에만 의존하지 않도록 강화
-//        (2) SQLState(08xxx, Connection Exception) + 다중 메시지 패턴으로 치명 상태(DB_CLOSED_FATAL) 전환
-//        (3) 치명 상태 전환 시 Thread.interrupt()로 즉시 수집 루프 중단
+// 수정됨: (B안 진단 + 트래픽 절감 + 원인 분리)
+//        (1) refineOnce()를 "도착정보(arrival) 관측/진단" 중심으로 재구성: empty / routeId매칭실패 / arrtime누락 / diff<=0 / budget/limitHit / apiError / dbFatalStop
+//        (2) arrival API 원문(JSON/텍스트) 1개만으로 (쿼터/인증/파라미터/응답구조/arrtime부재) 원인 확정 가능하도록, 최초 1회 원문 샘플을 diag에 저장
+//        (3) 트래픽 절감: refineOnce(calls)는 "세그먼트 수"가 아니라 "arrival API 호출 예산(callsBudget)"으로 해석하여, 예산 소진 시 즉시 조기중단
+//        (4) items/item 경로가 없거나 비정상 타입일 때를 apiError로 잡지 않고 arrivalItemsEmpty로 분리(응답구조/빈 결과 케이스를 명확히 카운트)
+//        (5) 기존 로직(collectOnce: seed/거리 fallback, route-stops 캐시, 라운드로빈, DB_CLOSED_FATAL 감지)은 유지
 
 package com.example.demo.collector;
 
@@ -8,12 +11,10 @@ import java.net.URI;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +55,7 @@ public class BusSegmentCollector {
     // =========================
     private static final String CITY_CODE_DAEJEON = "25";
 
+    // ✅ 사용자 서비스 키(요청에 따라 그대로 사용)
     private static final String SERVICE_KEY =
         "ff623cef3aa0e011104003d8973105076b9f4ce098a93e4b6de36a9f2560529c";
 
@@ -93,11 +95,6 @@ public class BusSegmentCollector {
     private static volatile List<String> LAST_TARGET_ROUTE_IDS = Collections.emptyList();
 
     // =========================
-    // Refine 진단(B안): 최근 refineOnce 결과(스킵 원인 분리)
-    // =========================
-    private static volatile RefineDiag LAST_REFINE_DIAG = null;
-
-    // =========================
     // route-stops 캐시(핵심)
     // =========================
     // routeId -> 정류장 목록(서버 생명주기 동안 1회 호출 후 재사용)
@@ -134,141 +131,205 @@ public class BusSegmentCollector {
         collectOnce(5);
     }
 
-    public void refineOnce(int calls) {
-    if (shouldStopNow()) {
-        System.out.println("[COLLECTOR] refineOnce stop requested");
-        return;
-    }
+    // =========================
+    // B안: Refine 진단 구조체
+    // =========================
+    private static class RefineDiag {
+        private final int callsBudget;  // arrival API 호출 예산(전체)
+        private int callsUsed;          // 실제 arrival API 호출 수(전체)
+        private int arrivalOk;          // arrtime을 정상 획득한 횟수(=fetchArrivalSeconds가 arrtime>0 반환)
+        private int arrivalItemsEmpty;  // items/item 경로가 없거나 타입 불일치(=실질적으로 빈 결과/구조 불일치)
+        private int routeIdMatchFail;   // items는 있는데 routeId가 매칭되는 항목이 없음
+        private int arrtimeMissing;     // routeId는 매칭되는데 arrtime이 없거나 0
+        private int diffNonPositive;    // toArr - fromArr <= 0
+        private int limitHit;           // callsBudget 소진 또는 per-route 제한으로 조기 차단된 횟수
+        private int dbFatalStop;        // DB 치명 상태로 중단된 횟수
+        private int apiError;           // HTTP/파싱 예외 또는 resultCode!=00 등 "진짜 에러" 횟수
 
-    if (calls <= 0) {
-        System.out.println("[COLLECTOR] refineOnce calls must be > 0");
-        return;
-    }
+        // 원문 샘플(최초 1회만 저장) - 원인 확정용
+        private String lastArrivalRaw;  // JSON/텍스트 그대로
+        private Boolean lastArrivalOk;  // 해당 샘플이 "정상(00)"이었는지
+        private String lastArrivalMeta; // header/resultMsg 또는 예외 메시지 등 짧은 메타
 
-    List<String> targetRouteIds = LAST_TARGET_ROUTE_IDS;
-    if (targetRouteIds == null || targetRouteIds.isEmpty()) {
-        System.out.println("[COLLECTOR] refineOnce: no last target routes. skip.");
-        return;
-    }
-
-    RefineDiag diag = new RefineDiag();
-    diag.ts = LocalDateTime.now().toString();
-    diag.callsBudget = calls;
-    diag.targetRoutes = String.join(", ", targetRouteIds);
-
-    int remaining = calls;
-
-    for (String routeId : targetRouteIds) {
-        if (shouldStopNow()) {
-            System.out.println("[COLLECTOR] refineOnce stop requested (mid-loop)");
-            diag.dbFatalStopCount++;
-            break;
+        private RefineDiag(int callsBudget) {
+            this.callsBudget = Math.max(0, callsBudget);
         }
-        if (remaining <= 0) break;
-        if (isBlank(routeId)) continue;
 
-        // nodeId -> arrtime(seconds), null(관측 불가)도 캐시한다.
-        Map<String, Integer> arrivalCache = new HashMap<>();
-        int[] arrivalApiCalls = new int[] { 0 };
+        private boolean budgetExhausted() {
+            return callsBudget > 0 && callsUsed >= callsBudget;
+        }
 
-        try {
-            if (shouldStopNow()) break;
-
-            List<StopOnRoute> stops = fetchStopsByRoute(routeId);
-            if (stops == null || stops.size() < 2) {
-                continue;
+        private void recordRawOnce(String raw, Boolean ok, String meta) {
+            // 원문(raw)은 최초 1회만 저장한다.
+            if (this.lastArrivalRaw == null && raw != null) {
+                this.lastArrivalRaw = raw;
             }
 
-            Map<Integer, List<StopOnRoute>> stopsByDir = new HashMap<>();
-            for (StopOnRoute s : stops) {
-                if (s == null) continue;
-                int dir = s.updowncd;
-                stopsByDir.computeIfAbsent(Integer.valueOf(dir), k -> new ArrayList<>()).add(s);
+            // ok/meta는 raw가 없더라도(예: exception) 최초 1회만 보조 정보로 남긴다.
+            if (this.lastArrivalOk == null && ok != null) {
+                this.lastArrivalOk = ok;
             }
+            if (this.lastArrivalMeta == null && meta != null && !meta.isBlank()) {
+                this.lastArrivalMeta = meta;
+            }
+        }
+    }
 
-            for (Map.Entry<Integer, List<StopOnRoute>> e : stopsByDir.entrySet()) {
-                if (remaining <= 0) break;
+    /**
+     * ✅ B안 refineOnce
+     * - calls: "세그먼트 개수"가 아니라 "arrival API 호출 예산(callsBudget)"이다.
+     * - 예산이 소진되면 즉시 조기 중단하여 트래픽 폭발을 막는다.
+     */
+    public void refineOnce(int calls) {
+        if (shouldStopNow()) {
+            System.out.println("[COLLECTOR] refineOnce stop requested");
+            return;
+        }
 
-                if (shouldStopNow()) {
-                    System.out.println("[COLLECTOR] refineOnce stop requested (mid-loop/dir)");
-                    diag.dbFatalStopCount++;
-                    remaining = 0;
-                    break;
+        if (calls <= 0) {
+            System.out.println("[COLLECTOR] refineOnce calls must be > 0");
+            return;
+        }
+
+        List<String> targetRouteIds = LAST_TARGET_ROUTE_IDS;
+        if (targetRouteIds == null || targetRouteIds.isEmpty()) {
+            System.out.println("[COLLECTOR] refineOnce: no last target routes. skip.");
+            return;
+        }
+
+        RefineDiag diag = new RefineDiag(calls);
+
+        int refined = 0;
+        int skippedNoTime = 0;
+
+        for (String routeId : targetRouteIds) {
+            if (shouldStopNow()) {
+                System.out.println("[COLLECTOR] refineOnce stop requested (mid-loop)");
+                break;
+            }
+            if (diag.budgetExhausted()) {
+                break;
+            }
+            if (isBlank(routeId)) continue;
+
+            Map<String, Integer> arrivalCache = new HashMap<>();
+            int[] arrivalApiCalls = new int[] { 0 };
+
+            try {
+                if (shouldStopNow()) break;
+
+                List<StopOnRoute> stops = fetchStopsByRoute(routeId);
+                if (stops == null || stops.size() < 2) {
+                    continue;
                 }
 
-                Integer dirObj = e.getKey();
-                int dir = (dirObj == null ? 0 : dirObj.intValue());
-                List<StopOnRoute> dirStops = e.getValue();
-                if (dirStops == null || dirStops.size() < 2) continue;
+                Map<Integer, List<StopOnRoute>> stopsByDir = new HashMap<>();
+                for (StopOnRoute s : stops) {
+                    if (s == null) continue;
+                    int dir = s.updowncd;
+                    stopsByDir.computeIfAbsent(Integer.valueOf(dir), k -> new ArrayList<>()).add(s);
+                }
 
-                dirStops.sort(Comparator.comparingInt(s -> s.routeSeq));
-
-                for (int i = 0; i < dirStops.size() - 1 && remaining > 0; i++) {
+                for (Map.Entry<Integer, List<StopOnRoute>> e : stopsByDir.entrySet()) {
+                    if (diag.budgetExhausted()) break;
                     if (shouldStopNow()) {
-                        System.out.println("[COLLECTOR] refineOnce stop requested (mid-loop/segment)");
-                        diag.dbFatalStopCount++;
-                        remaining = 0;
+                        System.out.println("[COLLECTOR] refineOnce stop requested (mid-loop/dir)");
                         break;
                     }
 
-                    StopOnRoute from = dirStops.get(i);
-                    StopOnRoute to = dirStops.get(i + 1);
-                    if (from == null || to == null) continue;
+                    Integer dirObj = e.getKey();
+                    int dir = (dirObj == null ? 0 : dirObj.intValue());
+                    List<StopOnRoute> dirStops = e.getValue();
+                    if (dirStops == null || dirStops.size() < 2) continue;
 
-                    double distanceM = haversineMeters(from.lat, from.lng, to.lat, to.lng);
+                    dirStops.sort(Comparator.comparingInt(s -> s.routeSeq));
 
-                    Integer travelSecSample = estimateTravelSecondsByArrivalDiffCached(
-                        routeId,
-                        from.nodeId,
-                        to.nodeId,
-                        arrivalCache,
-                        arrivalApiCalls,
-                        diag
-                    );
+                    for (int i = 0; i < dirStops.size() - 1; i++) {
+                        if (diag.budgetExhausted()) break;
+                        if (shouldStopNow()) {
+                            System.out.println("[COLLECTOR] refineOnce stop requested (mid-loop/segment)");
+                            break;
+                        }
 
-                    if (travelSecSample == null || travelSecSample <= 0) {
-                        diag.skippedNoTime++;
-                        continue;
-                    }
+                        StopOnRoute from = dirStops.get(i);
+                        StopOnRoute to = dirStops.get(i + 1);
+                        if (from == null || to == null) continue;
 
-                    boolean ok = upsertSegmentWeightBus(
-                        routeId,
-                        dir,
-                        from,
-                        to,
-                        distanceM,
-                        travelSecSample
-                    );
+                        double distanceM = haversineMeters(from.lat, from.lng, to.lat, to.lng);
 
-                    if (ok) {
-                        diag.refined++;
-                        diag.callsUsed++;
-                        remaining--;
+                        Integer travelSecSample = estimateTravelSecondsByArrivalDiffCached(
+                            routeId,
+                            from.nodeId,
+                            to.nodeId,
+                            arrivalCache,
+                            arrivalApiCalls,
+                            diag
+                        );
+
+                        if (travelSecSample == null || travelSecSample <= 0) {
+                            skippedNoTime++;
+                            continue;
+                        }
+
+                        boolean ok = upsertSegmentWeightBus(
+                            routeId,
+                            dir,
+                            from,
+                            to,
+                            distanceM,
+                            travelSecSample
+                        );
+
+                        if (ok) {
+                            refined++;
+                        }
+
+                        // refineOnce는 "DB upsert 횟수"가 아니라 "arrival API 호출 예산"이 핵심이므로
+                        // 여기서는 remaining 같은 세그먼트 기반 카운트를 사용하지 않는다.
                     }
                 }
-            }
 
-        } catch (Exception ex) {
-            diag.apiErrorCount++;
-            System.out.println("[COLLECTOR][ERROR] refineOnce routeId=" + routeId + " msg=" + ex.getMessage());
+            } catch (Exception ex) {
+                // refineOnce 내부 로직에서 예외가 나면 apiError로 잡되, 원문 샘플이 없으면 메시지를 남긴다.
+                diag.apiError++;
+                diag.recordRawOnce(null, null, ex.getMessage());
+                System.out.println("[COLLECTOR][ERROR] refineOnce routeId=" + routeId + " msg=" + ex.getMessage());
+            }
+        }
+
+        // ✅ 진단 한 줄 출력(사용자 요구: 상태에서 원인 분리)
+        System.out.println(
+            "[COLLECTOR] refineOnce done. calls=" + calls +
+            " refined=" + refined +
+            " skippedNoTime=" + skippedNoTime +
+            " arrivalItemsEmpty=" + diag.arrivalItemsEmpty +
+            " routeIdMatchFail=" + diag.routeIdMatchFail +
+            " arrtimeMissing=" + diag.arrtimeMissing +
+            " diffNonPositive=" + diag.diffNonPositive +
+            " limitHit=" + diag.limitHit +
+            " dbFatalStop=" + diag.dbFatalStop +
+            " apiError=" + diag.apiError +
+            " callsUsed=" + diag.callsUsed +
+            " callsBudget=" + diag.callsBudget
+        );
+
+        // ✅ 원문 샘플이 있으면 1회만 출력(너무 길면 잘라서)
+        if (diag.lastArrivalRaw != null) {
+            String raw = diag.lastArrivalRaw;
+            String cut = raw;
+            int max = 900;
+            if (raw.length() > max) {
+                cut = raw.substring(0, max) + "...(truncated)";
+            }
+            System.out.println(
+                "[COLLECTOR] LAST_ARRIVAL_RAW ok=" + diag.lastArrivalOk +
+                " meta=" + diag.lastArrivalMeta +
+                " raw=" + cut
+            );
         }
     }
 
-    LAST_REFINE_DIAG = diag;
-
-    System.out.println("[COLLECTOR] refineOnce done. calls=" + calls
-        + " refined=" + diag.refined
-        + " skippedNoTime=" + diag.skippedNoTime
-        + " arrivalItemsEmpty=" + diag.arrivalItemsEmptyCount
-        + " routeIdMatchFail=" + diag.routeIdMatchFailCount
-        + " arrtimeMissing=" + diag.arrtimeMissingCount
-        + " diffNonPositive=" + diag.diffNonPositiveCount
-        + " limitHit=" + diag.limitHitCount
-        + " dbFatalStop=" + diag.dbFatalStopCount
-        + " apiError=" + diag.apiErrorCount);
-}
-
-public void collectOnce(int batchSize) {
+    public void collectOnce(int batchSize) {
         if (shouldStopNow()) {
             System.out.println("[COLLECTOR] collectOnce stop requested");
             return;
@@ -386,12 +447,16 @@ public void collectOnce(int batchSize) {
                             travelSecSample = estimateTravelSecondsByDistanceFallback(distanceM);
                             fallbackUsed++;
                         } else {
+                            // collectOnce는 "대량 수집/적재"가 목적이므로,
+                            // 여기서는 기존처럼 per-route 상한(ARRIVAL_API_LIMIT_PER_ROUTE)까지만 호출하고
+                            // 실패 시 거리 fallback으로 진행한다.
                             travelSecSample = estimateTravelSecondsByArrivalDiffCached(
                                 route.routeId,
                                 from.nodeId,
                                 to.nodeId,
                                 arrivalCache,
-                                arrivalApiCalls
+                                arrivalApiCalls,
+                                null // ✅ collectOnce에서는 diag 집계하지 않음
                             );
 
                             if (travelSecSample != null && travelSecSample > 0) {
@@ -499,37 +564,6 @@ public void collectOnce(int batchSize) {
 
     public int getRoundRobinIndex() {
         return ROUND_ROBIN_INDEX.get();
-    }
-
-
-    /**
-     * 최근 refineOnce 진단(B안) 요약을 Map으로 반환한다.
-     * - CollectorController status()에서 한 줄로 보기 위한 용도이다.
-     */
-    public Map<String, Object> getLastRefineDiagSummary() {
-        RefineDiag d = LAST_REFINE_DIAG;
-        if (d == null) return Collections.emptyMap();
-
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("ts", d.ts);
-        m.put("callsBudget", d.callsBudget);
-        m.put("callsUsed", d.callsUsed);
-        m.put("refined", d.refined);
-        m.put("skippedNoTime", d.skippedNoTime);
-
-        // B안 핵심 카운트(스킵 원인 분리)
-        m.put("arrivalItemsEmptyCount", d.arrivalItemsEmptyCount);
-        m.put("routeIdMatchFailCount", d.routeIdMatchFailCount);
-        m.put("arrtimeMissingCount", d.arrtimeMissingCount);
-        m.put("diffNonPositiveCount", d.diffNonPositiveCount);
-        m.put("limitHitCount", d.limitHitCount);
-        m.put("dbFatalStopCount", d.dbFatalStopCount);
-        m.put("apiErrorCount", d.apiErrorCount);
-
-        // 참고(최근 대상 노선)
-        m.put("targetRoutes", d.targetRoutes);
-
-        return m;
     }
 
     private List<RouteInfo> fetchAllRoutes() {
@@ -762,193 +796,218 @@ public void collectOnce(int batchSize) {
     }
 
     private Integer estimateTravelSecondsByArrivalDiffCached(
-    String routeId,
-    String fromNodeId,
-    String toNodeId,
-    Map<String, Integer> arrivalCache,
-    int[] arrivalApiCalls
-) {
-    return estimateTravelSecondsByArrivalDiffCached(routeId, fromNodeId, toNodeId, arrivalCache, arrivalApiCalls, null);
-}
+        String routeId,
+        String fromNodeId,
+        String toNodeId,
+        Map<String, Integer> arrivalCache,
+        int[] arrivalApiCalls,
+        RefineDiag diag
+    ) {
+        if (shouldStopNow()) return null;
 
-private Integer estimateTravelSecondsByArrivalDiffCached(
-    String routeId,
-    String fromNodeId,
-    String toNodeId,
-    Map<String, Integer> arrivalCache,
-    int[] arrivalApiCalls,
-    RefineDiag diag
-) {
-    if (shouldStopNow()) {
-        if (diag != null) diag.dbFatalStopCount++;
-        return null;
-    }
-
-    if (isBlank(routeId)) return null;
-    if (isBlank(fromNodeId)) return null;
-    if (isBlank(toNodeId)) return null;
-
-    Integer fromArr = fetchArrivalSecondsCached(routeId, fromNodeId, arrivalCache, arrivalApiCalls, diag);
-    Integer toArr   = fetchArrivalSecondsCached(routeId, toNodeId, arrivalCache, arrivalApiCalls, diag);
-
-    if (fromArr == null || toArr == null) return null;
-
-    int diff = toArr - fromArr;
-    if (diff <= 0) {
-        if (diag != null) diag.diffNonPositiveCount++;
-        return null;
-    }
-
-    return diff;
-}
-
-private Integer fetchArrivalSecondsCached(
-    String routeId,
-    String nodeId,
-    Map<String, Integer> arrivalCache,
-    int[] arrivalApiCalls
-) {
-    return fetchArrivalSecondsCached(routeId, nodeId, arrivalCache, arrivalApiCalls, null);
-}
-
-private Integer fetchArrivalSecondsCached(
-    String routeId,
-    String nodeId,
-    Map<String, Integer> arrivalCache,
-    int[] arrivalApiCalls,
-    RefineDiag diag
-) {
-    if (shouldStopNow()) {
-        if (diag != null) diag.dbFatalStopCount++;
-        return null;
-    }
-
-    if (isBlank(nodeId)) return null;
-
-    if (arrivalCache.containsKey(nodeId)) {
-        return arrivalCache.get(nodeId);
-    }
-
-    if (arrivalApiCalls != null && arrivalApiCalls.length > 0) {
-        if (arrivalApiCalls[0] >= ARRIVAL_API_LIMIT_PER_ROUTE) {
-            if (diag != null) diag.limitHitCount++;
-            arrivalCache.put(nodeId, null);
-            return null;
-        }
-        arrivalApiCalls[0]++;
-    }
-
-    Integer v = fetchArrivalSeconds(routeId, nodeId, diag);
-    arrivalCache.put(nodeId, v);
-    return v;
-}
-
-private Integer fetchArrivalSeconds(String routeId, String nodeId) {
-    return fetchArrivalSeconds(routeId, nodeId, null);
-}
-
-private Integer fetchArrivalSeconds(String routeId, String nodeId, RefineDiag diag) {
-    try {
-        if (shouldStopNow()) {
-            if (diag != null) diag.dbFatalStopCount++;
+        if (diag != null && diag.budgetExhausted()) {
+            diag.limitHit++;
             return null;
         }
 
-        URI uri = UriComponentsBuilder
-            .fromHttpUrl(TAGO_ARRIVAL_BASE_URL + OP_GET_ARRIVAL_BY_STTN)
-            .queryParam("serviceKey", SERVICE_KEY)
-            .queryParam("_type", "json")
-            .queryParam("cityCode", CITY_CODE_DAEJEON)
-            .queryParam("nodeId", nodeId)
-            .queryParam("pageNo", 1)
-            .queryParam("numOfRows", 300)
-            .build(true)
-            .toUri();
+        if (isBlank(routeId)) return null;
+        if (isBlank(fromNodeId)) return null;
+        if (isBlank(toNodeId)) return null;
 
-        String json = restTemplate.getForObject(uri, String.class);
-        sleepApi();
+        Integer fromArr = fetchArrivalSecondsCached(routeId, fromNodeId, arrivalCache, arrivalApiCalls, diag);
+        Integer toArr   = fetchArrivalSecondsCached(routeId, toNodeId, arrivalCache, arrivalApiCalls, diag);
 
-        if (shouldStopNow()) {
-            if (diag != null) diag.dbFatalStopCount++;
+        if (fromArr == null || toArr == null) return null;
+
+        int diff = toArr - fromArr;
+        if (diff <= 0) {
+            if (diag != null) diag.diffNonPositive++;
             return null;
         }
 
-        if (isBlank(json)) {
-            if (diag != null) diag.apiErrorCount++;
+        return diff;
+    }
+
+    private Integer fetchArrivalSecondsCached(
+        String routeId,
+        String nodeId,
+        Map<String, Integer> arrivalCache,
+        int[] arrivalApiCalls,
+        RefineDiag diag
+    ) {
+        if (shouldStopNow()) return null;
+
+        if (diag != null && diag.budgetExhausted()) {
+            diag.limitHit++;
             return null;
         }
 
-        JsonNode root = objectMapper.readTree(json);
-        JsonNode items = root.path("response").path("body").path("items").path("item");
+        if (isBlank(nodeId)) return null;
 
-        // (B안) items 비어있음: 그 시간대에 도착 예정이 없거나 데이터가 비어 있음
-        if (items.isMissingNode() || items.isNull()) {
-            if (diag != null) diag.arrivalItemsEmptyCount++;
-            return null;
+        if (arrivalCache.containsKey(nodeId)) {
+            return arrivalCache.get(nodeId);
         }
 
-        boolean anyItem = false;
-        boolean matchedRoute = false;
+        // ✅ per-route 제한(기존 유지)
+        if (arrivalApiCalls != null && arrivalApiCalls.length > 0) {
+            if (arrivalApiCalls[0] >= ARRIVAL_API_LIMIT_PER_ROUTE) {
+                if (diag != null) diag.limitHit++;
+                arrivalCache.put(nodeId, null);
+                return null;
+            }
+            arrivalApiCalls[0]++;
+        }
 
-        if (items.isArray()) {
-            if (items.size() == 0) {
-                if (diag != null) diag.arrivalItemsEmptyCount++;
+        // ✅ callsBudget 예산(Refine에서만 의미)
+        if (diag != null) {
+            if (diag.budgetExhausted()) {
+                diag.limitHit++;
+                arrivalCache.put(nodeId, null);
+                return null;
+            }
+            diag.callsUsed++;
+        }
+
+        Integer v = fetchArrivalSeconds(routeId, nodeId, diag);
+        arrivalCache.put(nodeId, v);
+        return v;
+    }
+
+    /**
+     * ✅ arrival API 호출 1회
+     * - resultCode != "00" -> apiError
+     * - items/item 경로가 없거나 비정상 타입 -> arrivalItemsEmpty
+     * - routeId 매칭 실패 -> routeIdMatchFail
+     * - routeId 매칭 성공 but arrtime missing/0 -> arrtimeMissing
+     * - arrtime > 0 -> arrivalOk
+     *
+     * ※ 원문(JSON/텍스트) 1개만 있으면 원인 확정이 가능하므로,
+     *   최초 1회 raw를 diag에 저장한다.
+     */
+    private Integer fetchArrivalSeconds(String routeId, String nodeId, RefineDiag diag) {
+        try {
+            if (shouldStopNow()) return null;
+            if (diag != null && diag.budgetExhausted()) {
+                diag.limitHit++;
                 return null;
             }
 
-            for (JsonNode it : items) {
-                if (shouldStopNow()) {
-                    if (diag != null) diag.dbFatalStopCount++;
-                    return null;
+            URI uri = UriComponentsBuilder
+                .fromHttpUrl(TAGO_ARRIVAL_BASE_URL + OP_GET_ARRIVAL_BY_STTN)
+                .queryParam("serviceKey", SERVICE_KEY)
+                .queryParam("_type", "json")
+                .queryParam("cityCode", CITY_CODE_DAEJEON)
+                .queryParam("nodeId", nodeId)
+                .queryParam("pageNo", 1)
+                .queryParam("numOfRows", 300)
+                .build(true)
+                .toUri();
+
+            String json = restTemplate.getForObject(uri, String.class);
+            sleepApi();
+
+            if (shouldStopNow()) return null;
+
+            if (isBlank(json)) {
+                if (diag != null) {
+                    // 빈 응답은 "구조/빈 결과"로 보고 arrivalItemsEmpty로 분리(진짜 에러와 구분)
+                    diag.arrivalItemsEmpty++;
+                    diag.recordRawOnce("", null, "empty_response");
                 }
-
-                anyItem = true;
-
-                String rid = firstNonBlank(text(it, "routeid"), text(it, "routeId"));
-                if (!Objects.equals(routeId, rid)) continue;
-
-                matchedRoute = true;
-
-                Integer arr = firstNonNullInt(integer(it, "arrtime"), integer(it, "arrTime"));
-                if (arr != null && arr > 0) return arr;
-
-                // routeId는 맞는데 arrtime이 없거나 0
-                if (diag != null) diag.arrtimeMissingCount++;
                 return null;
             }
 
-        } else if (items.isObject()) {
-            anyItem = true;
+            JsonNode root = objectMapper.readTree(json);
+            JsonNode header = root.path("response").path("header");
+            String code = header.path("resultCode").asText();
+            String msg  = header.path("resultMsg").asText();
 
-            String rid = firstNonBlank(text(items, "routeid"), text(items, "routeId"));
-            if (!Objects.equals(routeId, rid)) {
-                matchedRoute = false;
+            if (!Objects.equals("00", code)) {
+                if (diag != null) {
+                    diag.apiError++;
+                    diag.recordRawOnce(json, false, "resultCode=" + code + " msg=" + msg);
+                }
+                return null;
+            }
+
+            JsonNode items = root.path("response").path("body").path("items").path("item");
+
+            // ✅ items가 아예 없거나 타입 불일치면: 파싱 경로/응답 구조/빈 결과 케이스로 분리
+            if (!(items.isArray() || items.isObject())) {
+                if (diag != null) {
+                    diag.arrivalItemsEmpty++;
+                    diag.recordRawOnce(json, true, "itemsType=" + items.getNodeType());
+                }
+                return null;
+            }
+
+            boolean anyMatchedRoute = false;
+
+            if (items.isArray()) {
+                for (JsonNode it : items) {
+                    if (shouldStopNow()) return null;
+
+                    String rid = firstNonBlank(text(it, "routeid"), text(it, "routeId"));
+                    if (!Objects.equals(routeId, rid)) {
+                        continue;
+                    }
+
+                    anyMatchedRoute = true;
+
+                    Integer arr = firstNonNullInt(integer(it, "arrtime"), integer(it, "arrTime"));
+                    if (arr != null && arr > 0) {
+                        if (diag != null) {
+                            diag.arrivalOk++;
+                            diag.recordRawOnce(json, true, "ok(arrtime>0)");
+                        }
+                        return arr;
+                    } else {
+                        if (diag != null) {
+                            diag.arrtimeMissing++;
+                            diag.recordRawOnce(json, true, "matched_but_arrtime_missing");
+                        }
+                        return null;
+                    }
+                }
             } else {
-                matchedRoute = true;
-                Integer arr = firstNonNullInt(integer(items, "arrtime"), integer(items, "arrTime"));
-                if (arr != null && arr > 0) return arr;
-
-                if (diag != null) diag.arrtimeMissingCount++;
-                return null;
+                String rid = firstNonBlank(text(items, "routeid"), text(items, "routeId"));
+                if (Objects.equals(routeId, rid)) {
+                    anyMatchedRoute = true;
+                    Integer arr = firstNonNullInt(integer(items, "arrtime"), integer(items, "arrTime"));
+                    if (arr != null && arr > 0) {
+                        if (diag != null) {
+                            diag.arrivalOk++;
+                            diag.recordRawOnce(json, true, "ok(arrtime>0)");
+                        }
+                        return arr;
+                    } else {
+                        if (diag != null) {
+                            diag.arrtimeMissing++;
+                            diag.recordRawOnce(json, true, "matched_but_arrtime_missing");
+                        }
+                        return null;
+                    }
+                }
             }
+
+            // ✅ items는 있는데 routeId 매칭 항목이 없으면: routeIdMatchFail
+            if (!anyMatchedRoute && diag != null) {
+                diag.routeIdMatchFail++;
+                diag.recordRawOnce(json, true, "no_route_match");
+            }
+
+            return null;
+
+        } catch (Exception e) {
+            if (diag != null) {
+                diag.apiError++;
+                diag.recordRawOnce(null, null, "exception=" + e.getMessage());
+            }
+            return null;
         }
-
-        // items는 있는데 routeId 매칭 실패
-        if (anyItem && !matchedRoute) {
-            if (diag != null) diag.routeIdMatchFailCount++;
-        } else if (!anyItem) {
-            if (diag != null) diag.arrivalItemsEmptyCount++;
-        }
-
-        return null;
-
-    } catch (Exception e) {
-        if (diag != null) diag.apiErrorCount++;
-        return null;
     }
-}
 
-private Integer estimateTravelSecondsByDistanceFallback(double distanceM) {
+    private Integer estimateTravelSecondsByDistanceFallback(double distanceM) {
         if (distanceM <= 0) return null;
 
         double speedMps = (BUS_FALLBACK_SPEED_KMH * 1000.0) / 3600.0;
@@ -1134,30 +1193,6 @@ private Integer estimateTravelSecondsByDistanceFallback(double distanceM) {
             Thread.currentThread().interrupt();
         }
     }
-// =========================
-// Refine 진단(B안) DTO
-// =========================
-private static class RefineDiag {
-    private String ts;
-    private int callsBudget;
-    private int callsUsed;
-
-    private int refined;
-    private int skippedNoTime;
-
-    // 스킵 원인 분리(핵심)
-    private int arrivalItemsEmptyCount;     // arrival API 정상 응답이지만 item이 비어있음
-    private int routeIdMatchFailCount;      // item은 있는데 routeId 매칭 실패
-    private int arrtimeMissingCount;        // routeId는 맞는데 arrtime이 없거나 0
-    private int diffNonPositiveCount;       // from/to 둘 다 arrtime은 있는데 to-from <= 0
-    private int limitHitCount;              // ARRIVAL_API_LIMIT_PER_ROUTE 도달
-    private int dbFatalStopCount;           // DB 풀/커넥션 치명 상태로 강제 중단
-    private int apiErrorCount;              // JSON 파싱/호출 실패 등
-
-    private String targetRoutes;
-}
-
-
 
     private static class RouteInfo {
         private final String routeId;

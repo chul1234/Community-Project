@@ -1,6 +1,7 @@
-// 수정됨: (1) stopAutoLoop()에서 inProgress를 강제로 false로 내리지 않도록 변경(실제 작업 종료는 finally에서 처리)
-//        (2) auto 루프에서 "인터럽트 감지"를 더 촘촘하게 적용(collect/refine 전후)
-//        (3) sleepQuietly() 인터럽트 시 즉시 루프 탈출 보장
+// 수정됨: (1) runRefineOnce/autoLoop의 calls를 "arrival API 호출 예산(callsBudget)" 의미로 명확화
+//        (2) quotaRemainingToday=0이면 collect/refine 모두 스킵(트래픽 절감)
+//        (3) refine 예산을 quotaRemainingToday로 상한 처리(min)하여 초과 호출 방지
+//        (4) BusSegmentCollector에 getLastRefineDiagSummary()가 없을 수 있으므로 리플렉션으로 안전 조회(String)
 
 package com.example.demo.controller;
 
@@ -44,7 +45,10 @@ public class CollectorController {
 
     private final AtomicInteger intervalMs = new AtomicInteger(25000);
     private final AtomicInteger batchSize = new AtomicInteger(6);
-    private final AtomicInteger refineCallsPerLoop = new AtomicInteger(6);
+
+    // ✅ refineOnce(callsBudget) : arrival API 호출 예산
+    private final AtomicInteger refineCallsBudgetPerLoop = new AtomicInteger(6);
+
     private final AtomicInteger lastElapsedMs = new AtomicInteger(0);
 
     private volatile ScheduledFuture<?> future;
@@ -65,6 +69,18 @@ public class CollectorController {
     @GetMapping(value = "/collector/runOnce", produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> runOnce(@RequestParam(defaultValue = "5") int batch) {
 
+        // ✅ 쿼터가 0이면 스킵
+        if (apiQuotaManager != null && apiQuotaManager.getRemainingToday() <= 0) {
+            Map<String, Object> res = new LinkedHashMap<>();
+            res.put("ok", false);
+            res.put("message", "quotaRemainingToday=0 (skip collectOnce)");
+            res.put("batchSize", batch);
+            res.put("quotaUsedToday", apiQuotaManager.getUsedToday());
+            res.put("quotaRemainingToday", apiQuotaManager.getRemainingToday());
+            res.put("ts", LocalDateTime.now().toString());
+            return res;
+        }
+
         long st = System.currentTimeMillis();
         busSegmentCollector.collectOnce(batch);
         int elapsed = (int) (System.currentTimeMillis() - st);
@@ -79,17 +95,44 @@ public class CollectorController {
     }
 
     @GetMapping(value = "/collector/runRefineOnce", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Map<String, Object> runRefineOnce(@RequestParam(defaultValue = "6") int calls) {
+    public Map<String, Object> runRefineOnce(@RequestParam(defaultValue = "6") int callsBudget) {
+
+        // ✅ callsBudget을 quotaRemainingToday로 상한 처리
+        int effectiveBudget = callsBudget;
+
+        if (apiQuotaManager != null) {
+            int remaining = apiQuotaManager.getRemainingToday();
+
+            if (remaining <= 0) {
+                Map<String, Object> res = new LinkedHashMap<>();
+                res.put("ok", false);
+                res.put("mode", "REFINE");
+                res.put("arrivalCallsBudget", callsBudget);
+                res.put("effectiveArrivalCallsBudget", 0);
+                res.put("message", "quotaRemainingToday=0 (skip refineOnce)");
+                res.put("quotaUsedToday", apiQuotaManager.getUsedToday());
+                res.put("quotaRemainingToday", remaining);
+                res.put("lastRefineDiag", safeInvokeString(busSegmentCollector, "getLastRefineDiagSummary"));
+                return res;
+            }
+
+            effectiveBudget = Math.min(callsBudget, remaining);
+        }
 
         long st = System.currentTimeMillis();
-        invokeRefineOnceSafely(calls);
+        invokeRefineOnceSafely(effectiveBudget);
         int elapsed = (int) (System.currentTimeMillis() - st);
 
         Map<String, Object> res = new LinkedHashMap<>();
         res.put("ok", true);
         res.put("mode", "REFINE");
-        res.put("arrivalCallsBudget", calls);
+        res.put("arrivalCallsBudget", callsBudget);
+        res.put("effectiveArrivalCallsBudget", effectiveBudget);
         res.put("elapsedMs", elapsed);
+
+        // ✅ B안 진단: BusSegmentCollector에 메서드가 없을 수도 있으므로 안전 조회
+        res.put("lastRefineDiag", safeInvokeString(busSegmentCollector, "getLastRefineDiagSummary"));
+
         return res;
     }
 
@@ -114,6 +157,9 @@ public class CollectorController {
         res.put("batchSize", batchSize.get());
         res.put("intervalMs", intervalMs.get());
 
+        // ✅ refineOnce 예산(=arrivalCallsBudget) 표시
+        res.put("arrivalCallsBudgetPerLoop", refineCallsBudgetPerLoop.get());
+
         if (apiQuotaManager != null) {
             res.put("quotaUsedToday", apiQuotaManager.getUsedToday());
             res.put("quotaRemainingToday", apiQuotaManager.getRemainingToday());
@@ -126,10 +172,8 @@ public class CollectorController {
         res.put("visitedRoutesNow", safeInvokeInt(busSegmentCollector, "getVisitedRoutesCount"));
         res.put("rrIndexNow", safeInvokeInt(busSegmentCollector, "getRoundRobinIndex"));
 
-        // B안: refineOnce 진단(스킵 원인 분리) 요약
-        if (busSegmentCollector != null) {
-            res.put("lastRefineDiag", busSegmentCollector.getLastRefineDiagSummary());
-        }
+        // ✅ B안 진단(있으면 표시, 없으면 null)
+        res.put("lastRefineDiag", safeInvokeString(busSegmentCollector, "getLastRefineDiagSummary"));
 
         boolean withinWindow = isWithinOperatingWindow();
         res.put("withinWindow", withinWindow);
@@ -162,6 +206,14 @@ public class CollectorController {
                     continue;
                 }
 
+                // ✅ 쿼터가 0이면 전체 작업을 스킵(collect/refine 모두)
+                if (apiQuotaManager != null && apiQuotaManager.getRemainingToday() <= 0) {
+                    if (!sleepQuietly(intervalMs.get())) {
+                        break;
+                    }
+                    continue;
+                }
+
                 if (!inProgress.compareAndSet(false, true)) {
                     if (!sleepQuietly(intervalMs.get())) {
                         break;
@@ -185,7 +237,16 @@ public class CollectorController {
                         break;
                     }
 
-                    invokeRefineOnceSafely(refineCallsPerLoop.get());
+                    // ✅ refine 예산을 quotaRemainingToday로 상한 처리
+                    int budget = refineCallsBudgetPerLoop.get();
+                    if (apiQuotaManager != null) {
+                        int remaining = apiQuotaManager.getRemainingToday();
+                        budget = Math.min(budget, Math.max(remaining, 0));
+                    }
+
+                    if (budget > 0) {
+                        invokeRefineOnceSafely(budget);
+                    }
 
                 } catch (Exception e) {
                     System.out.println("[COLLECTOR][AUTO ERROR] " + e.getMessage());
@@ -285,10 +346,26 @@ public class CollectorController {
         }
     }
 
-    private void invokeRefineOnceSafely(int calls) {
+    private String safeInvokeString(Object target, String methodName) {
+        if (target == null || methodName == null || methodName.trim().isEmpty()) {
+            return null;
+        }
+
+        try {
+            Method m = target.getClass().getMethod(methodName);
+            Object v = m.invoke(target);
+
+            if (v == null) return null;
+            return String.valueOf(v);
+        } catch (Exception ignore) {
+            return null;
+        }
+    }
+
+    private void invokeRefineOnceSafely(int callsBudget) {
         try {
             Method m = busSegmentCollector.getClass().getMethod("refineOnce", int.class);
-            m.invoke(busSegmentCollector, calls);
+            m.invoke(busSegmentCollector, callsBudget);
         } catch (NoSuchMethodException e) {
             // refineOnce 미구현 버전: 무시
         } catch (Exception e) {
