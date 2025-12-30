@@ -48,7 +48,10 @@ public class BusSegmentCollector {
 
     // ✅ 2차(Refine) 모드에서 arrival API 호출을 너무 많이 하지 않도록 노선당 호출 상한
     //    - 상한을 넘으면 해당 노선은 남은 구간을 거리 기반 fallback으로 처리한다(멈춤 방지)
-    private static final int ARRIVAL_API_LIMIT_PER_ROUTE = 80;
+    // ✅ 트래픽 최소화 최우선: 노선당 arrival API 호출 상한을 강하게 낮춘다.
+    //    - 기존 80은 "성과(=arrivalUsed) 0"인 노선에서도 쿼터를 태우는 최악의 패턴이었다.
+    //    - 이 값은 '정확도'보다 '호출 최소화'를 우선하는 정책값이다.
+    private static final int ARRIVAL_API_LIMIT_PER_ROUTE = 3;
 
     // =========================
     // TAGO 기본 설정
@@ -123,6 +126,12 @@ public class BusSegmentCollector {
 
     @Autowired
     private DataSource dataSource;
+
+    // ✅ 전역 호출 예산(일일 10,000) 강제 적용
+    //    - arrival API 호출은 반드시 tryConsume(1) 성공한 경우에만 수행한다.
+    //    - 예산 소진 시: 즉시 null 반환 → fallback(거리 기반)으로 진행되며, 추가 호출은 발생하지 않는다.
+    @Autowired
+    private ApiQuotaManager apiQuotaManager;
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -848,13 +857,21 @@ public class BusSegmentCollector {
             return arrivalCache.get(nodeId);
         }
 
-        // ✅ per-route 제한(기존 유지)
+        // ✅ per-route 제한(트래픽 최소화)
         if (arrivalApiCalls != null && arrivalApiCalls.length > 0) {
             if (arrivalApiCalls[0] >= ARRIVAL_API_LIMIT_PER_ROUTE) {
                 if (diag != null) diag.limitHit++;
                 arrivalCache.put(nodeId, null);
                 return null;
             }
+            // ✅ 전역 일일 쿼터 체크(호출 직전)
+            //    - 호출을 "막는" 것이지 호출 수를 늘리지 않는다.
+            if (apiQuotaManager != null && !apiQuotaManager.tryConsume(1)) {
+                if (diag != null) diag.limitHit++;
+                arrivalCache.put(nodeId, null);
+                return null;
+            }
+
             arrivalApiCalls[0]++;
         }
 
