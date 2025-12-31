@@ -19,6 +19,7 @@ public interface IPathService {
      * - fromLat/fromLng : 출발 좌표 (WGS84 위경도)
      * - toLat/toLng     : 도착 좌표 (WGS84 위경도)
      * - snapRadiusM     : 출발/도착을 정류장/정거장에 스냅시키는 반경(m), 정책 기본 500m
+     * - maxTransfers    : 허용 환승 횟수(0=직행만, 1=1회 환승까지, ...). 기본 2
      *
      * 출력(Map):
      * - totalMinutes : 총 소요시간(분)
@@ -29,7 +30,7 @@ public interface IPathService {
      * - BUS(segment_weight) + 출발/도착 도보 스냅 기반
      * - TRAM/arrtime/환승 정책은 이후 단계에서 확장
      */
-    Map<String, Object> solve(double fromLat, double fromLng, double toLat, double toLng, double snapRadiusM);
+    Map<String, Object> solve(double fromLat, double fromLng, double toLat, double toLng, double snapRadiusM, int maxTransfers);
 }
 
 // 추가됨 끝

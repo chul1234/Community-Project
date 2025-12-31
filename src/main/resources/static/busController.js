@@ -53,6 +53,9 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     $scope.pathStartStop = null;
     $scope.pathTotalMinutes = null; // 최단 경로 총 소요시간(분)
 
+    // ★ [추가] 허용 환승 횟수(0=직행만, 1=1회 환승까지, ...)
+    $scope.pathMaxTransfers = 2; // 기본 2회(=승차 3회)로 기존 정책과 동일
+
     $scope.pathPreTransferMinutes = null;  // 환승 전(첫 탑승 블록) 총 시간(분)
     $scope.pathWalkMinutes = null;         // 도보(환승 보행) 총 시간(분)
     $scope.pathPostTransferMinutes = null; // 환승 후(두 번째 탑승 블록 이후) 총 시간(분)
@@ -1936,6 +1939,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             toLat: endLat,
             toLng: endLng,
             snapRadiusM: 450, // 도보 스냅 반경 (450m)
+            maxTransfers: $scope.pathMaxTransfers, // 허용 환승 횟수
         };
 
         $http

@@ -142,7 +142,7 @@ public class PathServiceImpl implements IPathService {
      * * 4. 다익스트라 알고리즘으로 최단 시간 경로 탐색
      */
     @Override
-    public Map<String, Object> solve(double fromLat, double fromLng, double toLat, double toLng, double snapRadiusM) {
+    public Map<String, Object> solve(double fromLat, double fromLng, double toLat, double toLng, double snapRadiusM, int maxTransfers) {
 
         // 0. 트램 데이터 로드
         initTramData();
@@ -293,7 +293,7 @@ public class PathServiceImpl implements IPathService {
         // ---------------------------------------------------------
         // (5) 다익스트라로 최단시간 탐색
         // ---------------------------------------------------------
-        DijkstraResult result = dijkstra(graph, START_ID, END_ID);
+        DijkstraResult result = dijkstra(graph, START_ID, END_ID, maxTransfers);
 
         // ---------------------------------------------------------
         // (6) 경로가 없으면 빈 결과 반환
@@ -393,10 +393,26 @@ private String getTramNameByNodeId(String nodeId) {
     }
     return null;
 }
+/**
+ * 허용 환승 횟수(maxTransfers)를 "승차 횟수 상한(MAX_RIDES)"으로 변환한다.
+ *
+ * 규칙:
+ * - 환승 0회 → 승차 1회 (직행만)
+ * - 환승 N회 → 승차 N+1회
+ * - 음수 입력 방지
+ * - 상태 폭발 방지를 위해 상한 캡 적용
+ */
+private int clampMaxRides(int maxTransfers) {
+    int safeTransfers = Math.max(0, maxTransfers); // 음수 방지
+    int rides = safeTransfers + 1;                 // 환승 + 1 = 승차 횟수
+    int MAX_CAP = 10;                              // 안전 상한(정책값)
+    return Math.min(rides, MAX_CAP);
+}
+// ✅ 여기까지 추가
 // =========================
     // 다익스트라 알고리즘
     // =========================
-    private DijkstraResult dijkstra(Map<String, List<Edge>> graph, String startId, String endId) {
+    private DijkstraResult dijkstra(Map<String, List<Edge>> graph, String startId, String endId, int maxTransfers) {
         // ---------------------------------------------------------
         // 상태 기반 다익스트라:
         // - 현실 제약: 승차(버스/트램) 횟수 상한(MAX_RIDES) 적용
@@ -406,7 +422,7 @@ private String getTramNameByNodeId(String nodeId) {
         // - BUS/TRAM 간선을 "처음 타는 순간" 또는 "다른 노선/다른 모드로 갈아타는 순간"에 +1
         // - WALK는 승차 카운트 증가 없음
         // ---------------------------------------------------------
-        final int MAX_RIDES = 3; // 최대 3대(버스/트램 합산)까지만 허용
+        final int MAX_RIDES = clampMaxRides(maxTransfers); // 입력 환승 수 기반 승차 상한(=환승+1)
         final double TRANSFER_PENALTY_MIN = 4.0; // 환승/재승차 1회당 페널티(분)
 
         Map<String, Double> dist = new HashMap<>();

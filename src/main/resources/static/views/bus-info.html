@@ -175,6 +175,23 @@
                         </button>
                     </div>
 
+
+                    <div class="path-line">
+                        <span class="path-label">환승</span>
+                        <span class="path-value">
+                            <input
+                                type="number"
+                                ng-model="pathMaxTransfers"
+                                min="0"
+                                max="10"
+                                step="1"
+                                class="input-mini"
+                                title="허용 환승 횟수 (0=직행만, 1=1회 환승까지, ...)"
+                            />
+                            <span class="path-subhint">회 (0=직행)</span>
+                        </span>
+                    </div>
+
                     <div class="path-actions">
                         <button
                             type="button"

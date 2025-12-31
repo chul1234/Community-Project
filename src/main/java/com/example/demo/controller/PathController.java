@@ -29,7 +29,7 @@ public class PathController {
      * 최단경로 계산
      *
      * 호출 예시:
-     * /api/path/solve?fromLat=36.3&fromLng=127.3&toLat=36.35&toLng=127.34&snapRadiusM=500
+     * /api/path/solve?fromLat=36.3&fromLng=127.3&toLat=36.35&toLng=127.34&snapRadiusM=500&maxTransfers=2
      *
      * - 현재 1단계 구현:
      *   BUS(segment_weight) + 출발/도착 도보 스냅(500m)
@@ -40,6 +40,7 @@ public class PathController {
      * @param toLat 도착 위도(WGS84)
      * @param toLng 도착 경도(WGS84)
      * @param snapRadiusM 스냅 반경(m), 기본 500m
+     * @param maxTransfers 허용 환승 횟수(0=직행만, 1=1회 환승까지, ...), 기본 2
      * @return 최단경로 결과(Map) - totalMinutes, segments 등 포함
      */
     @CrossOrigin // 프론트 호출 편의를 위해 CORS 허용(프로젝트 기존 방식과 동일하게 운용 가능)
@@ -49,11 +50,12 @@ public class PathController {
         @RequestParam("fromLng") double fromLng, // 출발 경도
         @RequestParam("toLat") double toLat, // 도착 위도
         @RequestParam("toLng") double toLng, // 도착 경도
-        @RequestParam(value = "snapRadiusM", defaultValue = "500") double snapRadiusM // 스냅 반경(m)
+        @RequestParam(value = "snapRadiusM", defaultValue = "500") double snapRadiusM, // 스냅 반경(m)
+        @RequestParam(value = "maxTransfers", defaultValue = "2") int maxTransfers // 허용 환승 횟수
     ) {
 
         // Service에 계산 위임 후 결과(Map)를 그대로 반환(JSON 자동 변환)
-        return pathService.solve(fromLat, fromLng, toLat, toLng, snapRadiusM);
+        return pathService.solve(fromLat, fromLng, toLat, toLng, snapRadiusM, maxTransfers);
     }
 }
 
