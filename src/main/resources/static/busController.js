@@ -1977,15 +1977,31 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             if (m === 'BUS') {
                 rideTotal += min;
 
-                var routeId = seg && (seg.routeId || seg.routeid);
-                var routeNo = (seg && seg.routeNo) || (routeId ? pathRouteNoMap[routeId] : null);
-                var label = routeNo ? ('버스 ' + routeNo) : '버스';
+                // routeId/routeNo 키 표기가 응답마다 달라질 수 있어(예: routeId/routeid/route_id, routeNo/routeno/route_no)
+                // 가능한 키를 모두 수용하고, 최종 표시는 trim()된 값만 사용한다.
+                var routeId =
+                    seg &&
+                    (seg.routeId || seg.routeid || seg.route_id || seg.routeID);
+
+                var rawRouteNo =
+                    (seg && (seg.routeNo || seg.routeno || seg.route_no || seg.routeNO)) ||
+                    (routeId ? pathRouteNoMap[String(routeId)] : null);
+
+                var routeNo = rawRouteNo != null ? String(rawRouteNo).trim() : '';
+
+                // routeNo가 이미 "606번" 형태로 오는 경우가 있어, 중복 "번"을 방지한다.
+                // - 상세 패널은 hover 툴팁과 동일한 표기(버스(606번))로 통일한다.
+                if (routeNo && /번\s*$/.test(routeNo)) {
+                    routeNo = routeNo.replace(/번\s*$/, '').trim();
+                }
+
+                var label = routeNo ? ('버스(' + routeNo + '번)') : '버스';
 
                 parts.push({
                     type: 'RIDE',
                     label: label,
                     minutes: Math.round(min),
-                    meta: { routeId: routeId || seg.routeId, updowncd: seg.updowncd },
+                    meta: { routeId: routeId || seg.routeId || seg.routeid || seg.route_id, updowncd: seg.updowncd },
                 });
             } else if (m === 'TRAM') {
                 rideTotal += min;
@@ -1996,13 +2012,18 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                     meta: { routeId: seg.routeId },
                 });
             } else if (m === 'WALK') {
-                walkTotal += min;
-                parts.push({
-                    type: 'WALK',
-                    label: '도보',
-                    minutes: Math.round(min),
-                    meta: {},
-                });
+                // 도보 0분(또는 음수) 구간은 UI에서 노이즈이므로 제외한다.
+                // - 스냅/환승 연결에서 0초 WALK가 생길 수 있음
+                // - 도보 횟수/상세 리스트가 부풀려지는 문제를 방지
+                if (min > 0) {
+                    walkTotal += min;
+                    parts.push({
+                        type: 'WALK',
+                        label: '도보',
+                        minutes: Math.round(min),
+                        meta: {},
+                    });
+                }
             } else {
                 // 알 수 없는 모드도 표시가 깨지지 않게 안전 처리
                 parts.push({
@@ -2313,7 +2334,8 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             segments.forEach(function (seg) {
                 if (!seg) return;
                 if (seg.mode !== 'BUS') return;
-                var rid = seg.routeId || null;
+                // routeId 키가 케이스/표기(routeId/routeid/route_id 등)별로 달라질 수 있어 전부 커버한다.
+                var rid = seg.routeId || seg.routeid || seg.route_id || null;
                 if (!rid) return;
                 routeIds.push(String(rid));
             });
