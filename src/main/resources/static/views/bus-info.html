@@ -77,15 +77,44 @@
                 <span class="path-hint" ng-if="!pathStartStop || !pathEndStop">
                     (목록에서 '출발'/'도착' 버튼을 눌러 선택)
                 </span>
+<!-- 경로 요약(간결) + 상세 펼침(대기 미표시) -->
+                <div class="path-summary" ng-if="pathTotalMinutes != null">
+                    <span class="path-summary-item">🕒 약 {{ pathTotalMinutes }}분</span>
+                    <span class="path-summary-sep">|</span>
+                    <span class="path-summary-item">🚌 승차 {{ pathRideCount }}회</span>
+                    <span class="path-summary-sep">|</span>
+                    <span class="path-summary-item">🔁 환승 {{ pathUsedTransfers }}회</span>
+                    <span class="path-summary-sep">|</span>
+                    <span class="path-summary-item">🚶 도보 {{ pathWalkCount }}회</span>
 
-                <span class="path-total" ng-if="pathTotalMinutes != null">
-                    약 {{ pathTotalMinutes }}분
-                </span>
-            
+                    <button
+                        type="button"
+                        class="path-details-toggle"
+                        ng-click="togglePathDetails()"
+                        ng-if="pathDisplayParts && pathDisplayParts.length > 0"
+                    >
+                        {{ isPathDetailsOpen ? '탑승 상세 ▲' : '탑승 상세 ▼' }}
+                    </button>
+                </div>
 
-                <span class="path-breakdown" ng-if="pathPreTransferMinutes != null">
-                    (환승 전 {{ pathPreTransferMinutes }}분 / 도보 {{ pathWalkMinutes }}분 / 환승 후 {{ pathPostTransferMinutes }}분)
-                </span>
+                <div
+                    class="path-details"
+                    ng-if="isPathDetailsOpen && pathDisplayParts && pathDisplayParts.length > 0"
+                >
+                    <div class="path-details-list">
+                        <div
+                            class="path-details-item"
+                            ng-repeat="p in pathDisplayParts track by $index"
+                        >
+                            <span class="path-step-index">{{$index + 1}}.</span>
+                            <span class="path-step-icon" ng-if="p.type === 'WALK'">🚶</span>
+                            <span class="path-step-icon" ng-if="p.type === 'RIDE'">🚌</span>
+                            <span class="path-step-icon" ng-if="p.type !== 'WALK' && p.type !== 'RIDE'">•</span>
+                            <span class="path-step-text">{{ p.label }} {{ p.minutes }}분</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- 경로 요약(간결) + 상세 펼침 끝 -->
 </div>
 
             <!-- 지도 프레임 -->

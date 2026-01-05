@@ -1,3 +1,7 @@
+// 수정됨: (1) computePathPartsV2() 아래 불필요한 중괄호 제거로 JS 파싱 오류 해결
+//        (2) hover 툴팁 lastHoverFeature/Coord 중복 대입 제거
+//        (3) BUS 하행(updowncd=1) 점선 표시가 주석/의도와 다르던 부분 수정(lineDash 적용)
+
 // =========================================================
 // [최종 수정] busController.js
 // 수정 사항: 최단 경로 화살표 회전 각도 오류 수정 (rotation: -angle)
@@ -55,6 +59,20 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
     // ★ [추가] 허용 환승 횟수(0=직행만, 1=1회 환승까지, ...)
     $scope.pathMaxTransfers = 2; // 기본 2회(=승차 3회)로 기존 정책과 동일
+
+    // ★ [추가] 다회 환승(2회/3회...) breakdown 표시를 위한 파트 배열
+    $scope.pathParts = [];              // [{type:'RIDE'|'WALK'|'WAIT', label, minutes, meta}]
+    $scope.pathRideTotalMinutes = null; // 승차(버스/트램) 총 시간(분)
+    $scope.pathWalkTotalMinutes = null; // 도보 총 시간(분)
+    $scope.pathWaitTotalMinutes = null; // 환승 대기(패널티) 총 시간(분)
+    $scope.pathUsedTransfers = null;    // 실제 사용 환승 수
+    $scope.pathExactTransfersMatched = null; // 요청 환승 수 정확히 일치 여부
+
+    // 경로 표시(UI)용: 대기(WAIT) 미표시 + 요약/토글
+    $scope.pathDisplayParts = [];       // WAIT 제외한 표시용 파트 배열
+    $scope.pathRideCount = 0;           // 승차(버스/트램) 횟수
+    $scope.pathWalkCount = 0;           // 도보 파트 횟수
+    $scope.isPathDetailsOpen = false;   // 탑승 상세 펼침 상태
 
     $scope.pathPreTransferMinutes = null;  // 환승 전(첫 탑승 블록) 총 시간(분)
     $scope.pathWalkMinutes = null;         // 도보(환승 보행) 총 시간(분)
@@ -369,7 +387,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
             if (mode === 'BUS' && updowncd === 1) {
                 // 하행은 점선으로 구분 (동일한 라인이라도 방향 차이를 눈으로 확인 가능)
-                lineDash = null;
+                lineDash = [10, 10];
             }
 
             if (mode === 'TRAM') {
@@ -620,9 +638,6 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             }
 
             // 현재 hover 중인 feature/좌표를 저장(비동기 이름 보완 시 툴팁 갱신에 사용)
-            lastHoverFeature = feature;
-            lastHoverCoord = evt.coordinate;
-
             lastHoverFeature = feature;
             lastHoverCoord = evt.coordinate;
 
@@ -1911,6 +1926,117 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         return { pre: Math.round(total2), walk: 0, post: 0 };
     }
 
+    // =========================
+    // [경로] 다회 환승 breakdown (파트 배열)
+    // =========================
+    function computePathPartsV2(segments, usedTransfers, transferPenaltyMin) {
+        if (!segments || segments.length === 0) {
+            return {
+                parts: [],
+                ride: 0,
+                walk: 0,
+                wait: 0,
+            };
+        }
+
+        function modeUpper(seg) {
+            return String((seg && seg.mode) || '').toUpperCase();
+        }
+
+        var parts = [];
+        var rideTotal = 0;
+        var walkTotal = 0;
+
+        // (1) 세그먼트를 순서대로 파트로 변환 (BUS/TRAM/WALK)
+        segments.forEach(function (seg) {
+            var m = modeUpper(seg);
+            var min = Number((seg && seg.minutes) || 0);
+
+            if (m === 'BUS') {
+                rideTotal += min;
+                parts.push({
+                    type: 'RIDE',
+                    label: '버스',
+                    minutes: Math.round(min),
+                    meta: { routeId: seg.routeId, updowncd: seg.updowncd },
+                });
+            } else if (m === 'TRAM') {
+                rideTotal += min;
+                parts.push({
+                    type: 'RIDE',
+                    label: '트램',
+                    minutes: Math.round(min),
+                    meta: { routeId: seg.routeId },
+                });
+            } else if (m === 'WALK') {
+                walkTotal += min;
+                parts.push({
+                    type: 'WALK',
+                    label: '도보',
+                    minutes: Math.round(min),
+                    meta: {},
+                });
+            } else {
+                // 알 수 없는 모드도 표시가 깨지지 않게 안전 처리
+                parts.push({
+                    type: 'ETC',
+                    label: m || 'ETC',
+                    minutes: Math.round(min),
+                    meta: {},
+                });
+            }
+        });
+
+        // (2) usedTransfers 만큼 "환승 대기(패널티)"를 파트로 삽입
+        // - 삽입 위치: "다음 RIDE가 시작되기 직전" (첫 RIDE 앞은 제외)
+        var waitCount = Math.max(0, Number(usedTransfers || 0));
+        var waitMinEach = Number(transferPenaltyMin || 0);
+        var waitTotal = 0;
+
+        if (waitCount > 0 && waitMinEach > 0) {
+            var inserted = 0;
+            var newParts = [];
+            var rideSeen = 0;
+
+            for (var i = 0; i < parts.length; i++) {
+                var p = parts[i];
+
+                if (p.type === 'RIDE') {
+                    rideSeen += 1;
+
+                    // 두 번째 승차부터가 "환승" 시점 → 그 직전에 WAIT 삽입
+                    if (rideSeen >= 2 && inserted < waitCount) {
+                        waitTotal += waitMinEach;
+                        newParts.push({
+                            type: 'WAIT',
+                            label: '환승 대기',
+                            minutes: Math.round(waitMinEach),
+                            meta: { transferIndex: inserted + 1 },
+                        });
+                        inserted += 1;
+                    }
+                }
+
+                newParts.push(p);
+            }
+
+            parts = newParts;
+        }
+
+        return {
+            parts: parts,
+            ride: Math.round(rideTotal),
+            walk: Math.round(walkTotal),
+            wait: Math.round(waitTotal),
+        };
+    }
+
+
+    // 탑승 상세(대기 미표시) 토글
+    $scope.togglePathDetails = function () {
+        $scope.isPathDetailsOpen = !$scope.isPathDetailsOpen;
+    };
+
     $scope.solvePath = function () {
         // 유효성 검사: 사용자가 출발/도착지를 모두 선택했는지 확인
         if (!$scope.pathStartStop || !$scope.pathEndStop) {
@@ -1931,6 +2057,12 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             alert('선택한 정류장의 좌표 정보가 유효하지 않습니다.');
             return;
         }
+
+        // 이전 경로 표시 상태 초기화(새 계산 시작)
+        $scope.pathDisplayParts = [];
+        $scope.pathRideCount = 0;
+        $scope.pathWalkCount = 0;
+        $scope.isPathDetailsOpen = false;
 
         // 파라미터 구성
         var params = {
@@ -1958,10 +2090,44 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 var eName = e.nodenm || e.stationName;
                 $scope.pathTotalMinutes = totalMin;
 
-                var breakdown = computePathTimeBreakdown(data.segments);
-                $scope.pathPreTransferMinutes = breakdown.pre;
-                $scope.pathWalkMinutes = breakdown.walk;
-                $scope.pathPostTransferMinutes = breakdown.post;
+                // 다회 환승 breakdown (파트 배열)
+                $scope.pathUsedTransfers = data.usedTransfers;
+                $scope.pathExactTransfersMatched = data.exactTransfersMatched;
+
+                var partsResult = computePathPartsV2(
+                    data.segments,
+                    data.usedTransfers,
+                    data.transferPenaltyMin
+                );
+
+                $scope.pathParts = partsResult.parts;
+                $scope.pathRideTotalMinutes = partsResult.ride;
+                $scope.pathWalkTotalMinutes = partsResult.walk;
+                $scope.pathWaitTotalMinutes = partsResult.wait;
+
+                // UI 표시용(대기 미표시): WAIT 파트 제거 + 요약 카운트 계산
+                $scope.pathDisplayParts = (partsResult.parts || []).filter(function (p) {
+                    return p && p.type !== 'WAIT';
+                });
+
+                var rideCount = 0;
+                var walkCount = 0;
+                ($scope.pathDisplayParts || []).forEach(function (p) {
+                    if (!p) return;
+                    if (p.type === 'RIDE') rideCount += 1;
+                    if (p.type === 'WALK') walkCount += 1;
+                });
+
+                $scope.pathRideCount = rideCount;
+                $scope.pathWalkCount = walkCount;
+
+                // 경로가 새로 계산되면 기본은 접힘(간결 표시)
+                $scope.isPathDetailsOpen = false;
+
+                // 기존 1회 환승 전용 breakdown 변수는 더 이상 사용하지 않음(표시 방지)
+                $scope.pathPreTransferMinutes = null;
+                $scope.pathWalkMinutes = null;
+                $scope.pathPostTransferMinutes = null;
 
                 // 경로 그리기 호출
                 drawCalculatedPath(data.segments);
@@ -2214,3 +2380,5 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     // 페이지 진입 시: 상태 1회 확인(ON이면 applyCollectorStatus가 폴링 시작)
     refreshCollectorStatus();
 });
+
+// 수정됨 끝

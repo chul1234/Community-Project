@@ -29,6 +29,9 @@ public class PathServiceImpl implements IPathService {
     // 트램 속도: 35km/h (표정속도)
     private static final double TRAM_SPEED_KMPH = 35.0;
 
+    // 환승/재승차 패널티: 1회당 고정 페널티(분)
+    private static final double TRANSFER_PENALTY_MIN = 4.0;
+
     // START/END 가상 노드 ID
     private static final String START_ID = "__START__";
     private static final String END_ID = "__END__";
@@ -325,6 +328,10 @@ public class PathServiceImpl implements IPathService {
         out.put("requestedTransfers", maxTransfers);
         int usedTransfers = (result.usedRides <= 0 ? 0 : Math.max(0, result.usedRides - 1));
         out.put("usedTransfers", usedTransfers);
+
+        // 환승 패널티 정보 (프론트에서 breakdown 총합을 totalMinutes와 일치시키기 위해 제공)
+        out.put("transferPenaltyMin", TRANSFER_PENALTY_MIN);
+        out.put("transferPenaltyTotalMinutes", usedTransfers * TRANSFER_PENALTY_MIN);
         out.put("exactTransfersMatched", Boolean.valueOf(result.exactMatched));
         if (!result.exactMatched) {
             out.put("reason", "NO_PATH_EXACT_TRANSFERS_FALLBACK");
@@ -434,7 +441,6 @@ private int clampMaxRides(int maxTransfers) {
         // - WALK는 승차 카운트 증가 없음
         // ---------------------------------------------------------
         final int MAX_RIDES = clampMaxRides(maxTransfers); // 입력 환승 수 기반 승차 상한(=환승+1)
-        final double TRANSFER_PENALTY_MIN = 4.0; // 환승/재승차 1회당 페널티(분)
 
         Map<String, Double> dist = new HashMap<>();
         Map<String, String> prevState = new HashMap<>();
