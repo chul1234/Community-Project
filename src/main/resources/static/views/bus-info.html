@@ -82,10 +82,10 @@
 
                 <div class="bus-path-drawer-route">
                     <span class="label">출발</span>
-                    <span class="value">{{ routeStartName || '미선택' }}</span>
+                    <span class="value">{{ (pathStartStop && (pathStartStop.nodenm || pathStartStop.name)) || '미선택' }}</span>
                     <span class="sep">→</span>
                     <span class="label">도착</span>
-                    <span class="value">{{ routeEndName || '미선택' }}</span>
+                    <span class="value">{{ (pathEndStop && (pathEndStop.nodenm || pathEndStop.name)) || '미선택' }}</span>
                 </div>
 
                 <div class="bus-path-drawer-steps" ng-if="pathDisplayParts && pathDisplayParts.length">

@@ -413,6 +413,26 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     //    기존 /api/bus/locations 호출 결과의 routenm(=버스 번호/명칭)을 이용해 표시한다.
     // -------------------------
     var pathRouteNoMap = {}; // { routeId: '101', ... }
+
+    // 탑승 상세(경로 파트)에서 '버스 번호'가 보이도록,
+    // routeId -> routeNo 매핑이 갱신되면 경로 파트를 한 번 재계산한다.
+    var pathDisplayPartsRebuildScheduled = false;
+
+    function schedulePathDisplayPartsRebuild() {
+        if (pathDisplayPartsRebuildScheduled) {
+            return;
+        }
+        pathDisplayPartsRebuildScheduled = true;
+
+        $timeout(function () {
+            pathDisplayPartsRebuildScheduled = false;
+
+            if ($scope.pathSegments && Array.isArray($scope.pathSegments) && $scope.pathSegments.length > 0) {
+                $scope.pathDisplayParts = computePathPartsV2($scope.pathSegments);
+            }
+        }, 0);
+    }
+
     var pathRouteNoLoadingMap = {}; // { routeId: true } 중복 호출 방지
 
     // -------------------------
@@ -461,6 +481,8 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                     var routeNo = extractRouteNoFromBusLocationResponse(parsed);
                     if (routeNo) {
                         pathRouteNoMap[rid] = routeNo;
+
+                        schedulePathDisplayPartsRebuild();
                     }
                 })
                 .catch(function (err) {
@@ -1954,11 +1976,16 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
             if (m === 'BUS') {
                 rideTotal += min;
+
+                var routeId = seg && (seg.routeId || seg.routeid);
+                var routeNo = (seg && seg.routeNo) || (routeId ? pathRouteNoMap[routeId] : null);
+                var label = routeNo ? ('버스 ' + routeNo) : '버스';
+
                 parts.push({
                     type: 'RIDE',
-                    label: '버스',
+                    label: label,
                     minutes: Math.round(min),
-                    meta: { routeId: seg.routeId, updowncd: seg.updowncd },
+                    meta: { routeId: routeId || seg.routeId, updowncd: seg.updowncd },
                 });
             } else if (m === 'TRAM') {
                 rideTotal += min;

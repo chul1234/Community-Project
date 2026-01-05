@@ -1441,7 +1441,7 @@ header h1 {
 
 .bus-path-drawer {
     position: fixed;
-    left: 16px;
+    left: calc(50% - 550px - 380px);
     top: 220px;
     width: 320px;
     max-width: calc(100vw - 32px);
@@ -1475,6 +1475,12 @@ header h1 {
     align-items: center;
     justify-content: center;
 }
+@media (max-width: 1500px) {
+    .bus-path-drawer {
+        left: 16px;
+    }
+}
+
 
 .bus-path-drawer-tab:hover {
     background: #f8f9fa;
