@@ -387,7 +387,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
             if (mode === 'BUS' && updowncd === 1) {
                 // 하행은 점선으로 구분 (동일한 라인이라도 방향 차이를 눈으로 확인 가능)
-                lineDash = [10, 10];
+                lineDash = null;
             }
 
             if (mode === 'TRAM') {
@@ -525,8 +525,8 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     // -------------------------
     // 노선 라인 화살표
     // -------------------------
-    var ROUTE_ARROW_EVERY_N_SEGMENTS = 2;
-    var ROUTE_ARROW_MIN_SEGMENT_LEN = 30;
+    var ROUTE_ARROW_EVERY_N_SEGMENTS = 1;
+    var ROUTE_ARROW_MIN_SEGMENT_LEN = 20;
     var ROUTE_ARROW_ROTATION_OFFSET = 0;
     var routeArrowStyleCache = {};
 
@@ -2245,7 +2245,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
             // 5. 화살표(Arrow) 그리기 (도보 제외, 긴 구간만)
             if (seg.mode !== 'WALK' && transformedCoords.length > 3) {
-                var arrowStep = 5;
+                var arrowStep = 3;
                 for (var i = 0; i < transformedCoords.length - 1; i += arrowStep) {
                     var p1 = transformedCoords[i];
                     var p2 = transformedCoords[i + 1];
