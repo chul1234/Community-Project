@@ -60,6 +60,49 @@
 
     <!-- 메인 레이아웃: 좌(지도) + 우(컨트롤) -->
     <div class="bus-main-grid">
+
+        <!--
+            탑승 상세(경로 단계)만 "좌측 슬라이드 드로어"로 분리
+            - 다른 패널(검색/경로설정/목록/지도)은 기존 위치 그대로 유지
+            - 토글 버튼은 (1) 상단 경로 스트립의 "탑승 상세" 버튼, (2) 드로어 탭(화살표) 제공
+        -->
+        <div class="bus-path-drawer" ng-class="{ 'open': isPathDetailsOpen }">
+            <button
+                type="button"
+                class="bus-path-drawer-tab"
+                ng-click="togglePathDetails()"
+                aria-label="탑승 상세 열기/닫기"
+            >
+                <span ng-if="!isPathDetailsOpen">▶</span>
+                <span ng-if="isPathDetailsOpen">◀</span>
+            </button>
+
+            <div class="bus-path-drawer-body">
+                <div class="bus-path-drawer-title">탑승 상세</div>
+
+                <div class="bus-path-drawer-route">
+                    <span class="label">출발</span>
+                    <span class="value">{{ routeStartName || '미선택' }}</span>
+                    <span class="sep">→</span>
+                    <span class="label">도착</span>
+                    <span class="value">{{ routeEndName || '미선택' }}</span>
+                </div>
+
+                <div class="bus-path-drawer-steps" ng-if="pathDisplayParts && pathDisplayParts.length">
+                    <div class="bus-path-drawer-step" ng-repeat="p in pathDisplayParts track by $index">
+                        <span class="step-idx">{{$index + 1}}.</span>
+                        <span class="step-icon" ng-if="p.type === 'WALK'">🚶</span>
+                        <span class="step-icon" ng-if="p.type === 'RIDE'">🚌</span>
+                        <span class="step-icon" ng-if="p.type !== 'WALK' && p.type !== 'RIDE'">•</span>
+                        <span class="step-text">{{ p.label }} {{ p.minutes }}분</span>
+                    </div>
+                </div>
+
+                <div class="bus-path-drawer-empty" ng-if="!(pathDisplayParts && pathDisplayParts.length)">
+                    아직 경로가 없습니다.
+                </div>
+            </div>
+        </div>
         <!-- 좌측: 지도 영역 -->
         <div class="bus-map-area">
             <!-- 현재 경로 요약(지도 위) -->
@@ -97,23 +140,7 @@
                     </button>
                 </div>
 
-                <div
-                    class="path-details"
-                    ng-if="isPathDetailsOpen && pathDisplayParts && pathDisplayParts.length > 0"
-                >
-                    <div class="path-details-list">
-                        <div
-                            class="path-details-item"
-                            ng-repeat="p in pathDisplayParts track by $index"
-                        >
-                            <span class="path-step-index">{{$index + 1}}.</span>
-                            <span class="path-step-icon" ng-if="p.type === 'WALK'">🚶</span>
-                            <span class="path-step-icon" ng-if="p.type === 'RIDE'">🚌</span>
-                            <span class="path-step-icon" ng-if="p.type !== 'WALK' && p.type !== 'RIDE'">•</span>
-                            <span class="path-step-text">{{ p.label }} {{ p.minutes }}분</span>
-                        </div>
-                    </div>
-                </div>
+                <!-- (탑승 상세는 좌측 드로어로 이동) -->
                 <!-- 경로 요약(간결) + 상세 펼침 끝 -->
 </div>
 

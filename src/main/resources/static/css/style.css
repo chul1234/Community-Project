@@ -1434,6 +1434,141 @@ header h1 {
     white-space: nowrap;
 }
 
+/* ======================================================================
+   버스 경로 "탑승 상세" 좌측 슬라이드 드로어 (네이버 지도 스타일)
+   - 기존 레이아웃(지도/우측 패널)은 그대로 두고, 탑승 상세만 분리
+   ====================================================================== */
+
+.bus-path-drawer {
+    position: fixed;
+    left: 16px;
+    top: 220px;
+    width: 320px;
+    max-width: calc(100vw - 32px);
+    background: #ffffff;
+    border: 1px solid #e9ecef;
+    border-radius: 14px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+    z-index: 999;
+    overflow: hidden;
+    transform: translateX(calc(-100% + 34px));
+    transition: transform 180ms ease;
+}
+
+.bus-path-drawer.open {
+    transform: translateX(0);
+}
+
+.bus-path-drawer-tab {
+    position: absolute;
+    top: 18px;
+    right: -34px;
+    width: 34px;
+    height: 48px;
+    border: 1px solid #e9ecef;
+    border-left: none;
+    border-radius: 0 12px 12px 0;
+    background: #ffffff;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bus-path-drawer-tab:hover {
+    background: #f8f9fa;
+}
+
+.bus-path-drawer-arrow {
+    font-size: 16px;
+    font-weight: 900;
+    color: #495057;
+    line-height: 1;
+}
+
+.bus-path-drawer-body {
+    padding: 12px 12px 14px;
+}
+
+.bus-path-drawer-title {
+    font-size: 13px;
+    font-weight: 900;
+    margin-bottom: 8px;
+}
+
+.bus-path-drawer-route {
+    font-size: 12px;
+    color: #495057;
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+.bus-path-drawer-route .label {
+    color: #868e96;
+    margin-right: 4px;
+}
+
+.bus-path-drawer-route .val {
+    font-weight: 900;
+}
+
+.bus-path-drawer-route .val.start {
+    color: #0b5ed7;
+}
+
+.bus-path-drawer-route .val.end {
+    color: #dc3545;
+}
+
+.bus-path-drawer-steps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bus-path-drawer-steps li {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+    color: #212529;
+}
+
+.bus-path-drawer-steps .step-idx {
+    width: 18px;
+    text-align: right;
+    color: #adb5bd;
+    flex: none;
+}
+
+.bus-path-drawer-steps .step-type {
+    font-weight: 900;
+    flex: none;
+}
+
+.bus-path-drawer-steps .step-min {
+    margin-left: auto;
+    color: #495057;
+    font-weight: 900;
+    flex: none;
+}
+
+.bus-path-drawer-empty {
+    font-size: 12px;
+    color: #868e96;
+    padding: 8px 0 2px;
+}
+
+@media (max-width: 1100px) {
+    .bus-path-drawer {
+        top: 160px;
+    }
+}
+
 /* 지도 프레임(기존 .bus-map-frame 룩 유지, 크기만 안정화) */
 .bus-page .bus-map-frame {
     height: 600px;
