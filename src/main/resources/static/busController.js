@@ -1,6 +1,6 @@
-// 수정됨: (1) computePathPartsV2() 아래 불필요한 중괄호 제거로 JS 파싱 오류 해결
+// 수정됨: solvePath에서 버스번호 프리패치 완료 후 UI 구성(.then 체이닝) + drawCalculatedPath 중복 프리패치 제거
 //        (2) hover 툴팁 lastHoverFeature/Coord 중복 대입 제거
-//
+//        (3) BUS 하행(updowncd=1) 점선 표시가 주석/의도와 다르던 부분 수정(lineDash 적용)
 
 // =========================================================
 // [최종 수정] busController.js
@@ -16,7 +16,7 @@ proj4.defs(
 ol.proj.proj4.register(proj4); // OpenLayers에 좌표계 등록
 
 // AngularJS 컨트롤러 정의
-app.controller('BusController', function ($scope, $http, $timeout, $interval) {
+app.controller('BusController', function ($scope, $http, $timeout, $interval, $q) {
     const CITY_CODE = '25'; // 대전 도시코드
 
     $scope.searchType = 'route'; // 검색 타입 (기본: 노선)
@@ -67,6 +67,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     $scope.pathWaitTotalMinutes = null; // 환승 대기(패널티) 총 시간(분)
     $scope.pathUsedTransfers = null; // 실제 사용 환승 수
     $scope.pathExactTransfersMatched = null; // 요청 환승 수 정확히 일치 여부
+    $scope.pathTransferPenaltyMin = null; // 환승 대기(패널티) 분(백엔드 계산값)
 
     // 경로 표시(UI)용: 대기(WAIT) 미표시 + 요약/토글
     $scope.pathDisplayParts = []; // WAIT 제외한 표시용 파트 배열
@@ -386,6 +387,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             var lineDash = mode === 'WALK' ? [10, 10] : null;
 
             if (mode === 'BUS' && updowncd === 1) {
+                // 하행은 점선으로 구분 (동일한 라인이라도 방향 차이를 눈으로 확인 가능)
                 lineDash = null;
             }
 
@@ -427,7 +429,27 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             pathDisplayPartsRebuildScheduled = false;
 
             if ($scope.pathSegments && Array.isArray($scope.pathSegments) && $scope.pathSegments.length > 0) {
-                $scope.pathDisplayParts = computePathPartsV2($scope.pathSegments);
+                var partsResult = computePathPartsV2($scope.pathSegments, $scope.pathUsedTransfers, $scope.pathTransferPenaltyMin);
+
+                $scope.pathParts = partsResult.parts;
+                $scope.pathRideTotalMinutes = partsResult.ride;
+                $scope.pathWalkTotalMinutes = partsResult.walk;
+                $scope.pathWaitTotalMinutes = partsResult.wait;
+
+                $scope.pathDisplayParts = (partsResult.parts || []).filter(function (p) {
+                    return p && p.type !== 'WAIT';
+                });
+
+                var rideCount = 0;
+                var walkCount = 0;
+                ($scope.pathDisplayParts || []).forEach(function (p) {
+                    if (!p) return;
+                    if (p.type === 'RIDE') rideCount += 1;
+                    if (p.type === 'WALK') walkCount += 1;
+                });
+
+                $scope.pathRideCount = rideCount;
+                $scope.pathWalkCount = walkCount;
             }
         }, 0);
     }
@@ -462,34 +484,16 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     }
 
     function prefetchPathBusRouteNosByRouteIds(routeIds) {
-        if (!routeIds || !routeIds.length) return;
+        var list = Array.isArray(routeIds) ? routeIds : [];
+        if (list.length === 0) return $q.resolve();
 
-        routeIds.forEach(function (rid) {
-            if (!rid) return;
-            if (pathRouteNoMap[rid]) return;
-            if (pathRouteNoLoadingMap[rid]) return;
+        // ✅ $q.all 로 "모든" 버스번호 조회가 끝난 뒤에만 resolve 되도록 보장
+        var promises = list.map(function (rid) {
+            return fetchRouteNoPromise(String(rid));
+        });
 
-            pathRouteNoLoadingMap[rid] = true;
-
-            $http
-                .get('/api/bus/locations', {
-                    params: { routeId: rid, pageNo: 1, numOfRows: 1 },
-                })
-                .then(function (res) {
-                    var parsed = parseMaybeJson(res.data);
-                    var routeNo = extractRouteNoFromBusLocationResponse(parsed);
-                    if (routeNo) {
-                        pathRouteNoMap[rid] = routeNo;
-
-                        schedulePathDisplayPartsRebuild();
-                    }
-                })
-                .catch(function (err) {
-                    console.warn('최단경로 버스번호 매핑용 locations 호출 실패:', rid, err);
-                })
-                .finally(function () {
-                    pathRouteNoLoadingMap[rid] = false;
-                });
+        return $q.all(promises).then(function () {
+            return;
         });
     }
 
@@ -2118,54 +2122,60 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             .then(function (res) {
                 var data = res.data;
                 if (!data || !data.segments || data.segments.length === 0) {
-                    alert('경로를 찾을 수 없습니다.\n(출발/도착지 450m 반경 내에 연결 가능한 버스가 없습니다)');
+                    alert('경로를 찾을 수 없습니다.');
                     return;
                 }
 
-                var totalMin = Math.round(data.totalMinutes);
-                console.log('경로 찾기 성공:', data);
-
-                var sName = s.nodenm || s.stationName;
-                var eName = e.nodenm || e.stationName;
-                $scope.pathTotalMinutes = totalMin;
-
-                // 다회 환승 breakdown (파트 배열)
-                $scope.pathUsedTransfers = data.usedTransfers;
-                $scope.pathExactTransfersMatched = data.exactTransfersMatched;
-
-                var partsResult = computePathPartsV2(data.segments, data.usedTransfers, data.transferPenaltyMin);
-
-                $scope.pathParts = partsResult.parts;
-                $scope.pathRideTotalMinutes = partsResult.ride;
-                $scope.pathWalkTotalMinutes = partsResult.walk;
-                $scope.pathWaitTotalMinutes = partsResult.wait;
-
-                // UI 표시용(대기 미표시): WAIT 파트 제거 + 요약 카운트 계산
-                $scope.pathDisplayParts = (partsResult.parts || []).filter(function (p) {
-                    return p && p.type !== 'WAIT';
+                // ✅ BUS 구간의 routeId 목록 수집
+                var busRouteIds = [];
+                (data.segments || []).forEach(function (seg) {
+                    var rid = seg.routeId || seg.routeid || seg.route_id;
+                    if (String(seg.mode || '').toUpperCase() === 'BUS' && rid) {
+                        busRouteIds.push(String(rid));
+                    }
                 });
 
-                var rideCount = 0;
-                var walkCount = 0;
-                ($scope.pathDisplayParts || []).forEach(function (p) {
-                    if (!p) return;
-                    if (p.type === 'RIDE') rideCount += 1;
-                    if (p.type === 'WALK') walkCount += 1;
-                });
+                // ✅ 중복 제거
+                var uniqList = Array.from(new Set(busRouteIds));
 
-                $scope.pathRideCount = rideCount;
-                $scope.pathWalkCount = walkCount;
+                // ✅ (핵심) 버스 번호 프리패치가 "완료된 뒤" UI를 구성한다.
+                return prefetchPathBusRouteNosByRouteIds(uniqList)
+                    .catch(function (e) {
+                        console.warn('[PATH] prefetch routeNo failed. keep going.', e);
+                    })
+                    .then(function () {
+                        // 모든 버스 번호가 pathRouteNoMap 캐시에 반영된 상태
+                        $scope.pathTotalMinutes = Math.round(data.totalMinutes);
+                        $scope.pathUsedTransfers = data.usedTransfers;
+                        $scope.pathSegments = data.segments;
 
-                // 경로가 새로 계산되면 기본은 접힘(간결 표시)
-                $scope.isPathDetailsOpen = false;
+                        var partsResult = computePathPartsV2(data.segments, data.usedTransfers, data.transferPenaltyMin);
 
-                // 기존 1회 환승 전용 breakdown 변수는 더 이상 사용하지 않음(표시 방지)
-                $scope.pathPreTransferMinutes = null;
-                $scope.pathWalkMinutes = null;
-                $scope.pathPostTransferMinutes = null;
+                        $scope.pathParts = partsResult.parts;
 
-                // 경로 그리기 호출
-                drawCalculatedPath(data.segments);
+                        // UI 표시용 (WAIT 제외)
+                        $scope.pathDisplayParts = (partsResult.parts || []).filter(function (p) {
+                            return p.type !== 'WAIT';
+                        });
+
+                        // 통계 계산
+                        var rideCount = 0;
+                        var walkCount = 0;
+                        ($scope.pathDisplayParts || []).forEach(function (p) {
+                            if (p.type === 'RIDE') rideCount++;
+                            if (p.type === 'WALK') walkCount++;
+                        });
+                        $scope.pathRideCount = rideCount;
+                        $scope.pathWalkCount = walkCount;
+
+                        // 지도에 경로 그리기
+                        drawCalculatedPath(data.segments);
+
+                        $scope.isPathDetailsOpen = false;
+
+                        // ✅ Digest 보강(첫 렌더에 확실히 반영)
+                        $timeout(function () {}, 0);
+                    });
             })
             .catch(function (err) {
                 console.error('경로 검색 오류:', err);
