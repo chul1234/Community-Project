@@ -1,9 +1,8 @@
-// 수정됨: /api/bus/route-stops 호출 시 RestTemplate 예외로 서버가 500을 내리며 라인 좌표(정류장 목록)가 전달되지 않는 문제 대응
-//        - TAGO가 4xx/5xx를 반환해도 예외로 터지지 않도록 처리
-//        - 에러 응답 본문을 그대로 프론트로 반환하여 Network/Response에서 원인 확인 가능하게 함
-
 package com.example.demo.controller;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,6 +10,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
+
+import com.example.demo.collector.ApiQuotaManager;
 
 /**
  * TAGO (국토교통부) 버스 노선 정보 + 정류장 목록 + 버스 위치 + 도착정보 조회 컨트롤러
@@ -28,6 +29,13 @@ public class BusApiController {
     private static final String CITY_CODE = "25";
 
     private final RestTemplate restTemplate = new RestTemplate();
+
+    /**
+     * 일일 호출 예산 관리자(있으면 적용, 없으면 null)
+     * - arrival API 트래픽 절감/차단을 위해 전역에서 공통 적용
+     */
+    @Autowired(required = false)
+    private ApiQuotaManager apiQuotaManager;
 
     /**
      * 1) 버스 번호 → 노선 목록 조회 (getRouteNoList)
@@ -73,7 +81,10 @@ public class BusApiController {
             return ResponseEntity.status(ex.getStatusCode()).body(ex.getResponseBodyAsString());
         } catch (Exception ex) {
             // 예상치 못한 예외도 메시지를 반환해 원인 추적 가능하게 한다.
-            return ResponseEntity.status(500).body("{\"error\":\"route-stops proxy failed\",\"message\":\"" + ex.getMessage() + "\"}");
+            return ResponseEntity.status(500)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("{\"error\":\"route-stops proxy failed\",\"message\":\""
+                            + ex.getMessage().replace("\"", "\\\"") + "\"}");
         }
     }
 
@@ -102,38 +113,69 @@ public class BusApiController {
     }
 
     /**
-     * 4) 정류소별 도착 예정 버스 목록 조회
-     *    (getSttnAcctoArvlPrearngeInfoList)
+     * 4) 정류소별 도착 예정 버스 목록 조회 (getSttnAcctoArvlPrearngeInfoList)
      *
-     * 예: /api/bus/arrivals?nodeId=DJB8001793
+     * 예: /api/bus/arrivals?nodeId=DJB8001793&numOfRows=20
      */
     @CrossOrigin
     @GetMapping("/api/bus/arrivals")
-    public String getArrivalsByStop(
-            @RequestParam("nodeId") String nodeId,
+    public ResponseEntity<String> getArrivalsByStop(
+            @RequestParam(value = "nodeId", required = false) String nodeId,
+            @RequestParam(value = "stopId", required = false) String stopId,
             @RequestParam(value = "pageNo", defaultValue = "1") String pageNo,
             @RequestParam(value = "numOfRows", defaultValue = "20") String numOfRows
     ) {
+
+        String finalNodeId = (nodeId != null && !nodeId.isBlank()) ? nodeId : stopId;
+        if (finalNodeId == null || finalNodeId.isBlank()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("{\"error\":\"BAD_REQUEST\",\"message\":\"nodeId(stopId)가 필요합니다.\"}");
+        }
+
+        // 1) 서버 단에서 일일 호출 예산을 먼저 차단한다.
+        //    (프론트에서 새로고침/반복 호출해도, 여기서 더 이상 외부 API를 때리지 않도록)
+        if (apiQuotaManager != null && !apiQuotaManager.tryConsume(1)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("{\"error\":\"API_QUOTA_EXCEEDED\",\"message\":\"오늘 TAGO API 호출 허용량을 초과했습니다. (서버에서 차단됨)\"}");
+        }
 
         String url = "http://apis.data.go.kr/1613000/ArvlInfoInqireService/getSttnAcctoArvlPrearngeInfoList"
                 + "?serviceKey=" + SERVICE_KEY
                 + "&_type=json"
                 + "&cityCode=" + CITY_CODE
-                + "&nodeId=" + nodeId
+                + "&nodeId=" + finalNodeId
                 + "&pageNo=" + pageNo
                 + "&numOfRows=" + numOfRows;
 
-        return restTemplate.getForObject(url, String.class);
+        try {
+            String response = restTemplate.getForObject(url, String.class);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(response);
+        } catch (HttpStatusCodeException ex) {
+            // 2) 외부에서 429가 떨어졌으면 "오늘은 끝"으로 판단하고, 이후 호출을 즉시 차단한다.
+            if (apiQuotaManager != null && ex.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
+                apiQuotaManager.markExhaustedForToday();
+            }
+            // TAGO가 내려준 에러 본문을 그대로 반환해서 원인을 프론트(Network Response)에서 확인 가능하게 한다.
+            return ResponseEntity.status(ex.getStatusCode())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(ex.getResponseBodyAsString());
+        } catch (Exception ex) {
+            return ResponseEntity.status(500)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("{\"error\":\"arrivals proxy failed\",\"message\":\""
+                            + ex.getMessage().replace("\"", "\\\"") + "\"}");
+        }
     }
 
     /**
-     * 5) 정류장 이름으로 정류장 목록 조회
-     *    BusSttnInfoInqireService/getSttnNoList
+     * 5) 정류장 이름으로 정류장 목록 조회 (BusSttnInfoInqireService/getSttnNoList)
      *
      * 예: /api/bus/stops-by-name?nodeName=정부청사
      */
-    // 수정됨: 정류장 이름 검색 시 URLEncoder 제거하여 원본 문자열 그대로 전달
-
     @CrossOrigin
     @GetMapping("/api/bus/stops-by-name")
     public String getStopsByName(
@@ -179,7 +221,4 @@ public class BusApiController {
 
         return restTemplate.getForObject(url, String.class);
     }
-
 }
-
-// 수정됨 끝
