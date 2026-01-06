@@ -1,6 +1,6 @@
 // 수정됨: (1) computePathPartsV2() 아래 불필요한 중괄호 제거로 JS 파싱 오류 해결
 //        (2) hover 툴팁 lastHoverFeature/Coord 중복 대입 제거
-//        (3) BUS 하행(updowncd=1) 점선 표시가 주석/의도와 다르던 부분 수정(lineDash 적용)
+//        
 
 // =========================================================
 // [최종 수정] busController.js
@@ -386,7 +386,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             var lineDash = mode === 'WALK' ? [10, 10] : null;
 
             if (mode === 'BUS' && updowncd === 1) {
-                // 하행은 점선으로 구분 (동일한 라인이라도 방향 차이를 눈으로 확인 가능)
+                
                 lineDash = null;
             }
 
