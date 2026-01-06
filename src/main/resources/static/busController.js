@@ -1,6 +1,5 @@
 // 수정됨: solvePath에서 버스번호 프리패치 완료 후 UI 구성(.then 체이닝) + drawCalculatedPath 중복 프리패치 제거
 //        (2) hover 툴팁 lastHoverFeature/Coord 중복 대입 제거
-//        (3) BUS 하행(updowncd=1) 점선 표시가 주석/의도와 다르던 부분 수정(lineDash 적용)
 
 // =========================================================
 // [최종 수정] busController.js
@@ -387,7 +386,6 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval, $q
             var lineDash = mode === 'WALK' ? [10, 10] : null;
 
             if (mode === 'BUS' && updowncd === 1) {
-                // 하행은 점선으로 구분 (동일한 라인이라도 방향 차이를 눈으로 확인 가능)
                 lineDash = null;
             }
 
