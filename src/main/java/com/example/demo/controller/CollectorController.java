@@ -43,8 +43,8 @@ public class CollectorController {
     @Autowired
     private CollectorSwitch collectorSwitch;
 
-    private final AtomicInteger intervalMs = new AtomicInteger(25000);
-    private final AtomicInteger batchSize = new AtomicInteger(6);
+    private final AtomicInteger intervalMs = new AtomicInteger(30000);
+    private final AtomicInteger batchSize = new AtomicInteger(4);
 
     // ✅ refineOnce(callsBudget) : arrival API 호출 예산
     private final AtomicInteger refineCallsBudgetPerLoop = new AtomicInteger(6);
