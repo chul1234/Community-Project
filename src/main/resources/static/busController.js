@@ -1,6 +1,6 @@
 // 수정됨: (1) computePathPartsV2() 아래 불필요한 중괄호 제거로 JS 파싱 오류 해결
 //        (2) hover 툴팁 lastHoverFeature/Coord 중복 대입 제거
-//        
+//
 
 // =========================================================
 // [최종 수정] busController.js
@@ -61,21 +61,21 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
     $scope.pathMaxTransfers = 2; // 기본 2회(=승차 3회)로 기존 정책과 동일
 
     // ★ [추가] 다회 환승(2회/3회...) breakdown 표시를 위한 파트 배열
-    $scope.pathParts = [];              // [{type:'RIDE'|'WALK'|'WAIT', label, minutes, meta}]
+    $scope.pathParts = []; // [{type:'RIDE'|'WALK'|'WAIT', label, minutes, meta}]
     $scope.pathRideTotalMinutes = null; // 승차(버스/트램) 총 시간(분)
     $scope.pathWalkTotalMinutes = null; // 도보 총 시간(분)
     $scope.pathWaitTotalMinutes = null; // 환승 대기(패널티) 총 시간(분)
-    $scope.pathUsedTransfers = null;    // 실제 사용 환승 수
+    $scope.pathUsedTransfers = null; // 실제 사용 환승 수
     $scope.pathExactTransfersMatched = null; // 요청 환승 수 정확히 일치 여부
 
     // 경로 표시(UI)용: 대기(WAIT) 미표시 + 요약/토글
-    $scope.pathDisplayParts = [];       // WAIT 제외한 표시용 파트 배열
-    $scope.pathRideCount = 0;           // 승차(버스/트램) 횟수
-    $scope.pathWalkCount = 0;           // 도보 파트 횟수
-    $scope.isPathDetailsOpen = false;   // 탑승 상세 펼침 상태
+    $scope.pathDisplayParts = []; // WAIT 제외한 표시용 파트 배열
+    $scope.pathRideCount = 0; // 승차(버스/트램) 횟수
+    $scope.pathWalkCount = 0; // 도보 파트 횟수
+    $scope.isPathDetailsOpen = false; // 탑승 상세 펼침 상태
 
-    $scope.pathPreTransferMinutes = null;  // 환승 전(첫 탑승 블록) 총 시간(분)
-    $scope.pathWalkMinutes = null;         // 도보(환승 보행) 총 시간(분)
+    $scope.pathPreTransferMinutes = null; // 환승 전(첫 탑승 블록) 총 시간(분)
+    $scope.pathWalkMinutes = null; // 도보(환승 보행) 총 시간(분)
     $scope.pathPostTransferMinutes = null; // 환승 후(두 번째 탑승 블록 이후) 총 시간(분)
 
     $scope.pathEndStop = null;
@@ -386,7 +386,6 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
             var lineDash = mode === 'WALK' ? [10, 10] : null;
 
             if (mode === 'BUS' && updowncd === 1) {
-                
                 lineDash = null;
             }
 
@@ -1906,10 +1905,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
         if (transferWalkStart !== -1) {
             var transferWalkEnd = transferWalkStart;
-            while (
-                transferWalkEnd < segments.length &&
-                isWalk(segments[transferWalkEnd])
-            ) {
+            while (transferWalkEnd < segments.length && isWalk(segments[transferWalkEnd])) {
                 transferWalkEnd++;
             }
 
@@ -1979,13 +1975,9 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
 
                 // routeId/routeNo 키 표기가 응답마다 달라질 수 있어(예: routeId/routeid/route_id, routeNo/routeno/route_no)
                 // 가능한 키를 모두 수용하고, 최종 표시는 trim()된 값만 사용한다.
-                var routeId =
-                    seg &&
-                    (seg.routeId || seg.routeid || seg.route_id || seg.routeID);
+                var routeId = seg && (seg.routeId || seg.routeid || seg.route_id || seg.routeID);
 
-                var rawRouteNo =
-                    (seg && (seg.routeNo || seg.routeno || seg.route_no || seg.routeNO)) ||
-                    (routeId ? pathRouteNoMap[String(routeId)] : null);
+                var rawRouteNo = (seg && (seg.routeNo || seg.routeno || seg.route_no || seg.routeNO)) || (routeId ? pathRouteNoMap[String(routeId)] : null);
 
                 var routeNo = rawRouteNo != null ? String(rawRouteNo).trim() : '';
 
@@ -1995,7 +1987,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                     routeNo = routeNo.replace(/번\s*$/, '').trim();
                 }
 
-                var label = routeNo ? ('버스(' + routeNo + '번)') : '버스';
+                var label = routeNo ? '버스(' + routeNo + '번)' : '버스';
 
                 parts.push({
                     type: 'RIDE',
@@ -2079,7 +2071,6 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         };
     }
 
-
     // 탑승 상세(대기 미표시) 토글
     $scope.togglePathDetails = function () {
         $scope.isPathDetailsOpen = !$scope.isPathDetailsOpen;
@@ -2142,11 +2133,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
                 $scope.pathUsedTransfers = data.usedTransfers;
                 $scope.pathExactTransfersMatched = data.exactTransfersMatched;
 
-                var partsResult = computePathPartsV2(
-                    data.segments,
-                    data.usedTransfers,
-                    data.transferPenaltyMin
-                );
+                var partsResult = computePathPartsV2(data.segments, data.usedTransfers, data.transferPenaltyMin);
 
                 $scope.pathParts = partsResult.parts;
                 $scope.pathRideTotalMinutes = partsResult.ride;
@@ -2388,11 +2375,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval) {
         $scope.collectorStatus = d;
 
         if (d && d.running) {
-            $scope.collectorStatusText =
-                '상태: ON · batch ' +
-                d.batchSize +
-                (d.cycleCount != null ? ' · 순환 ' + d.cycleCount + '회' : '') +
-                (d.inProgress ? ' · 실행중' : '');
+            $scope.collectorStatusText = '상태: ON · batch ' + d.batchSize + (d.cycleCount != null ? ' · 순환 ' + d.cycleCount + '회' : '') + (d.inProgress ? ' · 실행중' : '');
             startCollectorPoll();
         } else {
             $scope.collectorStatusText = '상태: OFF';
