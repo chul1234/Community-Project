@@ -1995,3 +1995,107 @@ header h1 {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+
+/* ======================================================================
+   [추가] 탑승 상세(네이버 지도 스타일) 타임라인 UI
+   - 데이터는 기존 pathDisplayParts(WALK/RIDE) 기반으로 렌더링한다.
+   ====================================================================== */
+.path-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.path-tl-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.path-tl-rail {
+    position: relative;
+    width: 18px;
+    flex: 0 0 18px;
+    display: flex;
+    justify-content: center;
+}
+
+.path-tl-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: #cfcfcf;
+    margin-top: 4px;
+    z-index: 2;
+}
+
+.path-tl-line {
+    position: absolute;
+    top: 16px;
+    bottom: -10px;
+    width: 2px;
+    background: #e3e3e3;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+}
+
+.path-tl-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.path-tl-walk-title {
+    font-size: 13px;
+    color: #666;
+}
+
+.path-tl-transfer {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 12px;
+    color: #777;
+    font-weight: 700;
+}
+
+.path-tl-ride-title {
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.path-tl-ride-color {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    flex: 0 0 10px;
+}
+
+.path-tl-ride-badge {
+    display: inline-block;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    color: #111;
+    font-weight: 800;
+    font-size: 15px;
+}
+
+.path-tl-ride-row {
+    font-size: 13px;
+    color: #333;
+    margin-top: 4px;
+}
+
+.path-tl-duration {
+    margin-top: 6px;
+    font-weight: 700;
+    color: #111;
+}
+
+.path-tl-place {
+    font-weight: 700;
+}

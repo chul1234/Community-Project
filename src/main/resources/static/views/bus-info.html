@@ -1,6 +1,6 @@
-<!-- 수정됨: bus-info.html을 Angular ng-view 템플릿 형태로 수정
-     - <!DOCTYPE>, <html>, <head>, <body>, ng-app 제거 (라우팅 템플릿에서 중첩 ng-app/문서 태그로 컴파일 깨짐 방지)
-     - 기존 리레이아웃 UI/바인딩은 그대로 유지 -->
+<!-- 수정됨: 탑승 상세(승차 구간)에서 버스/트램 이모지 아이콘 표시 추가
+     - 도보는 기존 🚶 유지
+     - 승차 구간(p.type !== 'WALK')에서 p.label 기준으로 🚌(버스), 🚋(트램) 표시 -->
 
 <div class="container bus-page">
     <!-- 상단: 제목(좌) + 상태/제어(우, 한 줄 고정) -->
@@ -52,7 +52,7 @@
                     ng-click="toggleCollector()"
                     ng-class="{'running': (collectorStatus && collectorStatus.running)}"
                 >
-                    {{ (collectorStatus && collectorStatus.running) ? '⏹ 수집 중지' : '▶ 수집 시작' }}
+                    {{ (collectorStatus && (collectorStatus.running)) ? '⏹ 수집 중지' : '▶ 수집 시작' }}
                 </button>
             </div>
         </div>
@@ -88,13 +88,71 @@
                     <span class="value">{{ (pathEndStop && (pathEndStop.nodenm || pathEndStop.name)) || '미선택' }}</span>
                 </div>
 
+                
                 <div class="bus-path-drawer-steps" ng-if="pathDisplayParts && pathDisplayParts.length">
-                    <div class="bus-path-drawer-step" ng-repeat="p in pathDisplayParts track by $index">
-                        <span class="step-idx">{{$index + 1}}.</span>
-                        <span class="step-icon" ng-if="p.type === 'WALK'">🚶</span>
-                        <span class="step-icon" ng-if="p.type === 'RIDE'">🚌</span>
-                        <span class="step-icon" ng-if="p.type !== 'WALK' && p.type !== 'RIDE'">•</span>
-                        <span class="step-text">{{ p.label }} {{ p.minutes }}분</span>
+                    <div class="path-timeline">
+                        <div class="path-tl-item" ng-repeat="p in pathDisplayParts track by $index"
+                             ng-class="{'walk': (p.type === 'WALK'), 'ride': (p.type !== 'WALK')}">
+                            <!-- 좌측 레일(세로 라인) + 노드 -->
+                            <div class="path-tl-rail">
+                                <div class="path-tl-dot"
+                                     ng-style="p.type !== 'WALK' ? {'background': getPathTimelineColor($index)} : {}"></div>
+                                <div class="path-tl-line"
+                                     ng-style="p.type !== 'WALK' ? {'background': getPathTimelineColor($index)} : {}"></div>
+                            </div>
+
+                            <!-- 본문 -->
+                            <div class="path-tl-body">
+                                <!-- 도보(환승) -->
+                                <div class="path-tl-walk" ng-if="p.type === 'WALK'">
+                                    <div class="path-tl-walk-title">
+                                        🚶 도보 {{ p.minutes }}분
+                                        <span class="path-tl-transfer"
+                                              ng-if="($index > 0 && pathDisplayParts[$index-1].type !== 'WALK') && ($index < pathDisplayParts.length-1 && pathDisplayParts[$index+1].type !== 'WALK')">
+                                            환승
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- 승차 구간(버스/트램) -->
+                                <div class="path-tl-ride" ng-if="p.type !== 'WALK'">
+                                    <div class="path-tl-ride-title">
+                                        <span class="path-tl-ride-color" ng-style="{'background': getPathTimelineColor($index)}"></span>
+
+                                        <!-- 수정됨: 승차 구간 아이콘(이모지) 추가 -->
+                                        <span class="path-tl-ride-emoji"
+                                              ng-if="(p.label || '').indexOf('버스') === 0">🚌</span>
+                                        <span class="path-tl-ride-emoji"
+                                              ng-if="(p.label || '').indexOf('트램') === 0">🚋</span>
+                                        <span class="path-tl-ride-emoji"
+                                              ng-if="(p.label || '').indexOf('버스') !== 0 && (p.label || '').indexOf('트램') !== 0">🚌</span>
+
+                                        <!--
+                                          수정됨: 라벨이 비어 보이는 케이스 방지
+                                          - formatPathLabel 바인딩/캐시/데이터 이슈로 결과가 ''가 되더라도 p.label 또는 기본값을 표시
+                                        -->
+                                        <span class="path-tl-ride-badge">
+                                            {{ (formatPathLabel ? formatPathLabel(p.label) : '') || p.label || '승차' }}
+                                        </span>
+                                    </div>
+
+                                    <!-- NOTE:
+                                         - 현재 프로젝트의 pathDisplayParts는 '버스(108번)' 같은 라벨과 minutes만 확정적으로 가진다.
+                                         - 승차/하차 정류장명은 서버 응답 구조에 따라 없을 수 있으므로, 여기서는 '구조만' 만들어두고
+                                           값이 있으면 표시되도록 안전 처리한다.
+                                    -->
+                                    <div class="path-tl-ride-row" ng-if="p.fromName">
+                                        승차: <span class="path-tl-place">[{{ p.fromName }}]</span>
+                                    </div>
+                                    <div class="path-tl-ride-row path-tl-duration">
+                                        ⏱ {{ p.minutes }}분 이동
+                                    </div>
+                                    <div class="path-tl-ride-row" ng-if="p.toName">
+                                        하차: <span class="path-tl-place">[{{ p.toName }}]</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -103,6 +161,7 @@
                 </div>
             </div>
         </div>
+
         <!-- 좌측: 지도 영역 -->
         <div class="bus-map-area">
             <!-- 현재 경로 요약(지도 위) -->

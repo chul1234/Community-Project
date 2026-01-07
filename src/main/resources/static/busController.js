@@ -1,5 +1,6 @@
-// 수정됨: solvePath에서 버스번호 프리패치 완료 후 UI 구성(.then 체이닝) + drawCalculatedPath 중복 프리패치 제거
-//        (2) hover 툴팁 lastHoverFeature/Coord 중복 대입 제거
+// 수정됨: 탑승 상세에 '몇번 버스'가 안 나오는 문제 수정
+//        - /api/bus/locations 응답이 문자열(JSON)로 내려오는 케이스를 처리하도록 extractRouteNoFromBusLocationResponse에서 parseMaybeJson 적용
+
 
 // =========================================================
 // [최종 수정] busController.js
@@ -70,6 +71,46 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval, $q
 
     // 경로 표시(UI)용: 대기(WAIT) 미표시 + 요약/토글
     $scope.pathDisplayParts = []; // WAIT 제외한 표시용 파트 배열
+
+    // 탑승 상세(타임라인 UI) 색상 팔레트 (버스 환승(노선 변경) 느낌만 주기 위한 용도)
+    // - 실제 노선 색상 데이터가 없으므로, 승차 구간 순서에 따라 순환 적용한다.
+    var PATH_DETAIL_COLORS = ['#2D74FF', '#F59E0B', '#16A34A', '#7C3AED', '#DC2626'];
+
+    /**
+     * 탑승 상세 타임라인에서 "승차 구간"의 색상을 반환한다.
+     * - pathDisplayParts 기준으로, RIDE가 등장할 때마다 색상 인덱스를 1씩 증가시킨다.
+     * - WALK는 색상 인덱스를 증가시키지 않는다.
+     */
+    $scope.getPathTimelineColor = function (partIndex) {
+        var parts = $scope.pathDisplayParts || [];
+        var rideIdx = -1;
+
+        for (var i = 0; i <= partIndex && i < parts.length; i++) {
+            if (parts[i] && parts[i].type === 'RIDE') rideIdx += 1;
+        }
+
+        if (rideIdx < 0) return '#cfcfcf';
+        return PATH_DETAIL_COLORS[rideIdx % PATH_DETAIL_COLORS.length];
+    };
+
+    /**
+     * 탑승 상세 라벨을 목표 UI(예: "108번 버스") 형태로 정리한다.
+     * - 현재 pathDisplayParts의 label 예: "버스(108번)", "트램(1호선)" 등
+     * - 데이터가 없는 경우에도 안전하게 원문을 반환한다.
+     */
+    $scope.formatPathLabel = function (label) {
+        if (!label) return '';
+        // "버스(108번)" -> "108번 버스"
+        var mBus = /^버스\((.+)\)$/.exec(label);
+        if (mBus && mBus[1]) return (mBus[1] + ' 버스');
+
+        // "트램(1호선)" -> "1호선 트램"
+        var mTram = /^트램\((.+)\)$/.exec(label);
+        if (mTram && mTram[1]) return (mTram[1] + ' 트램');
+
+        return label;
+    };
+
     $scope.pathRideCount = 0; // 승차(버스/트램) 횟수
     $scope.pathWalkCount = 0; // 도보 파트 횟수
     $scope.isPathDetailsOpen = false; // 탑승 상세 펼침 상태
@@ -413,6 +454,9 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval, $q
     // -------------------------
     var pathRouteNoMap = {}; // { routeId: '101', ... }
 
+    // routeId -> 버스번호 조회 중복 호출 방지(in-flight) 캐시
+    var pathRouteNoFetchInFlight = {}; // { routeId: Promise }
+
     // 탑승 상세(경로 파트)에서 '버스 번호'가 보이도록,
     // routeId -> routeNo 매핑이 갱신되면 경로 파트를 한 번 재계산한다.
     var pathDisplayPartsRebuildScheduled = false;
@@ -463,6 +507,7 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval, $q
     var pathNodeNamePending = {}; // { nodeId: true } 중복 호출 방지
 
     function extractRouteNoFromBusLocationResponse(data) {
+        data = parseMaybeJson(data);
         // TAGO 응답 형태 방어적 처리
         if (!data || !data.response || !data.response.body) return null;
         var items = data.response.body.items && data.response.body.items.item;
@@ -481,7 +526,54 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval, $q
         return rn;
     }
 
-    function prefetchPathBusRouteNosByRouteIds(routeIds) {
+    
+function fetchRouteNoPromise(routeId) {
+    // routeId가 없으면 즉시 종료
+    if (routeId == null) return $q.resolve(null);
+
+    var rid = String(routeId).trim();
+    if (!rid) return $q.resolve(null);
+
+    // 이미 캐시에 있으면 재호출하지 않는다.
+    if (pathRouteNoMap[rid]) {
+        return $q.resolve(pathRouteNoMap[rid]);
+    }
+
+    // 동일 routeId에 대한 동시 호출 중복 방지
+    if (pathRouteNoFetchInFlight[rid]) {
+        return pathRouteNoFetchInFlight[rid];
+    }
+
+    // locations API에서 routenm(버스 번호/명칭)을 1회 조회하여 캐시에 저장한다.
+    // - 실패해도 전체 흐름이 깨지지 않도록 null로 마무리한다.
+    var p = $http
+        .get('/api/bus/locations', {
+            params: { routeId: rid },
+        })
+        .then(function (resp) {
+            var routeNo = extractRouteNoFromBusLocationResponse(resp && resp.data);
+            if (routeNo) {
+                pathRouteNoMap[rid] = routeNo;
+
+                // 버스번호 캐시가 갱신되면 탑승 상세(경로 파트)를 한 번 재계산하여 반영한다.
+                schedulePathDisplayPartsRebuild();
+            }
+            return routeNo || null;
+        })
+        .catch(function (e) {
+            // 프리패치 실패는 치명적이지 않다. (표시에서 '버스'로라도 남게 둔다)
+            console.warn('[PATH] fetchRouteNoPromise failed. routeId=' + rid, e);
+            return null;
+        })
+        .finally(function () {
+            delete pathRouteNoFetchInFlight[rid];
+        });
+
+    pathRouteNoFetchInFlight[rid] = p;
+    return p;
+}
+
+function prefetchPathBusRouteNosByRouteIds(routeIds) {
         var list = Array.isArray(routeIds) ? routeIds : [];
         if (list.length === 0) return $q.resolve();
 
@@ -543,6 +635,76 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval, $q
             .finally(function () {
                 pathNodeNamePending[nodeId] = false;
             });
+    }
+
+
+    // -------------------------
+    // [추가] 최단경로 탑승상세: BUS 승/하차 정류장명 보강(최소 호출)
+    //  - 백엔드 Path API는 BUS nodeNames를 null로 내려준다.
+    //  - 이미 화면에서 확보한 정류장 목록(route-stops / stops-by-name)으로 캐시를 먼저 채우고,
+    //    그래도 없는 정류장만 "좌표 기반 근접 정류장" API로 보강한다.
+    //  - 트래픽 절감을 위해: (1) 중복 nodeId 제거 (2) 구간의 '시작/끝'만 조회 (3) 호출 상한 적용
+    // -------------------------
+    function fetchPathNodeNamePromise(nodeId, wgsLat, wgsLng) {
+        if (!nodeId) return $q.resolve();
+        var key = String(nodeId);
+
+        if (pathNodeNameCache[key]) return $q.resolve(pathNodeNameCache[key]);
+
+        return $q(function (resolve) {
+            resolvePathBusStopName(key, wgsLat, wgsLng, function (nm) {
+                resolve(nm);
+            });
+            // resolvePathBusStopName 내부에서 실패 시 그냥 끝나므로, 안전하게 즉시 resolve 되도록 처리
+            // (캐시에 안 들어가면 computePathPartsV2에서 빈 문자열로 처리됨)
+            $timeout(function () { resolve(); }, 0);
+        });
+    }
+
+    function prefetchPathSegmentEndStopNames(segments, maxCalls) {
+        if (!segments || !segments.length) return $q.resolve();
+
+        var cap = (maxCalls != null ? Number(maxCalls) : 6);
+        if (isNaN(cap) || cap < 0) cap = 6;
+
+        var uniqKeys = {};
+        var tasks = [];
+
+        function pushIfNeeded(nodeId, pt) {
+            if (!nodeId || !pt || pt.length < 2) return;
+            var key = String(nodeId);
+            if (pathNodeNameCache[key]) return;
+            if (uniqKeys[key]) return;
+            uniqKeys[key] = true;
+
+            if (tasks.length >= cap) return;
+
+            // pt는 [lng, lat] (WGS84)
+            var wgsLng = Number(pt[0]);
+            var wgsLat = Number(pt[1]);
+            if (isNaN(wgsLat) || isNaN(wgsLng)) return;
+
+            tasks.push(fetchPathNodeNamePromise(key, wgsLat, wgsLng));
+        }
+
+        (segments || []).forEach(function (seg) {
+            var mode = String((seg && seg.mode) || '').toUpperCase();
+            if (mode !== 'BUS') return; // TRAM은 서버에서 nodeNames 내려줌
+
+            var ids = seg && seg.nodeIds;
+            var pts = seg && seg.points;
+
+            if (!ids || !ids.length || !pts || !pts.length) return;
+
+            // 시작/끝만 조회 (트래픽 최소화)
+            pushIfNeeded(ids[0], pts[0]);
+            if (ids.length > 1 && pts.length > 1) {
+                pushIfNeeded(ids[ids.length - 1], pts[pts.length - 1]);
+            }
+        });
+
+        if (tasks.length === 0) return $q.resolve();
+        return $q.all(tasks).then(function () { return; });
     }
 
     // -------------------------
@@ -1637,6 +1799,16 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval, $q
                 $scope.stops = stopsArray;
                 $scope.selectedStop = null;
 
+                // [추가] 최단경로 탑승상세에서 정류장 이름을 재사용할 수 있도록 nodeId -> nodenm 캐시를 채운다.
+                // - route-stops / stops-by-name 결과에 이미 정류장명(nodenm)이 있으므로, 별도 API 호출 없이도 표시 가능해진다.
+                (stopsArray || []).forEach(function (st) {
+                    var nid = st && (st.nodeid || st.nodeId || st.node_id);
+                    var nm = st && (st.nodenm || st.nodeNm || st.stationName);
+                    if (nid != null && nm) {
+                        pathNodeNameCache[String(nid)] = String(nm).trim();
+                    }
+                });
+
                 drawStopsOnMap(stopsArray);
                 drawRouteLineFromStops(stopsArray);
 
@@ -1707,6 +1879,15 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval, $q
                 $scope.stops = stopsArray;
                 $scope.selectedStop = null;
                 drawStopsOnMap(stopsArray);
+
+                // [추가] 최단경로 탑승상세에서 정류장 이름을 재사용할 수 있도록 nodeId -> nodenm 캐시를 채운다.
+                (stopsArray || []).forEach(function (st) {
+                    var nid = st && (st.nodeid || st.nodeId || st.node_id);
+                    var nm = st && (st.nodenm || st.nodeNm || st.stationName);
+                    if (nid != null && nm) {
+                        pathNodeNameCache[String(nid)] = String(nm).trim();
+                    }
+                });
             })
             .catch(function (err) {
                 console.error('정류장 검색 실패:', err);
@@ -1972,6 +2153,31 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval, $q
             var m = modeUpper(seg);
             var min = Number((seg && seg.minutes) || 0);
 
+            // [추가] 탑승 상세 승/하차 정류장명 결정
+            // 1) 서버가 내려준 nodeNames (TRAM은 들어있음)
+            // 2) 프론트 캐시(pathNodeNameCache) (route-stops/정류장검색/hover 보강/근접조회)
+            var startNm = '';
+            var endNm = '';
+
+            var nodeIds = (seg && seg.nodeIds) ? seg.nodeIds : null;
+            var nodeNames = (seg && seg.nodeNames) ? seg.nodeNames : null;
+
+            var sId = (nodeIds && nodeIds.length > 0) ? String(nodeIds[0]) : null;
+            var eId = (nodeIds && nodeIds.length > 0) ? String(nodeIds[nodeIds.length - 1]) : null;
+
+            if (nodeNames && nodeNames.length > 0 && nodeNames[0]) {
+                startNm = String(nodeNames[0]).trim();
+            } else if (sId && pathNodeNameCache[sId]) {
+                startNm = String(pathNodeNameCache[sId]).trim();
+            }
+
+            if (nodeNames && nodeNames.length > 0 && nodeNames[nodeNames.length - 1]) {
+                endNm = String(nodeNames[nodeNames.length - 1]).trim();
+            } else if (eId && pathNodeNameCache[eId]) {
+                endNm = String(pathNodeNameCache[eId]).trim();
+            }
+
+
             if (m === 'BUS') {
                 rideTotal += min;
 
@@ -1996,6 +2202,8 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval, $q
                     label: label,
                     minutes: Math.round(min),
                     meta: { routeId: routeId || seg.routeId || seg.routeid || seg.route_id, updowncd: seg.updowncd },
+                    fromName: startNm,
+                    toName: endNm,
                 });
             } else if (m === 'TRAM') {
                 rideTotal += min;
@@ -2004,6 +2212,8 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval, $q
                     label: '트램',
                     minutes: Math.round(min),
                     meta: { routeId: seg.routeId },
+                    fromName: startNm,
+                    toName: endNm,
                 });
             } else if (m === 'WALK') {
                 // 도보 0분(또는 음수) 구간은 UI에서 노이즈이므로 제외한다.
@@ -2137,9 +2347,12 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval, $q
                 var uniqList = Array.from(new Set(busRouteIds));
 
                 // ✅ (핵심) 버스 번호 프리패치가 "완료된 뒤" UI를 구성한다.
-                return prefetchPathBusRouteNosByRouteIds(uniqList)
+                return $q.all([
+                    prefetchPathBusRouteNosByRouteIds(uniqList),
+                    prefetchPathSegmentEndStopNames(data.segments, 6)
+                ])
                     .catch(function (e) {
-                        console.warn('[PATH] prefetch routeNo failed. keep going.', e);
+                        console.warn('[PATH] prefetch(routeNo/stopNames) failed. keep going.', e);
                     })
                     .then(function () {
                         // 모든 버스 번호가 pathRouteNoMap 캐시에 반영된 상태
