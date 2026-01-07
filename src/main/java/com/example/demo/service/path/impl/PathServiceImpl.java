@@ -1,4 +1,7 @@
-// 수정됨: BUS 구간을 무방향(양방향)으로 추가하던 로직을 제거하고, DB에 저장된 from_id -> to_id 방향만 유효하도록 유향 그래프로 변경
+// 수정됨: BUS 구간(nodeIds)에 대한 정류장명(nodeNames)이 null로 내려오는 문제 해결
+//        - /api/path/solve 응답의 segments[].nodeNames를 서버에서 채워서 반환하도록 개선
+//        - BUS 구간의 nodeId -> 정류장명은 TAGO '노선 경유 정류장 목록(route-stops)'을 routeId 단위로 1회 조회 후 메모리 캐시
+//        - 캐시 미스/오류 시에는 기존처럼 null을 유지(프론트에서 빈 문자열 등으로 처리 가능)
 
 package com.example.demo.service.path.impl;
 
@@ -10,12 +13,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.PriorityQueue;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.example.demo.dao.SegmentWeightDAO;
 import com.example.demo.service.path.IPathService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class PathServiceImpl implements IPathService {
@@ -38,6 +47,23 @@ public class PathServiceImpl implements IPathService {
 
     @Autowired
     private SegmentWeightDAO segmentWeightDAO;
+
+    // =========================
+    // BUS 정류장명 캐시(서버에서 nodeNames 채우기)
+    // =========================
+
+    // TAGO 공공데이터 서비스키 (기존 BusApiController와 동일한 값 사용)
+    private static final String TAGO_SERVICE_KEY =
+            "ff623cef3aa0e011104003d8973105076b9f4ce098a93e4b6de36a9f2560529c";
+
+    // 대전 도시코드
+    private static final String TAGO_CITY_CODE = "25";
+
+    // routeId -> (nodeId -> nodeName) 캐시
+    private static final Map<String, Map<String, String>> BUS_ROUTE_STOPNAME_CACHE = new ConcurrentHashMap<>();
+
+    private final RestTemplate busNameRestTemplate = new RestTemplate();
+    private final ObjectMapper busNameObjectMapper = new ObjectMapper();
 
     // ===============================================================
     // [Step 1] 트램 정거장 데이터 (내부 클래스 및 초기화)
@@ -410,6 +436,87 @@ private String getTramNameByNodeId(String nodeId) {
     }
     return null;
 }
+
+// =========================
+// 유틸: BUS 노드ID("DJB800....") → 정류장 이름
+// =========================
+private String getBusStopNameByNodeId(String routeId, String nodeId) {
+    if (routeId == null || routeId.isBlank()) return null;
+    if (nodeId == null || nodeId.isBlank()) return null;
+
+    try {
+        Map<String, String> map = BUS_ROUTE_STOPNAME_CACHE.get(routeId);
+        if (map == null) {
+            map = fetchAndCacheRouteStopNameMap(routeId);
+        }
+        if (map == null) return null;
+        return map.get(nodeId);
+    } catch (Exception ignore) {
+        return null;
+    }
+}
+
+private Map<String, String> fetchAndCacheRouteStopNameMap(String routeId) {
+    // 이미 누가 채웠을 수 있으므로, double-check 방식으로 최소 호출
+    Map<String, String> cached = BUS_ROUTE_STOPNAME_CACHE.get(routeId);
+    if (cached != null) return cached;
+
+    try {
+        String url = UriComponentsBuilder
+                .fromHttpUrl("http://apis.data.go.kr/1613000/BusRouteInfoInqireService/getRouteAcctoThrghSttnList")
+                .queryParam("serviceKey", TAGO_SERVICE_KEY)
+                .queryParam("_type", "json")
+                .queryParam("cityCode", TAGO_CITY_CODE)
+                .queryParam("routeId", routeId)
+                .queryParam("pageNo", "1")
+                .queryParam("numOfRows", "300")
+                .build(false)
+                .toUriString();
+
+        String body = busNameRestTemplate.getForObject(url, String.class);
+        if (body == null || body.isBlank()) {
+            BUS_ROUTE_STOPNAME_CACHE.put(routeId, Collections.emptyMap());
+            return BUS_ROUTE_STOPNAME_CACHE.get(routeId);
+        }
+
+        JsonNode root = busNameObjectMapper.readTree(body);
+        JsonNode itemsNode = root.path("response").path("body").path("items").path("item");
+
+        Map<String, String> map = new HashMap<>();
+        if (itemsNode.isArray()) {
+            for (JsonNode it : itemsNode) {
+                String nid = safeText(it, "nodeid");
+                String nm = safeText(it, "nodenm");
+                if (nid != null && !nid.isBlank() && nm != null && !nm.isBlank()) {
+                    map.putIfAbsent(nid, nm);
+                }
+            }
+        } else if (itemsNode.isObject()) {
+            String nid = safeText(itemsNode, "nodeid");
+            String nm = safeText(itemsNode, "nodenm");
+            if (nid != null && !nid.isBlank() && nm != null && !nm.isBlank()) {
+                map.putIfAbsent(nid, nm);
+            }
+        }
+
+        BUS_ROUTE_STOPNAME_CACHE.put(routeId, map);
+        return map;
+    } catch (HttpStatusCodeException ex) {
+        // 외부 API 오류(4xx/5xx)는 캐시를 비워둬서 동일 routeId에 대해 계속 폭발하지 않도록 막는다.
+        BUS_ROUTE_STOPNAME_CACHE.put(routeId, Collections.emptyMap());
+        return BUS_ROUTE_STOPNAME_CACHE.get(routeId);
+    } catch (Exception ex) {
+        BUS_ROUTE_STOPNAME_CACHE.put(routeId, Collections.emptyMap());
+        return BUS_ROUTE_STOPNAME_CACHE.get(routeId);
+    }
+}
+
+private String safeText(JsonNode node, String field) {
+    if (node == null || field == null) return null;
+    JsonNode v = node.get(field);
+    if (v == null || v.isNull()) return null;
+    return v.asText(null);
+}
 /**
  * 허용 환승 횟수(maxTransfers)를 "승차 횟수 상한(MAX_RIDES)"으로 변환한다.
  *
@@ -655,13 +762,25 @@ StopPoint to = stopPointMap.get(e.toId);
 if (from != null) {
     points.add(new double[]{from.lng, from.lat});
     nodeIds.add(e.fromId);
-    nodeNames.add("TRAM".equals(e.mode) ? getTramNameByNodeId(e.fromId) : null);
+    if ("TRAM".equals(e.mode)) {
+        nodeNames.add(getTramNameByNodeId(e.fromId));
+    } else if ("BUS".equals(e.mode)) {
+        nodeNames.add(getBusStopNameByNodeId(e.routeId, e.fromId));
+    } else {
+        nodeNames.add(null);
+    }
 }
 
 if (to != null) {
     points.add(new double[]{to.lng, to.lat});
     nodeIds.add(e.toId);
-    nodeNames.add("TRAM".equals(e.mode) ? getTramNameByNodeId(e.toId) : null);
+    if ("TRAM".equals(e.mode)) {
+        nodeNames.add(getTramNameByNodeId(e.toId));
+    } else if ("BUS".equals(e.mode)) {
+        nodeNames.add(getBusStopNameByNodeId(e.routeId, e.toId));
+    } else {
+        nodeNames.add(null);
+    }
 }}
 
         if (curSeg != null) segments.add(curSeg);
