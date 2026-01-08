@@ -43,8 +43,8 @@ public class CollectorController {
     @Autowired
     private CollectorSwitch collectorSwitch;
 
-    private final AtomicInteger intervalMs = new AtomicInteger(60000);
-    private final AtomicInteger batchSize = new AtomicInteger(5);
+    private final AtomicInteger intervalMs = new AtomicInteger(180000); // 3분
+    private final AtomicInteger batchSize = new AtomicInteger(1); // 1개씩
 
     // ✅ refineOnce(callsBudget) : arrival API 호출 예산
     private final AtomicInteger refineCallsBudgetPerLoop = new AtomicInteger(4);
@@ -254,7 +254,7 @@ public class CollectorController {
                     int elapsed = (int) (System.currentTimeMillis() - st);
                     lastElapsedMs.set(elapsed);
 
-                    autoTuneBatch(elapsed);
+                    // autoTuneBatch(elapsed); // 튜닝 비활성화 (1개 고정)
 
                     inProgress.set(false);
                 }

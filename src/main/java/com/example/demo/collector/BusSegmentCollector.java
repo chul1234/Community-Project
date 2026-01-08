@@ -54,7 +54,7 @@ public class BusSegmentCollector {
     // ✅ 트래픽 최소화 최우선: 노선당 arrival API 호출 상한을 강하게 낮춘다.
     //    - 기존 80은 "성과(=arrivalUsed) 0"인 노선에서도 쿼터를 태우는 최악의 패턴이었다.
     //    - 이 값은 '정확도'보다 '호출 최소화'를 우선하는 정책값이다.
-    private static final int ARRIVAL_API_LIMIT_PER_ROUTE = 3;
+    private static final int ARRIVAL_API_LIMIT_PER_ROUTE = 40;
 
     // =========================
     // TAGO 기본 설정
