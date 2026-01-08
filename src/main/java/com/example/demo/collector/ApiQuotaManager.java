@@ -1,3 +1,5 @@
+// 수정됨: isExhaustedToday() 추가(remaining=0 상태를 명확히 판정)하여 수집 루프/외부 호출 경로에서 즉시 중단 가능
+
 package com.example.demo.collector;
 
 import java.time.LocalDate;
@@ -55,6 +57,15 @@ public class ApiQuotaManager {
     }
 
     /**
+     * 오늘 기준으로 호출 가능 잔여량이 0인지(=쿼터 소진 상태) 반환한다.
+     *
+     * @return true면 오늘은 더 이상 외부 API 호출을 하면 안 된다.
+     */
+    public boolean isExhaustedToday() {
+        return getRemainingToday() <= 0;
+    }
+
+    /**
      * 외부 API에서 "quota exceeded"(429 등)가 발생했을 때, 남은 호출을 강제로 0으로 만든다.
      * 공공데이터포털은 초과 이후 동일 키로 계속 429가 날 수 있으므로, 그날은 즉시 중단시키는 용도이다.
      */
@@ -63,3 +74,5 @@ public class ApiQuotaManager {
         usedToday.set(DAILY_LIMIT);
     }
 }
+
+// 수정됨 끝

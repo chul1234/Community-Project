@@ -1,5 +1,5 @@
 // 수정됨: (1) runRefineOnce/autoLoop의 calls를 "arrival API 호출 예산(callsBudget)" 의미로 명확화
-//        (2) quotaRemainingToday=0이면 collect/refine 모두 스킵(트래픽 절감)
+//        (2) quotaRemainingToday=0이면 "스킵"이 아니라 collectorSwitch OFF로 내려 autoLoop 자체를 종료(수집 완전 중단)
 //        (3) refine 예산을 quotaRemainingToday로 상한 처리(min)하여 초과 호출 방지
 //        (4) BusSegmentCollector에 getLastRefineDiagSummary()가 없을 수 있으므로 리플렉션으로 안전 조회(String)
 
@@ -206,12 +206,12 @@ public class CollectorController {
                     continue;
                 }
 
-                // ✅ 쿼터가 0이면 전체 작업을 스킵(collect/refine 모두)
+                // ✅ 쿼터가 0이면 "스킵"이 아니라 "수집 OFF" 처리하여 루프 자체를 종료한다.
+                //    - 쿼터 소진 이후에도 계속 돌며 로그를 찍거나 상태가 running으로 보이는 것을 방지
                 if (apiQuotaManager != null && apiQuotaManager.getRemainingToday() <= 0) {
-                    if (!sleepQuietly(intervalMs.get())) {
-                        break;
-                    }
-                    continue;
+                    collectorSwitch.stop();
+                    System.out.println("[COLLECTOR][QUOTA] remaining=0 -> collectorSwitch OFF (autoLoop exit)");
+                    break;
                 }
 
                 if (!inProgress.compareAndSet(false, true)) {

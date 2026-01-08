@@ -3,7 +3,8 @@
 //        (2) arrival API 원문(JSON/텍스트) 1개만으로 (쿼터/인증/파라미터/응답구조/arrtime부재) 원인 확정 가능하도록, 최초 1회 원문 샘플을 diag에 저장
 //        (3) 트래픽 절감: refineOnce(calls)는 "세그먼트 수"가 아니라 "arrival API 호출 예산(callsBudget)"으로 해석하여, 예산 소진 시 즉시 조기중단
 //        (4) items/item 경로가 없거나 비정상 타입일 때를 apiError로 잡지 않고 arrivalItemsEmpty로 분리(응답구조/빈 결과 케이스를 명확히 카운트)
-//        (5) 기존 로직(collectOnce: seed/거리 fallback, route-stops 캐시, 라운드로빈, DB_CLOSED_FATAL 감지)은 유지
+//        (5) 쿼터 소진 감지(HTTP 429 / resultMsg) 시 ApiQuotaManager를 즉시 소진 처리하고 collectorSwitch OFF로 내려 수집 루프를 종료
+//        (6) route-stops / route-noList 등 수집 루프에서 발생하는 외부 호출에도 전역 쿼터를 적용하고, 429/쿼터 초과 메시지면 즉시 중단
 
 package com.example.demo.collector;
 
@@ -28,6 +29,8 @@ import javax.sql.DataSource;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -115,6 +118,13 @@ public class BusSegmentCollector {
      * + DB 풀 종료 치명 상태(DB_CLOSED_FATAL)면 무조건 중단한다.
      */
     private boolean shouldStopNow() {
+        // ✅ 전역 일일 쿼터가 0이면, 즉시 수집을 멈춘다(무한 루프/로그 스팸 방지)
+        if (apiQuotaManager != null && apiQuotaManager.isExhaustedToday()) {
+            if (collectorSwitch != null) {
+                collectorSwitch.stop();
+            }
+            return true;
+        }
         if (DB_CLOSED_FATAL.get()) {
             return true;
         }
@@ -122,6 +132,48 @@ public class BusSegmentCollector {
             return true;
         }
         return Thread.currentThread().isInterrupted();
+    }
+
+    /**
+     * 외부 API에서 "오늘 쿼터 소진"이 확정된 경우, 로컬 쿼터를 0으로 만들고 수집 스위치를 OFF로 내려
+     * 수집 루프가 즉시 종료되도록 만든다.
+     */
+    private void stopCollectorDueToQuota(String meta, String raw) {
+        try {
+            if (apiQuotaManager != null) {
+                apiQuotaManager.markExhaustedForToday();
+            }
+        } catch (Exception ignore) {
+        }
+
+        try {
+            if (collectorSwitch != null) {
+                collectorSwitch.stop();
+            }
+        } catch (Exception ignore) {
+        }
+
+        System.out.println("[COLLECTOR][QUOTA] exhausted -> collector stopped. meta=" + meta);
+        if (raw != null && !raw.isBlank()) {
+            // 원문은 너무 길 수 있으니 앞부분만 로그로 남긴다.
+            String s = raw;
+            if (s.length() > 400) {
+                s = s.substring(0, 400) + "...";
+            }
+            System.out.println("[COLLECTOR][QUOTA] rawSample=" + s);
+        }
+    }
+
+    private boolean isQuotaExceededMessage(String msg) {
+        if (msg == null) return false;
+        String m = msg.toLowerCase();
+        // 공공데이터포털/기관 API에서 자주 보이는 패턴들
+        if (m.contains("quota") && m.contains("exceed")) return true;
+        if (m.contains("token") && m.contains("quota") && m.contains("exceed")) return true;
+        // 한글 메시지(예: "일일 호출 허용량을 초과")
+        if (msg.contains("허용량") && msg.contains("초과")) return true;
+        if (msg.contains("호출") && msg.contains("초과")) return true;
+        return false;
     }
 
     @Autowired
@@ -581,6 +633,12 @@ public class BusSegmentCollector {
                 return Collections.emptyList();
             }
 
+            // ✅ 전역 일일 쿼터 체크(호출 직전)
+            if (apiQuotaManager != null && !apiQuotaManager.tryConsume(1)) {
+                stopCollectorDueToQuota("quotaRemainingToday=0 before getRouteNoList", null);
+                return Collections.emptyList();
+            }
+
             URI uri = UriComponentsBuilder
                 .fromHttpUrl(TAGO_ROUTE_BASE_URL + OP_GET_ROUTE_NO_LIST)
                 .queryParam("serviceKey", SERVICE_KEY)
@@ -612,6 +670,14 @@ public class BusSegmentCollector {
 
             System.out.println("[COLLECTOR] routesApi resultCode=" + code + " resultMsg=" + msg);
             System.out.println("[COLLECTOR] routesApi itemsType=" + items.getNodeType());
+
+            // ✅ resultCode != 00 인 경우(특히 quota exceeded) 더 이상 진행하지 않는다.
+            if (!Objects.equals("00", code)) {
+                if (isQuotaExceededMessage(msg)) {
+                    stopCollectorDueToQuota("getRouteNoList resultCode=" + code + " msg=" + msg, json);
+                }
+                return Collections.emptyList();
+            }
 
             Set<String> routeIdSet = new LinkedHashSet<>();
 
@@ -658,6 +724,13 @@ public class BusSegmentCollector {
 
             return result;
 
+        } catch (HttpStatusCodeException e) {
+            // ✅ 429는 "오늘 쿼터 소진"이 확정된 신호이므로, 즉시 수집을 멈춘다.
+            if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
+                stopCollectorDueToQuota("routesApi HTTP_429", e.getResponseBodyAsString());
+            }
+            System.out.println("[COLLECTOR][ERROR] fetchAllRoutes httpStatus=" + e.getStatusCode() + " msg=" + e.getMessage());
+            return Collections.emptyList();
         } catch (Exception e) {
             System.out.println("[COLLECTOR][ERROR] fetchAllRoutes msg=" + e.getMessage());
             return Collections.emptyList();
@@ -700,6 +773,12 @@ public class BusSegmentCollector {
                 return Collections.emptyList();
             }
 
+            // ✅ 전역 일일 쿼터 체크(호출 직전)
+            if (apiQuotaManager != null && !apiQuotaManager.tryConsume(1)) {
+                stopCollectorDueToQuota("quotaRemainingToday=0 before getRouteAcctoThrghSttnList", null);
+                return Collections.emptyList();
+            }
+
             URI uri = UriComponentsBuilder
                 .fromHttpUrl(TAGO_ROUTE_BASE_URL + OP_GET_ROUTE_STOPS)
                 .queryParam("serviceKey", SERVICE_KEY)
@@ -728,6 +807,12 @@ public class BusSegmentCollector {
 
             String code = root.path("response").path("header").path("resultCode").asText();
             String msg  = root.path("response").path("header").path("resultMsg").asText();
+
+            // ✅ resultCode != 00 이면서 quota exceeded가 확인되면 즉시 중단
+            if (!Objects.equals("00", code) && isQuotaExceededMessage(msg)) {
+                stopCollectorDueToQuota("stopsApi resultCode=" + code + " msg=" + msg, json);
+                return Collections.emptyList();
+            }
             System.out.println("[COLLECTOR] stopsApi routeId=" + routeId
                 + " key=" + routeIdParamKey
                 + " resultCode=" + code
@@ -751,6 +836,15 @@ public class BusSegmentCollector {
             }
 
             return result;
+
+        } catch (HttpStatusCodeException e) {
+            // ✅ 429는 "오늘 쿼터 소진" 확정 신호
+            if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
+                stopCollectorDueToQuota("stopsApi HTTP_429", e.getResponseBodyAsString());
+            }
+            System.out.println("[COLLECTOR][ERROR] fetchStopsByRoute routeId=" + routeId + " key=" + routeIdParamKey
+                + " httpStatus=" + e.getStatusCode() + " msg=" + e.getMessage());
+            return Collections.emptyList();
 
         } catch (Exception e) {
             System.out.println("[COLLECTOR][ERROR] fetchStopsByRoute routeId=" + routeId + " key=" + routeIdParamKey + " msg=" + e.getMessage());
@@ -944,6 +1038,11 @@ public class BusSegmentCollector {
                     diag.apiError++;
                     diag.recordRawOnce(json, false, "resultCode=" + code + " msg=" + msg);
                 }
+
+                // ✅ quota exceeded가 확정되면 즉시 수집을 멈춘다(남은 루프에서 반복 호출 금지)
+                if (isQuotaExceededMessage(msg)) {
+                    stopCollectorDueToQuota("arrivalApi resultCode=" + code + " msg=" + msg, json);
+                }
                 return null;
             }
 
@@ -1013,6 +1112,17 @@ public class BusSegmentCollector {
                 diag.recordRawOnce(json, true, "no_route_match");
             }
 
+            return null;
+
+        } catch (HttpStatusCodeException e) {
+            // ✅ 429는 "오늘 쿼터 소진" 확정 신호
+            if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
+                stopCollectorDueToQuota("arrivalApi HTTP_429", e.getResponseBodyAsString());
+            }
+            if (diag != null) {
+                diag.apiError++;
+                diag.recordRawOnce(e.getResponseBodyAsString(), null, "httpStatus=" + e.getStatusCode());
+            }
             return null;
 
         } catch (Exception e) {

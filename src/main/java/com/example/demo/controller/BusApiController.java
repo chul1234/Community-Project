@@ -1,3 +1,5 @@
+// 수정됨: arrival API가 429(Quota Exceeded)일 때 ApiQuotaManager를 소진 처리하고 collectorSwitch OFF로 내려 수집 자동 루프를 즉시 중단
+
 package com.example.demo.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +14,7 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import com.example.demo.collector.ApiQuotaManager;
+import com.example.demo.collector.CollectorSwitch;
 
 /**
  * TAGO (국토교통부) 버스 노선 정보 + 정류장 목록 + 버스 위치 + 도착정보 조회 컨트롤러
@@ -36,6 +39,11 @@ public class BusApiController {
      */
     @Autowired(required = false)
     private ApiQuotaManager apiQuotaManager;
+
+    // ✅ 수집 자동 루프가 켜져 있는 상태에서 외부 429(Quota Exceeded)가 확정되면 즉시 OFF로 내려
+    //    더 이상의 불필요한 호출/로그 스팸을 막는다.
+    @Autowired(required = false)
+    private CollectorSwitch collectorSwitch;
 
     /**
      * 1) 버스 번호 → 노선 목록 조회 (getRouteNoList)
@@ -158,6 +166,9 @@ public class BusApiController {
             // 2) 외부에서 429가 떨어졌으면 "오늘은 끝"으로 판단하고, 이후 호출을 즉시 차단한다.
             if (apiQuotaManager != null && ex.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
                 apiQuotaManager.markExhaustedForToday();
+                if (collectorSwitch != null) {
+                    collectorSwitch.stop();
+                }
             }
             // TAGO가 내려준 에러 본문을 그대로 반환해서 원인을 프론트(Network Response)에서 확인 가능하게 한다.
             return ResponseEntity.status(ex.getStatusCode())
@@ -222,3 +233,5 @@ public class BusApiController {
         return restTemplate.getForObject(url, String.class);
     }
 }
+
+// 수정됨 끝
