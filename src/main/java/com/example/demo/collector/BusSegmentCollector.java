@@ -524,9 +524,12 @@ public class BusSegmentCollector {
                                 arrivalUsed++;
                             }
 
+                            // ✅ [Modified] Fallback disabled for data purity.
+                            // If API returns no data (null or <=0), we do NOT use distance-based estimate.
+                            // This ensures DB only contains real-time data.
                             if (travelSecSample == null || travelSecSample <= 0) {
-                                travelSecSample = estimateTravelSecondsByDistanceFallback(distanceM);
-                                fallbackUsed++;
+                                // travelSecSample = estimateTravelSecondsByDistanceFallback(distanceM);
+                                // fallbackUsed++;
                             }
                         }
 
