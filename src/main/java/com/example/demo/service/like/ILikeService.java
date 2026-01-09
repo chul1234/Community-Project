@@ -26,5 +26,14 @@ public interface ILikeService {
      * @param targetId   대상 ID
      * @return 좋아요 개수(int)
      */
-    int getLikeCount(String targetType, int targetId); // 
+    int getLikeCount(String targetType, int targetId);
+
+    /**
+     * 특정 사용자가 좋아요를 눌렀는지 확인
+     * @param targetType 'POST' 또는 'COMMENT'
+     * @param targetId   대상 ID
+     * @param userId     사용자 ID
+     * @return true if liked, false otherwise
+     */
+    boolean checkLike(String targetType, int targetId, String userId);
 }

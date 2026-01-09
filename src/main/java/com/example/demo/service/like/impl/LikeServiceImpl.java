@@ -49,4 +49,9 @@ public class LikeServiceImpl implements ILikeService {   // : 인터페이스 �
     public int getLikeCount(String targetType, int targetId) {
         return likeDAO.count(targetType, targetId);   // 
     }
+
+    @Override
+    public boolean checkLike(String targetType, int targetId, String userId) {
+        return likeDAO.exists(targetType, targetId, userId);
+    }
 }

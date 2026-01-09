@@ -168,7 +168,7 @@
                         class="action-btn-sm"
                         ng-click="togglePostLike(post)"
                     >
-                        <span ng-class="{'liked': post.likeCount > 0}">♥</span>
+                        <span ng-class="{'liked': post.liked}">♥</span>
                         {{ post.likeCount || 0 }}
                     </button>
                 </td>

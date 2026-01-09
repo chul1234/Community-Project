@@ -146,17 +146,24 @@ app.controller('BoardController', function ($scope, $http, $rootScope) {
 
     // 게시글 좋아요 개수 조회 함수 (목록 화면용)
     $scope.loadLikeCountForPost = function (post) {
-        // 해당 게시글의 좋아요 개수를 서버에서 가져옴
+        var params = {
+            type: 'POST', // 게시글 타입
+            id: post.post_id // 게시글 PK
+        };
+        // 로그인한 경우 userId 추가하여 좋아요 여부 체크
+        if ($rootScope.currentUser && $rootScope.currentUser.user_id) {
+            params.userId = $rootScope.currentUser.user_id;
+        }
+
         $http
-            .get('/likes/count', {
-                params: {
-                    type: 'POST', // 게시글 타입
-                    id: post.post_id, // 게시글 PK
-                },
-            })
+            .get('/likes/count', { params: params })
             .then(function (res) {
                 // 받아온 좋아요 수를 post 객체에 저장
                 post.likeCount = res.data.count;
+                // 좋아요 여부(liked) 상태 업데이트 (있으면)
+                if (res.data.liked !== undefined) {
+                    post.liked = res.data.liked;
+                }
             });
     };
 
@@ -614,15 +621,21 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
 
     // 게시글 좋아요 개수 조회 (상세 화면용)
     $scope.loadLikeCountForPost = function (post) {
+        var params = {
+            type: 'POST', // 게시글 타입
+            id: postId, // 현재 상세 화면 게시글 ID
+        };
+        if ($rootScope.currentUser && $rootScope.currentUser.user_id) {
+            params.userId = $rootScope.currentUser.user_id;
+        }
+
         $http
-            .get('/likes/count', {
-                params: {
-                    type: 'POST', // 게시글 타입
-                    id: postId, // 현재 상세 화면 게시글 ID
-                },
-            })
+            .get('/likes/count', { params: params })
             .then(function (res) {
                 post.likeCount = res.data.count; // 좋아요 개수 저장
+                if (res.data.liked !== undefined) {
+                    post.liked = res.data.liked;
+                }
             });
     };
 
@@ -664,15 +677,21 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
 
     // 댓글/대댓글 좋아요 개수 조회
     $scope.loadLikeCountForComment = function (comment) {
+        var params = {
+            type: 'COMMENT', // 댓글/대댓글은 COMMENT 타입으로 통합
+            id: comment.comment_id, // 해당 댓글 PK
+        };
+        if ($rootScope.currentUser && $rootScope.currentUser.user_id) {
+            params.userId = $rootScope.currentUser.user_id;
+        }
+
         $http
-            .get('/likes/count', {
-                params: {
-                    type: 'COMMENT', // 댓글/대댓글은 COMMENT 타입으로 통합
-                    id: comment.comment_id, // 해당 댓글 PK
-                },
-            })
+            .get('/likes/count', { params: params })
             .then(function (res) {
                 comment.likeCount = res.data.count; // 좋아요 개수 저장
+                if (res.data.liked !== undefined) {
+                    comment.liked = res.data.liked;
+                }
             });
     };
 

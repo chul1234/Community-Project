@@ -56,21 +56,28 @@ public class LikeController {
 
 
     /**
-     *좋아요 개수 단독 조회 API (선택)
-     * 게시글/댓글을 처음 로딩할 때 count만 필요할 경우 사용 가능
+     * 좋아요 개수 + 여부 조회 API
+     * 게시글/댓글을 로딩할 때 count와 함께 "내가 좋아요를 눌렀는지"도 확인
      *
      * 요청:
-     * /likes/count?type=POST&id=3
+     * /likes/count?type=POST&id=3&userId=user1
      */
-    @GetMapping("/likes/count")     // 
+    @GetMapping("/likes/count")
     public Map<String, Object> getLikeCount(
             @RequestParam("type") String targetType,
-            @RequestParam("id") int targetId
+            @RequestParam("id") int targetId,
+            @RequestParam(value = "userId", required = false) String userId
     ) {
-        int count = likeService.getLikeCount(targetType, targetId);  // 
+        int count = likeService.getLikeCount(targetType, targetId);
+        boolean liked = false;
+
+        if (userId != null && !userId.isEmpty()) {
+            liked = likeService.checkLike(targetType, targetId, userId);
+        }
 
         Map<String, Object> result = new HashMap<>();
         result.put("count", count);
+        result.put("liked", liked);
 
         return result;
     }
