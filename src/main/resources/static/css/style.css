@@ -1972,6 +1972,7 @@ header h1 {
 /* 기본은 닫힘, 체크 시 펼침 */
 .bus-page .sheet-toggle:checked ~ .sheet-body {
     max-height: 280px;
+    overflow-y: auto; /* ✅ 콘텐츠가 많으면 스크롤 */
 }
 
 /* 바텀 시트 안 컨텐츠 패딩 */
