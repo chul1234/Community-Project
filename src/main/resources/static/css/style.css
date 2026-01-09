@@ -747,6 +747,17 @@ header h1 {
 }
 
 /* ====== 7-2. 상태/제어 카드 ====== */
+/* ✅ 공통 카드 스타일 정의: 중복 제거 */
+.bus-card,
+.bus-panel-box,
+.stats-card,
+.bus-page .sidebar-block {
+    background: #ffffff;
+    border: 1px solid #e9ecef;
+    border-radius: 14px;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
+}
+
 .bus-status-container {
     display: flex;
     gap: 14px;
@@ -755,10 +766,7 @@ header h1 {
 }
 
 .bus-card {
-    background: #fff;
-    border-radius: 14px;
-    border: 1px solid #e9ecef;
-    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
+    /* 공통 스타일 상속됨 */
     padding: 14px 16px;
     display: flex;
     align-items: center;
@@ -805,7 +813,9 @@ header h1 {
 }
 
 /* 자동갱신/멈춤 버튼 (세로 찌그러짐 방지) */
-.btn-refresh-toggle {
+/* 자동갱신/멈춤 버튼 (세로 찌그러짐 방지) */
+.btn-refresh-toggle,
+.bus-page .btn-refresh {
     padding: 10px 12px;
     font-size: 13px;
     border-radius: 12px;
@@ -813,17 +823,19 @@ header h1 {
     border: 1px solid transparent;
     font-weight: 900;
     white-space: nowrap;       /* ✅ 글자 세로로 줄바꿈 방지 */
-    min-width: 110px;          /* ✅ 버튼 폭 확보 */
+    min-width: 120px;          /* ✅ 버튼 폭 확보 (110->120 통일) */
     text-align: center;
 }
 
-.btn-refresh-toggle.on {
+.btn-refresh-toggle.on,
+.bus-page .btn-refresh.on {
     background-color: #e6fcf5;
     color: #0ca678;
     border-color: #c3fae8;
 }
 
-.btn-refresh-toggle.off {
+.btn-refresh-toggle.off,
+.bus-page .btn-refresh.off {
     background-color: #fff5f5;
     color: #fa5252;
     border-color: #ffc9c9;
@@ -880,12 +892,9 @@ header h1 {
 
 /* 패널 박스 */
 .bus-panel-box {
+    /* 공통 스타일 상속됨 */
     flex: 1;
     min-width: 320px;
-    background: #fff;
-    border-radius: 14px;
-    border: 1px solid #e9ecef;
-    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -1071,10 +1080,7 @@ header h1 {
 .stats-card {
     flex: 1;
     min-width: 320px;
-    background: #ffffff;
-    border: 1px solid #e9ecef;
-    border-radius: 14px;
-    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
+    /* 공통 스타일 상속됨 */
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -1602,10 +1608,7 @@ header h1 {
 
 /* 사이드바 블록(카드) */
 .bus-page .sidebar-block {
-    background: #ffffff;
-    border: 1px solid #e9ecef;
-    border-radius: 14px;
-    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
+    /* 공통 스타일 상속됨 */
     padding: 12px;
 }
 
@@ -1778,28 +1781,7 @@ header h1 {
     flex-wrap: wrap;
 }
 
-.bus-page .btn-refresh {
-    padding: 10px 12px;
-    border-radius: 12px;
-    border: 1px solid transparent;
-    font-size: 13px;
-    font-weight: 900;
-    white-space: nowrap;
-    min-width: 120px;
-    text-align: center;
-}
-
-.bus-page .btn-refresh.on {
-    background-color: #e6fcf5;
-    color: #0ca678;
-    border-color: #c3fae8;
-}
-
-.bus-page .btn-refresh.off {
-    background-color: #fff5f5;
-    color: #fa5252;
-    border-color: #ffc9c9;
-}
+/* .btn-refresh uses common .btn-refresh-toggle styles defined above */
 
 .bus-page .btn-collector {
     width: 100%;
