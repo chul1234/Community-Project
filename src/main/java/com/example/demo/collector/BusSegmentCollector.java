@@ -437,14 +437,17 @@ public class BusSegmentCollector {
             + ", seedDistanceOnly=" + SEED_DISTANCE_ONLY
             + ", routeStopsCacheSize(now)=" + ROUTE_STOPS_CACHE.size());
 
-        int totalSegmentsUpserted = 0;
-        int totalSegmentsSkippedNoTime = 0;
-        int totalSegmentsTried = 0;
+        // ✅ 병렬 처리를 위한 AtomicInteger 카운터 사용
+        AtomicInteger totalSegmentsUpserted = new AtomicInteger(0);
+        AtomicInteger totalSegmentsSkippedNoTime = new AtomicInteger(0);
+        AtomicInteger totalSegmentsTried = new AtomicInteger(0);
 
-        for (RouteInfo route : targetRoutes) {
+        // ✅ 순차 루프(for) -> 병렬 스트림(parallelStream)으로 변경하여 동시 실행
+        //    (Batch=2 이상일 때 진짜 병렬로 동시에 API를 호출함)
+        targetRoutes.parallelStream().forEach(route -> {
             if (shouldStopNow()) {
-                System.out.println("[COLLECTOR] collectOnce stop requested (mid-loop)");
-                break;
+                // 병렬 스트림에서는 break 대신 return으로 종료
+                return;
             }
             long routeStartMs = System.currentTimeMillis();
             System.out.println("[COLLECTOR] routeStart=" + route.routeId);
@@ -453,15 +456,14 @@ public class BusSegmentCollector {
             int[] arrivalApiCalls = new int[] { 0 };
 
             try {
-                if (shouldStopNow()) break;
+                if (shouldStopNow()) return;
 
                 List<StopOnRoute> stops = fetchStopsByRoute(route.routeId);
                 if (stops.size() < 2) {
                     System.out.println("[COLLECTOR] routeId=" + route.routeId + " stops < 2. skip.");
-                    long elapsedMs = System.currentTimeMillis() - routeStartMs;
-                    System.out.println("[COLLECTOR] routeEnd=" + route.routeId + " elapsedMs=" + elapsedMs + " (skip)");
-                    continue;
+                    return; // continue -> return
                 }
+
 
                 Map<Integer, List<StopOnRoute>> stopsByDir = new HashMap<>();
                 for (StopOnRoute s : stops) {
@@ -469,9 +471,9 @@ public class BusSegmentCollector {
                     stopsByDir.computeIfAbsent(dir, k -> new ArrayList<>()).add(s);
                 }
 
-                int upsertedForRoute = 0;
-                int skippedForRouteNoTime = 0;
-                int triedForRoute = 0;
+                // int upsertedForRoute = 0; // Replaced by AtomicInteger
+                // int skippedForRouteNoTime = 0; // Replaced by AtomicInteger
+                // int triedForRoute = 0; // Replaced by AtomicInteger
 
                 int arrivalUsed = 0;
                 int fallbackUsed = 0;
@@ -519,6 +521,7 @@ public class BusSegmentCollector {
                                 arrivalApiCalls,
                                 null // ✅ collectOnce에서는 diag 집계하지 않음
                             );
+                            totalSegmentsTried.incrementAndGet(); // Increment here as API call is attempted
 
                             if (travelSecSample != null && travelSecSample > 0) {
                                 arrivalUsed++;
@@ -534,7 +537,7 @@ public class BusSegmentCollector {
                         }
 
                         if (travelSecSample == null || travelSecSample <= 0) {
-                            skippedForRouteNoTime++;
+                            totalSegmentsSkippedNoTime.incrementAndGet(); // Use AtomicInteger
                             continue;
                         }
 
@@ -547,21 +550,21 @@ public class BusSegmentCollector {
                             travelSecSample
                         );
 
-                        triedForRoute++;
+                        // triedForRoute++; // Replaced by totalSegmentsTried.incrementAndGet() above
                         if (ok) {
-                            upsertedForRoute++;
+                            totalSegmentsUpserted.incrementAndGet(); // Use AtomicInteger
                         }
                     }
                 }
 
-                totalSegmentsUpserted += upsertedForRoute;
-                totalSegmentsSkippedNoTime += skippedForRouteNoTime;
-                totalSegmentsTried += triedForRoute;
+                // totalSegmentsUpserted += upsertedForRoute; // Replaced by direct AtomicInteger updates
+                // totalSegmentsSkippedNoTime += skippedForRouteNoTime; // Replaced by direct AtomicInteger updates
+                // totalSegmentsTried += triedForRoute; // Replaced by direct AtomicInteger updates
 
                 System.out.println("[COLLECTOR] routeId=" + route.routeId
-                    + " tried=" + triedForRoute
-                    + " upserted=" + upsertedForRoute
-                    + " skippedNoTime=" + skippedForRouteNoTime
+                    // + " tried=" + triedForRoute // Removed as it's now global
+                    // + " upserted=" + upsertedForRoute // Removed as it's now global
+                    // + " skippedNoTime=" + skippedForRouteNoTime // Removed as it's now global
                     + " arrivalUsed=" + arrivalUsed
                     + " fallbackUsed=" + fallbackUsed
                     + " arrivalApiCalls=" + arrivalApiCalls[0]
@@ -575,14 +578,13 @@ public class BusSegmentCollector {
                 System.out.println("[COLLECTOR][ERROR] routeId=" + route.routeId + " msg=" + e.getMessage());
                 System.out.println("[COLLECTOR] routeEnd=" + route.routeId + " elapsedMs=" + elapsedMs + " (error)");
             }
-        }
+        }); // End of parallelStream
 
         if (VISITED_ROUTES.size() >= routes.size()) {
             System.out.println("[COLLECTOR] ALL ROUTES VISITED (visited=" + VISITED_ROUTES.size() + "/" + routes.size() + "). next call will start new cycle.");
         }
 
         System.out.println("[COLLECTOR] done. routes=" + targetRoutes.size()
-            + ", segmentsTried=" + totalSegmentsTried
             + ", totalSegmentsUpserted=" + totalSegmentsUpserted
             + ", totalSkippedNoTime=" + totalSegmentsSkippedNoTime);
     }

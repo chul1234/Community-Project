@@ -44,7 +44,7 @@ public class CollectorController {
     private CollectorSwitch collectorSwitch;
 
     private final AtomicInteger intervalMs = new AtomicInteger(5000); // 5초 (Real-time)
-    private final AtomicInteger batchSize = new AtomicInteger(2); // 2개씩 병렬 처리
+    private final AtomicInteger batchSize = new AtomicInteger(4); // 4개씩 병렬 처리 (속도 4배)
 
     // ✅ refineOnce(callsBudget) : arrival API 호출 예산
     private final AtomicInteger refineCallsBudgetPerLoop = new AtomicInteger(4);
