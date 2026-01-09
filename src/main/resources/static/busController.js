@@ -2630,6 +2630,19 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
         );
     };
 
+    // -------------------------
+    // [추가] 경로 탐색 출발/도착지 제거 (X버튼)
+    // -------------------------
+    $scope.clearPathStart = function() {
+        $scope.pathStartStop = null;
+        if ($scope.clearResultPath) $scope.clearResultPath();
+    };
+
+    $scope.clearPathEnd = function() {
+        $scope.pathEndStop = null;
+        if ($scope.clearResultPath) $scope.clearResultPath();
+    };
+
     // 페이지 진입 시: 상태 1회 확인(ON이면 applyCollectorStatus가 폴링 시작)
     refreshCollectorStatus();
 });

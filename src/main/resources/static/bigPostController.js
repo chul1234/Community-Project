@@ -169,13 +169,17 @@ app.controller('BigPostController', function ($scope, $http, $window, $timeout) 
     // 검색 초기화
     // ------------------------------------------
     $scope.clearSearch = function () {
+        var wasSearchMode = $scope.isSearchMode;
         $scope.searchKeyword = '';
         $scope.isSearchMode = false;
-        $scope.currentPage = 1;
-
-        // 전체 기준 총 개수 다시 불러오고, 키셋 첫 페이지 로드
-        loadTotalInfo();
-        loadFirstPage();
+        
+        // 검색 모드였다면 목록을 초기화(리로드), 
+        // 단순히 검색어만 입력했던 상태라면 텍스트만 지우고 리로드 안 함
+        if (wasSearchMode) {
+            $scope.currentPage = 1;
+            loadTotalInfo();
+            loadFirstPage();
+        }
     };
 
     // ------------------------------------------
