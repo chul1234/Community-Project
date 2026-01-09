@@ -16,8 +16,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class ApiQuotaManager {
 
-    // 일일 트래픽 상한(사용자 요구사항: 10,000)
-    private static final int DAILY_LIMIT = 10000;
+    // 일일 트래픽 상한(사용자 요구사항: 500,000 - 운영계정)
+    private static final int DAILY_LIMIT = 500000;
 
     private volatile LocalDate currentDate = LocalDate.now();
     private final AtomicInteger usedToday = new AtomicInteger(0);
