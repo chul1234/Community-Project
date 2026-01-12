@@ -215,6 +215,27 @@
 
         <!-- 우측: 컨트롤 패널 -->
         <aside class="bus-sidebar">
+            
+            <!-- 0) [추가] 내 즐겨찾기 (접이식 UI) -->
+            <section class="sidebar-block" ng-if="userId && bmkList && bmkList.length > 0">
+                <div class="sidebar-title" ng-click="isFavExpanded = !isFavExpanded" style="cursor: pointer; display: flex; justify-content: space-between;">
+                    <span>★ 내 즐겨찾기</span>
+                    <span>{{ isFavExpanded ? '▼' : '▶' }}</span>
+                </div>
+                
+                <div class="sidebar-list" ng-show="isFavExpanded" style="max-height: 200px; overflow-y: auto; margin-bottom: 10px; transition: all 0.3s;">
+                    <ul class="stop-list">
+                        <li ng-repeat="bmk in bmkList" ng-click="selectBookmark(bmk)" style="cursor: pointer;">
+                            <div class="stop-left">
+                                <span style="color: #FFD700; margin-right: 5px;">★</span>
+                                <span class="stop-title">{{ bmk.alias || bmk.target_id }}</span>
+                                <span class="badge" style="font-size: 0.7em; margin-left: 5px;" ng-if="bmk.target_type=='BUS'">버스</span>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+
             <!-- 1) 검색 & 필터 -->
             <section class="sidebar-block">
                 <div class="sidebar-title">1. 검색 & 필터</div>
@@ -354,6 +375,14 @@
                             </div>
 
                             <div class="stop-actions">
+                                <button
+                                    type="button"
+                                    class="btn-mini star"
+                                    ng-click="$event.stopPropagation(); toggleBookmark('STOP', s)"
+                                    title="즐겨찾기"
+                                >
+                                    {{ s.isBookmarked ? '★' : '☆' }}
+                                </button>
                                 <button
                                     type="button"
                                     class="btn-mini start"

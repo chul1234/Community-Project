@@ -2645,6 +2645,119 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
 
     // 페이지 진입 시: 상태 1회 확인(ON이면 applyCollectorStatus가 폴링 시작)
     refreshCollectorStatus();
+
+
+    // =========================================================
+    // [즐겨찾기 - Favorites] 추가 기능
+    // =========================================================
+    $scope.userId = null;
+    $scope.myBookmarks = {}; 
+    $scope.bmkList = []; 
+    $scope.isFavExpanded = false; // 기본값: 접힘 (UX 개선)
+
+    // 1. 사용자 정보 로드 & 즐겨찾기 목록 로드
+    function initUser() {
+        $http.get('/api/me').then(function(res) {
+            // 성공: 로그인 상태
+            if (res.data && res.data.user_id) {
+                $scope.userId = res.data.user_id;
+                loadMyBookmarks();
+            }
+        }, function(err) {
+            // 실패: 비로그인 상태 (무시)
+            console.log("[Auth] Guest User");
+        });
+    }
+
+    // 2. 내 즐겨찾기 목록 가져오기
+    function loadMyBookmarks() {
+        if (!$scope.userId) return;
+        
+        $http.get('/api/bmk/list', { params: { userId: $scope.userId } })
+            .then(function(res) {
+                $scope.myBookmarks = {};
+                $scope.bmkList = res.data || [];
+                
+                $scope.bmkList.forEach(function(bmk) {
+                    var key = bmk.target_type + '_' + bmk.target_id;
+                    $scope.myBookmarks[key] = true;
+                });
+                
+                applyBookmarksToStops();
+            });
+    }
+
+    // 3. 즐겨찾기 토글 (HTML 버튼 연결)
+    $scope.toggleBookmark = function(type, item) {
+        if (!$scope.userId) {
+            if (confirm("즐겨찾기 기능은 로그인이 필요합니다.\n로그인 페이지로 이동하시겠습니까?")) {
+                location.href = "/login";
+            }
+            return;
+        }
+
+        var targetId = (type === 'STOP') ? (item.nodeid || item.nodeId) : (item.id);
+        // 별칭(이름) 추출 - API 구조에 맞춰서
+        // 정류장: nodenm, stop_name, stationName
+        // 버스: routeno, routenm, route_id
+        var alias = (type === 'STOP') 
+            ? (item.nodenm || item.stop_name || item.stationName || targetId) 
+            : (item.route_id || item.routeno || item.routenm || targetId);
+
+        $http.post('/api/bmk/toggle', null, { 
+            params: { type: type, id: targetId, alias: alias, userId: $scope.userId } 
+        }).then(function(res) {
+            var isLiked = res.data.liked;
+            var key = type + '_' + targetId;
+            
+            if (isLiked) {
+                $scope.myBookmarks[key] = true;
+                item.isBookmarked = true;
+                loadMyBookmarks(); // 목록 갱신 (Alias 저장 확인 겸)
+            } else {
+                delete $scope.myBookmarks[key];
+                item.isBookmarked = false;
+                loadMyBookmarks(); // 목록 갱신
+            }
+        }, function(err) {
+            alert("즐겨찾기 처리 중 오류가 발생했습니다.");
+        });
+    };
+
+    // 4. 화면 목록에 즐겨찾기 상태 반영 (★/☆)
+    function applyBookmarksToStops() {
+        if (!$scope.stops) return;
+        $scope.stops.forEach(function(s) {
+            var key = 'STOP_' + (s.nodeid || s.nodeId);
+            s.isBookmarked = !!$scope.myBookmarks[key];
+        });
+    }
+
+    // 5. 검색 결과(stops)가 바뀔 때마다 즐겨찾기 상태 다시 입히기
+    $scope.$watch('stops', function(newVal) {
+        if (newVal) {
+            applyBookmarksToStops();
+        }
+    });
+
+    // 6. 즐겨찾기 항목 클릭 시 이동 (검색 활용)
+    $scope.selectBookmark = function(bmk) {
+        var keyword = bmk.alias || bmk.target_id;
+        
+        if (bmk.target_type === 'STOP') {
+            $scope.searchType = 'stop';
+            $scope.searchKeyword = keyword;
+            $scope.doSearch(); 
+        } else {
+            $scope.searchType = 'route';
+            $scope.searchKeyword = keyword;
+            $scope.doSearch();
+        }
+    };
+
+    // 시작 시 사용자 체크
+    initUser();
+
 });
 
 // 수정됨 끝
