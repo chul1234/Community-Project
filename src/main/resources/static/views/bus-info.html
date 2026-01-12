@@ -262,15 +262,26 @@
                 </div>
 
                 <div class="sidebar-row sidebar-search">
-                    <input
-                        type="text"
-                        ng-model="searchKeyword"
-                        class="bus-dashboard-input"
-                        placeholder="{{ searchType == 'route' ? '버스 번호 입력 (예: 202)' : '정류장 이름 입력' }}"
-                        ng-keyup="$event.keyCode == 13 && doSearch()"
-                    />
+                    <div style="position: relative; flex: 1;">
+                        <input
+                            type="text"
+                            ng-model="searchKeyword"
+                            class="bus-dashboard-input"
+                            style="width: 100%; padding-right: 30px;"
+                            placeholder="{{ searchType == 'route' ? '버스 번호 입력 (예: 202)' : '정류장 이름 입력' }}"
+                            ng-keyup="$event.keyCode == 13 && doSearch()"
+                        />
+                        <span 
+                            ng-show="searchKeyword" 
+                            ng-click="clearAllSearch()" 
+                            style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #999; font-weight: bold; font-size: 1.2em;" 
+                            title="초기화"
+                        >
+                            &times;
+                        </span>
+                    </div>
 
-                    <button type="button" ng-click="doSearch()" class="btn-bus-action">
+                    <button type="button" ng-click="doSearch()" class="btn-bus-action" style="margin-left: 5px;">
                         검색
                     </button>
                 </div>

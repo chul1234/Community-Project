@@ -1729,6 +1729,32 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
         cancelAutoRefresh();
     };
 
+    // [초기화] 검색 및 지도 상태 초기화
+    $scope.clearAllSearch = function() {
+        // 1. 입력 초기화
+        $scope.searchKeyword = '';
+        $scope.searchTerm = '';
+        
+        // 2. 상태 초기화
+        $scope.currentRouteId = null;
+        $scope.currentStop = null;
+        $scope.selectedStop = null;
+        
+        // 3. 데이터 초기화
+        $scope.stops = [];
+        $scope.arrivalList = [];
+        
+        // 4. 지도 오버레이 제거
+        clearRouteLine();
+        clearBusMarkers();
+        
+        // 정류장 마커 제거 (빈 목록으로 다시 그리기)
+        drawStopsOnMap([]); 
+        
+        // 5. 자동 갱신 중단
+        cancelAutoRefresh();
+    };
+
     $scope.doSearch = function () {
         if (!$scope.searchKeyword) {
             alert('검색어를 입력하세요.');
