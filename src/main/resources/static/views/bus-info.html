@@ -226,10 +226,26 @@
                 <div class="sidebar-list" ng-show="isFavExpanded" style="max-height: 200px; overflow-y: auto; margin-bottom: 10px; transition: all 0.3s;">
                     <ul class="stop-list">
                         <li ng-repeat="bmk in bmkList" ng-click="selectBookmark(bmk)" style="cursor: pointer;">
-                            <div class="stop-left">
-                                <span style="color: #FFD700; margin-right: 5px;">★</span>
-                                <span class="stop-title">{{ bmk.alias || bmk.target_id }}</span>
+                            <div class="stop-left" style="display: flex; align-items: center; overflow: hidden;">
+                                <span style="color: #FFD700; margin-right: 5px; flex-shrink: 0;">★</span>
+                                <span class="stop-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ bmk.alias || bmk.target_id }}</span>
                                 <span class="badge" style="font-size: 0.7em; margin-left: 5px;" ng-if="bmk.target_type=='BUS'">버스</span>
+                                
+                                <!-- [신규] 출발/도착 버튼 (STOP인 경우만) -->
+                                <span ng-if="bmk.target_type=='STOP'" style="margin-left: 10px; display: flex; gap: 4px;">
+                                    <button class="btn-mini" 
+                                            ng-click="setFavAsStart(bmk); $event.stopPropagation()"
+                                            title="출발지로 설정"
+                                            style="padding: 2px 5px; font-size: 0.7em; cursor: pointer;">
+                                        출발
+                                    </button>
+                                    <button class="btn-mini" 
+                                            ng-click="setFavAsEnd(bmk); $event.stopPropagation()"
+                                            title="도착지로 설정"
+                                            style="padding: 2px 5px; font-size: 0.7em; cursor: pointer;">
+                                        도착
+                                    </button>
+                                </span>
                             </div>
                         </li>
                     </ul>

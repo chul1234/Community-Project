@@ -2782,6 +2782,7 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
     });
 
     // 6. 즐겨찾기 항목 클릭 시 이동 (검색 활용)
+    // 6. 즐겨찾기 항목 클릭 시 이동 (검색 활용)
     $scope.selectBookmark = function(bmk) {
         var keyword = bmk.alias || bmk.target_id;
         
@@ -2795,6 +2796,62 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
             $scope.doSearch();
         }
     };
+
+    // [신규] 즐겨찾기 -> 출발지로 설정
+    $scope.setFavAsStart = function(bmk) {
+        if (!bmk || bmk.target_type !== 'STOP') return;
+        resolveFavStopCoords(bmk).then(function(stopObj) {
+            if (stopObj) {
+                $scope.setPathStart(stopObj);
+            } else {
+                alert('정류장 정보를 찾을 수 없어 설정하지 못했습니다.');
+            }
+        });
+    };
+
+    // [신규] 즐겨찾기 -> 도착지로 설정
+    $scope.setFavAsEnd = function(bmk) {
+        if (!bmk || bmk.target_type !== 'STOP') return;
+        resolveFavStopCoords(bmk).then(function(stopObj) {
+            if (stopObj) {
+                $scope.setPathEnd(stopObj);
+            } else {
+                alert('정류장 정보를 찾을 수 없어 설정하지 못했습니다.');
+            }
+        });
+    };
+
+    // (내부 유틸) 즐겨찾기 Alias로 정류장 좌표 찾기
+    function resolveFavStopCoords(bmk) {
+        // 1. 이미 좌표가 있다면
+        if (bmk.gpslati && bmk.gpslong) {
+            return $q.resolve(bmk);
+        }
+
+        // 2. 검색 API를 통해 좌표 조회 (이름 기준)
+        var name = bmk.alias || bmk.target_id;
+        if (!name) return $q.reject('No name');
+
+        return $http.get('/api/bus/stops-by-name', {
+            params: { nodeName: name, pageNo: 1, numOfRows: 5 }
+        }).then(function(res) {
+            var data = parseMaybeJson(res.data);
+            if (!data || !data.response || !data.response.body) return null;
+            
+            var items = data.response.body.items && data.response.body.items.item;
+            if (!items) return null;
+
+            var arr = angular.isArray(items) ? items : [items];
+            var match = null;
+            if (bmk.target_id) {
+                match = arr.find(function(it) {
+                    var id = it.nodeid || it.nodeId || it.node_id;
+                    return String(id) === String(bmk.target_id);
+                });
+            }
+            return match || arr[0];
+        });
+    }
 
     // 시작 시 사용자 체크
     initUser();
