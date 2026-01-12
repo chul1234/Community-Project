@@ -1399,6 +1399,10 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
     // 버스 마커 관련 함수
     // -------------------------
     function clearBusMarkers() {
+        // [중요] 비동기로 날아간 버스 위치 요청들이 돌아왔을 때, 
+        // 이미 취소된 상태라면 그리지 않도록 ID를 증가시켜 무효화함.
+        lastArrivalDrawRequestId++; 
+        
         var newSrc = new ol.source.Vector();
         busLayer.setSource(newSrc);
         busSource = newSrc;
@@ -1642,6 +1646,17 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
 
     $scope.selectStop = function (stop) {
         if (!stop) return;
+
+        // [토글 기능 개선] 이미 선택된 정류장을 다시 누르면 선택 해제
+        if ($scope.currentStop === stop) {
+            $scope.selectedStop = null;
+            $scope.currentStop = null;
+            $scope.arrivalList = [];
+            clearBusMarkers();
+            drawStopsOnMap($scope.stops); // 맵 마커 스타일 초기화
+            return;
+        }
+
         $scope.selectedStop = stop;
         $scope.currentStop = stop;
 
