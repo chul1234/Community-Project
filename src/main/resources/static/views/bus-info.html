@@ -45,15 +45,6 @@
                 >
                     ⏸ 멈춤
                 </button>
-
-                <button
-                    type="button"
-                    class="btn-top-control btn-top-collector"
-                    ng-click="toggleCollector()"
-                    ng-class="{'running': (collectorStatus && collectorStatus.running)}"
-                >
-                    {{ (collectorStatus && (collectorStatus.running)) ? '⏹ 수집 중지' : '▶ 수집 시작' }}
-                </button>
             </div>
         </div>
     </div>
