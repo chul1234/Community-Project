@@ -1446,22 +1446,28 @@ header h1 {
 
 .bus-path-drawer {
     position: fixed;
-    left: calc(50% - 550px - 380px);
-    top: 220px;
+    left: calc(50% - 550px - 380px); /* 기존 좌측 위치 유지 */
+    top: 50%; /* 화면 세로 중앙 */
     width: 320px;
-    max-width: calc(100vw - 32px);
+    /* 화면 높이를 넘어가면 스크롤 생성을 위해 제한 */
+    max-height: calc(100vh - 100px); /* 넉넉하게 잡음 */
     background: #ffffff;
     border: 1px solid #e9ecef;
     border-radius: 14px;
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
     z-index: 999;
-    overflow: hidden;
-    transform: translateX(calc(-100% + 34px));
+    /* 탭이 짤리지 않게 visible, 내부는 body에서 스크롤 */
+    overflow: visible; 
+    display: flex;
+    flex-direction: column;
+    /* 닫힘: X축(=숨김), Y축(=중앙보정 -50%) */
+    transform: translate(calc(-100% + 34px), -50%);
     transition: transform 180ms ease;
 }
 
 .bus-path-drawer.open {
-    transform: translateX(0);
+    /* 열림: X축(=0), Y축(=중앙보정 -50%) */
+    transform: translate(0, -50%);
 }
 
 .bus-path-drawer-tab {
@@ -1500,6 +1506,8 @@ header h1 {
 
 .bus-path-drawer-body {
     padding: 12px 12px 14px;
+    overflow-y: auto; 
+    flex: 1; /* 남은 공간을 모두 차지하며 스크롤됨 */
 }
 
 .bus-path-drawer-title {
