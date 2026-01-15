@@ -83,14 +83,9 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval, $q
      */
     $scope.getPathTimelineColor = function (partIndex) {
         var parts = $scope.pathDisplayParts || [];
-        var rideIdx = -1;
-
-        for (var i = 0; i <= partIndex && i < parts.length; i++) {
-            if (parts[i] && parts[i].type === 'RIDE') rideIdx += 1;
-        }
-
-        if (rideIdx < 0) return '#cfcfcf';
-        return PATH_DETAIL_COLORS[rideIdx % PATH_DETAIL_COLORS.length];
+        if (partIndex < 0 || partIndex >= parts.length) return '#cfcfcf';
+        // 계산 시점에서 주입된 viewColor 사용 (Map 로직과 100% 동기화)
+        return parts[partIndex].viewColor || '#cfcfcf';
     };
 
     /**
@@ -484,10 +479,20 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval, $q
 
                 var rideCount = 0;
                 var walkCount = 0;
+                // [신규] Map과 동일한 색상 팔레트 (재빌드 시에도 적용)
+                var busColorsForList = ['#2E86AB', '#F18F01', '#C73E1D', '#6A4C93', '#2A9D8F', '#E76F51'];
+
                 ($scope.pathDisplayParts || []).forEach(function (p) {
                     if (!p) return;
-                    if (p.type === 'RIDE') rideCount += 1;
-                    if (p.type === 'WALK') walkCount += 1;
+                    if (p.type === 'RIDE') {
+                        // RIDE 구간은 순서대로 색상을 로테이션하며 부여
+                        p.viewColor = busColorsForList[rideCount % busColorsForList.length];
+                        rideCount += 1;
+                    }
+                    if (p.type === 'WALK') {
+                        walkCount += 1;
+                        p.viewColor = '#555555';
+                    }
                 });
 
                 $scope.pathRideCount = rideCount;
@@ -2410,12 +2415,21 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
                             return p.type !== 'WAIT';
                         });
 
-                        // 통계 계산
+                        // 통계 계산 및 화면 표시용 색상 주입
                         var rideCount = 0;
                         var walkCount = 0;
+                        // [신규] Map과 동일한 색상 팔레트
+                        var busColorsForList = ['#2E86AB', '#F18F01', '#C73E1D', '#6A4C93', '#2A9D8F', '#E76F51'];
+
                         ($scope.pathDisplayParts || []).forEach(function (p) {
-                            if (p.type === 'RIDE') rideCount++;
-                            if (p.type === 'WALK') walkCount++;
+                            if (p.type === 'RIDE') {
+                                // RIDE 구간은 순서대로 색상을 로테이션하며 부여
+                                p.viewColor = busColorsForList[rideCount % busColorsForList.length];
+                                rideCount++;
+                            } else if (p.type === 'WALK') {
+                                walkCount++;
+                                p.viewColor = '#555555'; // 도보 회색
+                            }
                         });
                         $scope.pathRideCount = rideCount;
                         $scope.pathWalkCount = walkCount;
@@ -2481,6 +2495,9 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
                 lineFeat.set('updowncd', parseInt(seg.updowncd, 10));
             }
 
+            // BUS 환승(노선 변경) 시 색상을 바꾸기 위한 팔레트 (Style Function과 동일하게 맞춤)
+            var busColors = ['#2E86AB', '#F18F01', '#C73E1D', '#6A4C93', '#2A9D8F', '#E76F51'];
+
             // BUS 구간은 노선(routeId)이 바뀌는 순간을 '환승'으로 보고 색 인덱스를 증가시킨다.
             if (seg.mode === 'BUS') {
                 if (prevBusRouteId !== seg.routeId) {
@@ -2488,9 +2505,17 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
                     prevBusRouteId = seg.routeId;
                 }
                 lineFeat.set('busTransferIndex', busTransferIndex);
-            } else {
-                // BUS가 아닌 구간은 색 인덱스를 0으로 둔다(스타일 함수에서 안전 처리)
+                
+                // [신규] 화면(HTML) 표시를 위해 세그먼트 객체 자체에 색상 코드 주입
+                seg.viewColor = busColors[busTransferIndex % busColors.length];
+                
+            } else if (seg.mode === 'TRAM') {
                 lineFeat.set('busTransferIndex', 0);
+                seg.viewColor = '#FF69B4'; // 트램 핑크
+            } else {
+                // WALK
+                lineFeat.set('busTransferIndex', 0);
+                seg.viewColor = '#555555'; // 도보 회색
             }
 
             pathSource.addFeature(lineFeat);
@@ -2499,7 +2524,11 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
             // 4. 지나가는 정류장 마커(Node) 그리기
             // - Path API에서 nodeIds/nodeNames를 내려주므로, BUS/TRAM 구간의 모든 정류장(정거장)을 표시한다.
             if (seg.mode === 'BUS' || seg.mode === 'TRAM') {
-                var circleBorderColor = seg.mode === 'TRAM' ? '#FF69B4' : '#0066ff';
+                // var circleBorderColor = seg.mode === 'TRAM' ? '#FF69B4' : '#0066ff';
+                // [수정] 마커 테두리 색상도 노선 색상과 일치시킴
+                var circleBorderColor = seg.viewColor; 
+                
+                var nodeIds = seg.nodeIds || [];
                 var nodeIds = seg.nodeIds || [];
                 var nodeNames = seg.nodeNames || [];
 
