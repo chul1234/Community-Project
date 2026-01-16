@@ -497,6 +497,11 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval, $q
 
                 $scope.pathRideCount = rideCount;
                 $scope.pathWalkCount = walkCount;
+
+                // [신규] 첫 번째 버스 실시간 도착정보 확인 및 총 소요시간 보정
+                if (typeof $scope.checkFirstBusArrival === 'function') {
+                    $scope.checkFirstBusArrival();
+                }
             }
         }, 0);
     }
@@ -1708,6 +1713,14 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
                 fetchArrivalsForCurrentStop();
             }, 10000);
             $scope.isAutoRefreshOn = true;
+        } else if ($scope.pathSegments && $scope.pathSegments.length > 0) {
+            // [추가] 경로 탐색 모드일 때도 자동갱신(실시간 도착정보)
+            autoRefreshPromise = $interval(function () {
+                if (typeof $scope.checkAllBusArrivals === 'function') {
+                    $scope.checkAllBusArrivals();
+                }
+            }, 10000);
+            $scope.isAutoRefreshOn = true;
         }
     }
 
@@ -1723,10 +1736,10 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
     });
 
     $scope.enableAutoRefresh = function () {
-        if ($scope.currentRouteId || $scope.selectedStop) {
+        if ($scope.currentRouteId || $scope.selectedStop || ($scope.pathSegments && $scope.pathSegments.length > 0)) {
             startAutoRefresh();
         } else {
-            alert('먼저 버스 번호를 검색하거나 정류장을 선택하세요.');
+            alert('먼저 버스 번호를 검색하거나 정류장을 선택, 혹은 경로 탐색을 수행하세요.');
         }
     };
 
@@ -2215,12 +2228,17 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
                 startNm = String(nodeNames[0]).trim();
             } else if (sId && pathNodeNameCache[sId]) {
                 startNm = String(pathNodeNameCache[sId]).trim();
+            } else if (sId) {
+                // [수정] 이름이 없으면 ID라도 표시하여 UI가 숨겨지지 않도록 함
+                startNm = '정류장 ' + sId;
             }
 
             if (nodeNames && nodeNames.length > 0 && nodeNames[nodeNames.length - 1]) {
                 endNm = String(nodeNames[nodeNames.length - 1]).trim();
             } else if (eId && pathNodeNameCache[eId]) {
                 endNm = String(pathNodeNameCache[eId]).trim();
+            } else if (eId) {
+                endNm = '정류장 ' + eId;
             }
 
 
@@ -2250,6 +2268,11 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
                     meta: { routeId: routeId || seg.routeId || seg.routeid || seg.route_id, updowncd: seg.updowncd },
                     fromName: startNm,
                     toName: endNm,
+                    fromNodeId: sId, // [신규] 실시간 도착정보 조회를 위한 Node ID
+                    toNodeId: eId,
+                    routeId: routeId || seg.routeId || seg.routeid || seg.route_id, 
+                    routeNo: routeNo, // [신규] 라벨 파싱 없이 바로 번호 매칭하기 위함
+                    meta: { routeId: routeId || seg.routeId || seg.routeid || seg.route_id, updowncd: seg.updowncd },
                 });
             } else if (m === 'TRAM') {
                 rideTotal += min;
@@ -2434,10 +2457,19 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
                         $scope.pathRideCount = rideCount;
                         $scope.pathWalkCount = walkCount;
 
+                        // [신규] 첫 번째 버스 실시간 도착정보 확인 및 총 소요시간 보정
+                        if (typeof $scope.checkAllBusArrivals === 'function') {
+                            $scope.checkAllBusArrivals();
+                        }
+
+
                         // 지도에 경로 그리기
                         drawCalculatedPath(data.segments);
 
                         $scope.isPathDetailsOpen = false;
+
+                        // [추가] 경로 탐색 완료 시 실시간 정보 갱신(및 자동갱신) 시작
+                        startAutoRefresh();
 
                         // ✅ Digest 보강(첫 렌더에 확실히 반영)
                         $timeout(function () {}, 0);
@@ -2882,9 +2914,265 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
         });
     }
 
-    // 시작 시 사용자 체크
-    initUser();
+    // [신규] 첫 번째 버스의 실시간 도착정보를 조회하여 총 소요시간을 보정한다.
+    $scope.checkFirstBusArrival = function() {
+        var parts = $scope.pathDisplayParts || [];
+        var firstRidePart = null;
 
+        for (var i = 0; i < parts.length; i++) {
+            if (parts[i].type === 'RIDE') {
+                firstRidePart = parts[i];
+                break;
+            }
+        }
+
+        if (!firstRidePart || !firstRidePart.fromNodeId) {
+            console.log('RealTimeCheck: No Ride Part or NodeID', firstRidePart);
+            return;
+        }
+        // 이미 조회했으면 패스
+        if (firstRidePart.realTimeInfo) return;
+
+        var nodeId = firstRidePart.fromNodeId;
+        var routeId = firstRidePart.routeId; 
+        
+        // [수정] routeNo가 없으면 API로 조회해서라도 찾아낸다.
+        var routeNo = firstRidePart.routeNo || '';
+        
+        // 내부 함수: 도착 정보 조회 및 매칭 수행
+        function fetchAndMatchArrivals(vNodeId, vRouteId, vRouteNo) {
+            console.log('RealTimeCheck: Fetching Arrivals for Node:', vNodeId, 'RouteId:', vRouteId, 'RouteNo:', vRouteNo);
+            
+            $http.get('/api/bus/arrivals', { params: { nodeId: vNodeId } })
+            .then(function (res) {
+                var responseBody = (res.data && res.data.response && res.data.response.body);
+                if (!responseBody) return;
+
+                var items = responseBody.items && responseBody.items.item;
+                if (!items) {
+                    console.log('RealTimeCheck: No items in response');
+                    return;
+                }
+                if (!Array.isArray(items)) items = [items];
+                
+                // console.log('RealTimeCheck: API Items:', items);
+
+                var targetItem = null;
+                // 1. routeId 매칭
+                if (vRouteId) {
+                    targetItem = items.find(function(it) {
+                        var rid = it.routeid || it.routeId || it.route_id;
+                        return String(rid) === String(vRouteId);
+                    });
+                }
+                // 2. routeNo 매칭 (핵심)
+                if (!targetItem && vRouteNo) {
+                    // "101번" vs "101" 등 '번' 접미사 제거 후 비교
+                    var vNoClean = String(vRouteNo).replace(/번\s*$/, '').trim();
+
+                    targetItem = items.find(function(it) {
+                        var rno = it.routeno || it.routeNo || it.route_no || '';
+                        var rnoClean = String(rno).replace(/번\s*$/, '').trim();
+                        return rnoClean === vNoClean;
+                    });
+                }
+                
+                if (targetItem) {
+                    console.log('RealTimeCheck: Found Item', targetItem);
+                    var arrTimeVal = targetItem.arrtime || targetItem.arrTime;
+                    var arrPrevVal = targetItem.arrprevstationcnt || targetItem.arrPrevStationCnt;
+                    
+                    var arrTimeSec = Number(arrTimeVal);
+                    var arrTimeMin = Math.round(arrTimeSec / 60);
+                    var stopsLeft = arrPrevVal;
+                    
+                    // UI 표시 (탑승 상세 내)
+                    // [중요] 비동기 콜백 시점에서 객체 참조가 끊겼을 수 있으므로 다시 찾는다.
+                    var currentParts = $scope.pathDisplayParts || [];
+                    var targetPart = currentParts.find(function(p) { return p.type === 'RIDE' && p.fromNodeId === vNodeId; });
+                    
+                    if (targetPart) {
+                        targetPart.realTimeInfo = arrTimeMin + "분 후 도착 (" + stopsLeft + "번째 전)";
+                        // console.log('RealTimeCheck: UI Updated', targetPart.realTimeInfo);
+                    } else {
+                        // fallback: 처음에 잡았던 객체에라도 넣음
+                        firstRidePart.realTimeInfo = arrTimeMin + "분 후 도착 (" + stopsLeft + "번째 전)";
+                    }
+
+                    // [핵심] 총 소요시간(pathTotalMinutes) 보정
+                    // 기존 '4분' 기준 보정 로직은 UX상 혼란을 줄 수 있으나, 사용자 요청(또는 이전 로직) 존중하여 유지
+                    // 단, 0분이 되는 현상 등 방지
+                    if ($scope.pathTotalMinutes != null) {
+                        var diff = arrTimeMin - 4; 
+                        // 너무 큰 왜곡 방지 (-10분 등)
+                        if (diff < -10) diff = -10; 
+                        if (diff > 30) diff = 30;
+
+                        var newTotal = $scope.pathTotalMinutes + diff;
+                        if (newTotal < 1) newTotal = 1; // 최소 1분
+                        
+                        // $scope.pathTotalMinutes = Math.round(newTotal); // (일단 주식 처리: 총 시간 흔들림 방지하고 싶으면 주석 처리)
+                    }
+
+                    // 화면 갱신 유도 (Digest cycle 강제)
+                    $timeout(function(){
+                        $scope.$apply(); 
+                    }, 0);
+                } else {
+                    console.log('RealTimeCheck: No Match Found for Route', vRouteId, vRouteNo);
+                }
+            });
+        }
+
+        // routeNo가 있으면 바로 진행, 없으면 조회 후 진행
+        if (routeNo) {
+            fetchAndMatchArrivals(nodeId, routeId, routeNo);
+        } else if (routeId) {
+            console.log('RealTimeCheck: RouteNo missing. Fetching info for RouteId:', routeId);
+            $http.get('/api/bus/route-stops', { params: { routeId: routeId } })
+            .then(function(res) {
+                var body = (res.data && res.data.response && res.data.response.body);
+                var items = body && body.items && body.items.item;
+                if (items) {
+                    if (!Array.isArray(items)) items = [items];
+                    if (items.length > 0) {
+                        // 첫 번째 항목에서 routeno 추출
+                        var foundNo = items[0].routeno || items[0].routeNo;
+                        if (foundNo) {
+                            console.log('RealTimeCheck: Resolved RouteNo:', foundNo);
+                            fetchAndMatchArrivals(nodeId, routeId, foundNo);
+                            return;
+                        }
+                    }
+                }
+                console.warn('RealTimeCheck: Failed to resolve RouteNo for RouteId:', routeId);
+                // 그래도 일단 routeId만이라도 가지고 시도
+                fetchAndMatchArrivals(nodeId, routeId, '');
+            })
+            .catch(function(e) {
+                console.error('RealTimeCheck: Error resolving routeNo', e);
+                fetchAndMatchArrivals(nodeId, routeId, '');
+            });
+        } else {
+            // 둘 다 없으면 포기 (사실상 불가능)
+            fetchAndMatchArrivals(nodeId, '', '');
+        }
+
+    };
+
+    // [신규] 모든 버스 구간의 실시간 도착정보를 조회하여 표시한다.
+    $scope.checkAllBusArrivals = function() {
+        var parts = $scope.pathDisplayParts || [];
+        
+        parts.forEach(function(part, index) {
+            if (part && part.type === 'RIDE' && part.fromNodeId) {
+                checkArrivalForPart(part);
+            }
+        });
+    };
+
+    function checkArrivalForPart(part) {
+        var nodeId = part.fromNodeId;
+        var routeId = part.routeId;
+        var routeNo = part.routeNo || '';
+        
+        if (routeNo) {
+            fetchAndMatchArrivals(part, nodeId, routeId, routeNo);
+        } else if (routeId) {
+            $http.get('/api/bus/route-stops', { params: { routeId: routeId } })
+            .then(function(res) {
+                var body = (res.data && res.data.response && res.data.response.body);
+                var items = body && body.items && body.items.item;
+                if (items) {
+                    if (!Array.isArray(items)) items = [items];
+                    if (items.length > 0) {
+                        var foundNo = items[0].routeno || items[0].routeNo;
+                        if (foundNo) {
+                            fetchAndMatchArrivals(part, nodeId, routeId, foundNo);
+                            return;
+                        }
+                    }
+                }
+                fetchAndMatchArrivals(part, nodeId, routeId, '');
+            })
+            .catch(function(e) {
+                fetchAndMatchArrivals(part, nodeId, routeId, '');
+            });
+        }
+    }
+        
+    function fetchAndMatchArrivals(targetPart, vNodeId, vRouteId, vRouteNo) {
+        $http.get('/api/bus/arrivals', { params: { nodeId: vNodeId } })
+        .then(function (res) {
+            var responseBody = (res.data && res.data.response && res.data.response.body);
+            if (!responseBody) return;
+
+            var items = responseBody.items && responseBody.items.item;
+            if (!items) {
+                // 도착 예정 정보 자체가 아예 없는 경우
+                if (targetPart) targetPart.realTimeInfo = "도착 정보 없음 (API)";
+                return;
+            }
+            if (!Array.isArray(items)) items = [items];
+            
+            var targetItem = null;
+            if (vRouteId) {
+                targetItem = items.find(function(it) {
+                    var rid = it.routeid || it.routeId || it.route_id;
+                    return String(rid) === String(vRouteId);
+                });
+            }
+            if (!targetItem && vRouteNo) {
+                var vNoClean = String(vRouteNo).replace(/번\s*$/, '').trim();
+                targetItem = items.find(function(it) {
+                    var rno = it.routeno || it.routeNo || it.route_no || '';
+                    var rnoClean = String(rno).replace(/번\s*$/, '').trim();
+                    // 정확한 매칭 완화: 공백 제거 후 비교 등
+                    return rnoClean === vNoClean;
+                });
+            }
+            
+            if (targetItem) {
+                var arrTimeVal = targetItem.arrtime || targetItem.arrTime;
+                var arrPrevVal = targetItem.arrprevstationcnt || targetItem.arrPrevStationCnt;
+                
+                var arrTimeSec = Number(arrTimeVal);
+                var arrTimeMin = Math.round(arrTimeSec / 60);
+                var stopsLeft = arrPrevVal;
+                
+                if (targetPart) {
+                    targetPart.realTimeInfo = arrTimeMin + "분 후 도착 (" + stopsLeft + "번째 전)";
+                }
+
+                // 총 시간 보정 (첫 번째 구간만)
+                var allParts = $scope.pathDisplayParts || [];
+                var firstRide = allParts.find(function(p){ return p.type === 'RIDE'; });
+                
+                if (firstRide === targetPart && $scope.pathTotalMinutes != null) {
+                    var diff = arrTimeMin - 4; 
+                    if (diff < -10) diff = -10; 
+                    if (diff > 30) diff = 30;
+
+                    var newTotal = $scope.pathTotalMinutes + diff;
+                    if (newTotal < 1) newTotal = 1;
+                    // $scope.pathTotalMinutes = Math.round(newTotal); 
+                }
+
+                $timeout(function(){
+                    $scope.$apply(); 
+                }, 0);
+            } else {
+                // 매칭 실패 시
+                if (targetPart) {
+                    targetPart.realTimeInfo = "도착 정보 없음 (매칭 실패)";
+                    // console.log('RealTimeCheck Match Failed:', vRouteNo, items);
+                }
+            }
+        });
+    }
+
+    // 초기화
+    initUser();
 });
 
 // 수정됨 끝

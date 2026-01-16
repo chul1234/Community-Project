@@ -134,6 +134,10 @@
                                     -->
                                     <div class="path-tl-ride-row" ng-if="p.fromName">
                                         승차: <span class="path-tl-place">[{{ p.fromName }}]</span>
+                                        <!-- [신규] 실시간 도착정보 표시 (자동 조회됨) -->
+                                        <span class="txt-realtime" ng-if="p.realTimeInfo" style="color: #d6336c; font-weight: bold; margin-left: 6px; font-size: 11px;">
+                                            {{ p.realTimeInfo }}
+                                        </span>
                                     </div>
                                     <div class="path-tl-ride-row path-tl-duration">
                                         ⏱ {{ p.minutes }}분 이동
