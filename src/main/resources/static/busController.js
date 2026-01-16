@@ -2732,6 +2732,31 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
         );
     };
 
+    // [신규] 경로 및 선택 초기화
+    $scope.clearResultPath = function() {
+        $scope.pathStartStop = null;
+        $scope.pathEndStop = null;
+        
+        $scope.pathDisplayParts = [];
+        $scope.pathParts = [];
+        $scope.pathSegments = [];
+        
+        $scope.pathTotalMinutes = null;
+        $scope.pathRideCount = 0;
+        $scope.pathWalkCount = 0;
+        $scope.pathUsedTransfers = 0;
+        
+        $scope.isPathDetailsOpen = false; // [요청] 탑승 상세 닫기
+        
+        // 지도 경로 제거
+        if (typeof pathSource !== 'undefined') {
+            pathSource.clear();
+        }
+        
+        // 자동갱신 중단 (경로 모드일 수도 있으므로 checkAllBusArrivals polling 중지)
+        cancelAutoRefresh();
+    };
+
     // -------------------------
     // [추가] 경로 탐색 출발/도착지 제거 (X버튼)
     // -------------------------
