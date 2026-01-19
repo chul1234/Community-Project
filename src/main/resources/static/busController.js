@@ -2269,11 +2269,11 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
                     meta: { routeId: routeId || seg.routeId || seg.routeid || seg.route_id, updowncd: seg.updowncd },
                     fromName: startNm,
                     toName: endNm,
-                    fromNodeId: sId, // [신규] 실시간 도착정보 조회를 위한 Node ID
+                    fromNodeId: sId,
                     toNodeId: eId,
                     routeId: routeId || seg.routeId || seg.routeid || seg.route_id, 
-                    routeNo: routeNo, // [신규] 라벨 파싱 없이 바로 번호 매칭하기 위함
-                    meta: { routeId: routeId || seg.routeId || seg.routeid || seg.route_id, updowncd: seg.updowncd },
+                    routeNo: routeNo, 
+                    mode: 'BUS', // [신규] 명시적 모드 추가
                 });
             } else if (m === 'TRAM') {
                 rideTotal += min;
@@ -2284,6 +2284,7 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
                     meta: { routeId: seg.routeId },
                     fromName: startNm,
                     toName: endNm,
+                    mode: 'TRAM', // [신규] 명시적 모드 추가
                 });
             } else if (m === 'WALK') {
                 // 도보 0분(또는 음수) 구간은 UI에서 노이즈이므로 제외한다.
@@ -2296,6 +2297,7 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
                         label: '도보',
                         minutes: Math.round(min),
                         meta: {},
+                        mode: 'WALK', // [신규] 명시적 모드 추가
                     });
                 }
             } else {
@@ -2305,6 +2307,7 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
                     label: m || 'ETC',
                     minutes: Math.round(min),
                     meta: {},
+                    mode: m || 'ETC',
                 });
             }
         });
@@ -2334,6 +2337,7 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
                             label: '환승 대기',
                             minutes: Math.round(waitMinEach),
                             meta: { transferIndex: inserted + 1 },
+                            mode: 'WAIT',
                         });
                         inserted += 1;
                     }
@@ -2445,16 +2449,37 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
                         // [신규] Map과 동일한 색상 팔레트
                         var busColorsForList = ['#2E86AB', '#F18F01', '#C73E1D', '#6A4C93', '#2A9D8F', '#E76F51'];
 
+                        // -----------------------------------------------------
+                        // ★ [수정] 지도(Map)와 동일한 로직으로 색상 부여
+                        // -----------------------------------------------------
+                        var busTransferIndex = -1; // 첫 BUS: index=0
+                        var prevRouteId = null;
+
                         ($scope.pathDisplayParts || []).forEach(function (p) {
-                            if (p.type === 'RIDE') {
-                                // RIDE 구간은 순서대로 색상을 로테이션하며 부여
-                                p.viewColor = busColorsForList[rideCount % busColorsForList.length];
+                            if (p.mode === 'BUS') {
+                                // 노선(ID)이 바뀌면 인덱스 증가 (같은 노선 연속이면 유지)
+                                if (p.routeId !== prevRouteId) {
+                                    busTransferIndex++;
+                                    prevRouteId = p.routeId;
+                                }
+                                p.viewColor = busColorsForList[busTransferIndex % busColorsForList.length];
                                 rideCount++;
-                            } else if (p.type === 'WALK') {
+                            } else if (p.mode === 'TRAM') {
+                                // 트램은 고정 색상 (핑크)
+                                p.viewColor = '#FF69B4';
+                                // TRAM도 rideCount에 포함? (기존 로직 유지)
+                                // 트램은 busTransferIndex에 영향 주지 않음 (지도 로직 참조)
+                                rideCount++;
+                            } else if (p.mode === 'WALK') {
                                 walkCount++;
                                 p.viewColor = '#555555'; // 도보 회색
+                            } else {
+                                // ETC
+                                p.viewColor = '#999999';
                             }
                         });
+
+
                         $scope.pathRideCount = rideCount;
                         $scope.pathWalkCount = walkCount;
 
