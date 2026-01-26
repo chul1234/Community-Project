@@ -322,46 +322,57 @@ public class PathServiceImpl implements IPathService {
         // ---------------------------------------------------------
         // (5) 다익스트라로 최단시간 탐색
         // ---------------------------------------------------------
-        DijkstraResult result = dijkstra(graph, START_ID, END_ID, maxTransfers);
+        // ---------------------------------------------------------
+        // (5) 다익스트라로 모든 승차 횟수별 최적 경로 탐색
+        // ---------------------------------------------------------
+        List<DijkstraResult> results = dijkstraAllCandidates(graph, START_ID, END_ID, maxTransfers);
 
         // ---------------------------------------------------------
-        // (6) 경로가 없으면 빈 결과 반환
+        // (6) 결과가 하나도 없으면 빈 결과 반환
         // ---------------------------------------------------------
-        if (result == null || Double.isInfinite(result.totalMinutes)) {
+        if (results.isEmpty()) {
             Map<String, Object> out = new HashMap<>();
             out.put("totalMinutes", 0);
             out.put("segments", Collections.emptyList());
             out.put("reason", "NO_PATH");
             out.put("requestedTransfers", maxTransfers);
+            out.put("candidates", Collections.emptyList()); // 빈 후보 리스트
             return out;
         }
 
         // ---------------------------------------------------------
-        // (7) prevEdge를 이용해 간선 리스트 복원 (역추적)
+        // (7) 각 결과별 경로 복원 및 후보 리스트 생성
         // ---------------------------------------------------------
-        List<Edge> edges = reconstructEdges(result, START_ID, END_ID);
+        List<Map<String, Object>> candidates = new ArrayList<>();
 
-        // ---------------------------------------------------------
-        // (8) 프론트엔드용 Segment 리스트 생성 (좌표 포함)
-        // ---------------------------------------------------------
-        List<Map<String, Object>> segments = buildSegments(edges, stopPointMap);
+        for (DijkstraResult res : results) {
+            List<Edge> edges = reconstructEdges(res, START_ID, END_ID);
+            List<Map<String, Object>> segments = buildSegments(edges, stopPointMap);
 
-        Map<String, Object> out = new HashMap<>();
-        out.put("totalMinutes", result.totalMinutes);
-        out.put("segments", segments);
+            Map<String, Object> cand = new HashMap<>();
+            cand.put("totalMinutes", res.totalMinutes);
+            cand.put("segments", segments);
 
-        // 요청한 환승 수와 실제 경로의 환승 수(승차-1)를 함께 반환
-        out.put("requestedTransfers", maxTransfers);
-        int usedTransfers = (result.usedRides <= 0 ? 0 : Math.max(0, result.usedRides - 1));
-        out.put("usedTransfers", usedTransfers);
+            int usedTransfers = (res.usedRides <= 0 ? 0 : Math.max(0, res.usedRides - 1));
+            cand.put("usedTransfers", usedTransfers);
+            cand.put("transferPenaltyMin", TRANSFER_PENALTY_MIN);
+            cand.put("transferPenaltyTotalMinutes", usedTransfers * TRANSFER_PENALTY_MIN);
 
-        // 환승 패널티 정보 (프론트에서 breakdown 총합을 totalMinutes와 일치시키기 위해 제공)
-        out.put("transferPenaltyMin", TRANSFER_PENALTY_MIN);
-        out.put("transferPenaltyTotalMinutes", usedTransfers * TRANSFER_PENALTY_MIN);
-        out.put("exactTransfersMatched", Boolean.valueOf(result.exactMatched));
-        if (!result.exactMatched) {
-            out.put("reason", "NO_PATH_EXACT_TRANSFERS_FALLBACK");
+            candidates.add(cand);
         }
+
+        // 후보들을 시간순(오름차순)으로 정렬 (가장 빠른게 0번 인덱스)
+        candidates.sort(Comparator.comparingDouble(m -> (double) m.get("totalMinutes")));
+
+        // 기본 응답 구조(하위 호환 및 편리성):
+        // 최상위 필드에는 "Best Candidate(=시간 최소)"의 정보를 채운다.
+        Map<String, Object> best = candidates.get(0);
+        
+        Map<String, Object> out = new HashMap<>();
+        out.putAll(best); // totalMinutes, segments, usedTransfers 등 복사
+
+        out.put("requestedTransfers", maxTransfers);
+        out.put("candidates", candidates); // 전체 후보 리스트 포함
 
         return out;
     }
@@ -533,24 +544,17 @@ private int clampMaxRides(int maxTransfers) {
     // - 환승 N회 → 승차 N+1회
     return safeTransfers + 1;
 }
-// ✅ 여기까지 추가
-// =========================
-    // 다익스트라 알고리즘
+// ✅ 여기까지    // =========================
+    // 다익스트라 알고리즘 (수정됨: 모든 환승 횟수별 최적 경로 탐색)
     // =========================
-    private DijkstraResult dijkstra(Map<String, List<Edge>> graph, String startId, String endId, int maxTransfers) {
-        // ---------------------------------------------------------
-        // 상태 기반 다익스트라:
-        // - 현실 제약: 승차(버스/트램) 횟수 상한(MAX_RIDES) 적용
-        // - 현실 반영: 환승/재승차 시 고정 패널티(TRANSFER_PENALTY_MIN) 적용
-        //
-        // 승차(ride) 카운트 규칙:
-        // - BUS/TRAM 간선을 "처음 타는 순간" 또는 "다른 노선/다른 모드로 갈아타는 순간"에 +1
-        // - WALK는 승차 카운트 증가 없음
-        // ---------------------------------------------------------
-        final int MAX_RIDES = clampMaxRides(maxTransfers); // 입력 환승 수 기반 승차 상한(=환승+1)
+    private List<DijkstraResult> dijkstraAllCandidates(Map<String, List<Edge>> graph, String startId, String endId, int maxTransfers) {
+        final int MAX_RIDES = clampMaxRides(maxTransfers);
 
+        // stateKey -> dist (전체 상태 공간 최단거리)
         Map<String, Double> dist = new HashMap<>();
+        // stateKey -> prevStateKey (경로 복원용)
         Map<String, String> prevState = new HashMap<>();
+        // stateKey -> prevEdge (경로 복원용)
         Map<String, Edge> prevEdge = new HashMap<>();
 
         PriorityQueue<NodeDist> pq = new PriorityQueue<>(Comparator.comparingDouble(a -> a.dist));
@@ -559,15 +563,14 @@ private int clampMaxRides(int maxTransfers) {
         dist.put(startKey, 0.0);
         pq.add(new NodeDist(startKey, 0.0));
 
-        int targetRides = MAX_RIDES; // 요청 환승 수 기반 '정확히' 도착해야 하는 승차 횟수
-
-        double bestExactEndDist = Double.POSITIVE_INFINITY;
-        String bestExactEndKey = null;
-
-        // exact가 불가능할 수 있으므로, fallback(가능한 최대 승차)도 함께 기록한다.
-        int bestFallbackRides = -1;
-        double bestFallbackEndDist = Double.POSITIVE_INFINITY;
-        String bestFallbackEndKey = null;
+        // 각 승차 횟수(rideCount)별로 도착지(endId)에 도달한 최단 거리/상태를 기록
+        // Index 0 사용 안함. rides=1(직행)..MAX_RIDES
+        // bestEndDists[r] = 승차 r회로 도착했을 때의 최소 시간
+        double[] bestEndDists = new double[MAX_RIDES + 1];
+        String[] bestEndKeys = new String[MAX_RIDES + 1];
+        for (int i = 0; i <= MAX_RIDES; i++) {
+            bestEndDists[i] = Double.POSITIVE_INFINITY;
+        }
 
         while (!pq.isEmpty()) {
             NodeDist cur = pq.poll();
@@ -578,25 +581,17 @@ private int clampMaxRides(int maxTransfers) {
 
             State curState = parseStateKey(cur.stateKey);
 
-            // endId에 도달한 상태 처리
-            // - 목표: 요청한 환승 수에 맞춰 "정확히 targetRides(=환승+1번 승차)"로 도착하는 경로를 선택한다.
-            // - 단, 그래프 구조상 exact가 불가능할 수 있으므로 fallback(가능한 최대 승차)도 기록한다.
+            // 도착지 도달 확인
             if (Objects.equals(curState.nodeId, endId)) {
-                // 1) exact 후보
-                if (curState.rideCount == targetRides) {
-                    if (cur.dist < bestExactEndDist) {
-                        bestExactEndDist = cur.dist;
-                        bestExactEndKey = cur.stateKey;
-                    }
-                } else if (curState.rideCount <= targetRides) {
-                    // 2) fallback 후보: (승차 횟수 최대) 우선, 동률이면 시간 최소
-                    if (curState.rideCount > bestFallbackRides ||
-                        (curState.rideCount == bestFallbackRides && cur.dist < bestFallbackEndDist)) {
-                        bestFallbackRides = curState.rideCount;
-                        bestFallbackEndDist = cur.dist;
-                        bestFallbackEndKey = cur.stateKey;
+                int rides = curState.rideCount;
+                if (rides >= 1 && rides <= MAX_RIDES) {
+                    // 해당 승차 횟수에서 더 빠른 길이면 업데이트
+                    if (cur.dist < bestEndDists[rides]) {
+                        bestEndDists[rides] = cur.dist;
+                        bestEndKeys[rides] = cur.stateKey;
                     }
                 }
+                // 여기서 break하지 않고 계속 탐색 (다른 승차 횟수의 최적해도 찾아야 함)
             }
 
             List<Edge> neighbors = graph.getOrDefault(curState.nodeId, Collections.emptyList());
@@ -610,11 +605,10 @@ private int clampMaxRides(int maxTransfers) {
                         Objects.equals(curState.mode, e.mode) &&
                         Objects.equals(curState.routeId, e.routeId) &&
                         (!"BUS".equals(e.mode) || curState.updowncd == e.updowncd);
-if (!isSameVehicle) {
-                        // 새로 승차(또는 다른 노선/다른 모드로 환승)
-                        nextRides = curState.rideCount + 1;
 
-                        // 첫 승차는 페널티 없음, 2번째 승차부터 환승 페널티 부여
+                    if (!isSameVehicle) {
+                        // 새로 승차(또는 환승)
+                        nextRides = curState.rideCount + 1;
                         if (curState.rideCount > 0) {
                             penalty = TRANSFER_PENALTY_MIN;
                         }
@@ -622,18 +616,16 @@ if (!isSameVehicle) {
                 }
 
                 if (nextRides > MAX_RIDES) {
-                    continue; // 현실 제약: 승차 횟수 초과
+                    continue; // 상한 초과
                 }
 
                 // (2) 다음 상태 키 구성
                 String nextMode = e.mode;
                 String nextRoute = (e.routeId == null ? "" : e.routeId);
-                // WALK는 "차량 탑승 상태"를 끊어야 다음 BUS/TRAM에서 승차 카운트가 올라감
                 if ("WALK".equals(nextMode)) {
                     nextMode = "WALK";
                     nextRoute = "";
                 }
-
                 int nextUpdown = ("BUS".equals(nextMode) ? e.updowncd : -1);
                 String nextKey = stateKey(e.toId, nextMode, nextRoute, nextUpdown, nextRides);
 
@@ -650,31 +642,21 @@ if (!isSameVehicle) {
             }
         }
 
-        String chosenEndKey = (bestExactEndKey != null ? bestExactEndKey : bestFallbackEndKey);
-        double chosenEndDist = (bestExactEndKey != null ? bestExactEndDist : bestFallbackEndDist);
-        int chosenRides = -1;
-
-        if (bestExactEndKey != null) {
-            chosenRides = targetRides;
-        } else if (bestFallbackEndKey != null) {
-            // fallback의 rideCount는 stateKey에 포함되어 있으므로 파싱으로 복원
-            State chosenState = parseStateKey(bestFallbackEndKey);
-            chosenRides = chosenState.rideCount;
+        // 결과 수집
+        List<DijkstraResult> results = new ArrayList<>();
+        for (int r = 1; r <= MAX_RIDES; r++) {
+            if (bestEndKeys[r] != null) {
+                // 승차 r회로 도착하는 경로가 존재함
+                DijkstraResult res = new DijkstraResult();
+                res.totalMinutes = bestEndDists[r];
+                res.endStateKey = bestEndKeys[r];
+                res.prevState = prevState;
+                res.prevEdge = prevEdge;
+                res.usedRides = r;
+                results.add(res);
+            }
         }
-
-        if (chosenEndKey == null) {
-            return null;
-        }
-
-        DijkstraResult res = new DijkstraResult();
-        res.totalMinutes = chosenEndDist;
-        res.endStateKey = chosenEndKey;
-        res.prevState = prevState;
-        res.prevEdge = prevEdge;
-        res.requestedRides = targetRides;
-        res.usedRides = chosenRides;
-        res.exactMatched = (bestExactEndKey != null);
-        return res;
+        return results;
     }
 
     // =========================

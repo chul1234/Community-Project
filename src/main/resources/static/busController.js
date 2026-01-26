@@ -2362,14 +2362,82 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
         $scope.isPathDetailsOpen = !$scope.isPathDetailsOpen;
     };
 
+
+    // [신규] 경로 후보(Transfer Options) 관리
+    $scope.pathCandidates = [];
+    $scope.selectedPathCandidate = null;
+
+    $scope.selectPathCandidate = function(cand) {
+        if (!cand) return;
+        $scope.selectedPathCandidate = cand;
+
+        // UI에 반영할 데이터 연결
+        $scope.pathTotalMinutes = Math.round(cand.totalMinutes);
+        $scope.pathUsedTransfers = cand.usedTransfers;
+        $scope.pathSegments = cand.segments; // 이걸 바꿔야 지도/상세가 갱신됨
+
+        // segments가 바뀌었으므로 상세 파트/지도 다시 그리기 수행
+        rebuildPathUI(cand);
+    };
+
+    function rebuildPathUI(candData) {
+        // 1. 프리패치 (이미 되어 있을 수 있음)
+        // 버스 번호와 정류장 이름은 이미 '전체' 기준으로 프리패치했으므로 재활용 가능
+        
+        // 2. 파트 재계산
+        var partsResult = computePathPartsV2(candData.segments, candData.usedTransfers, candData.transferPenaltyMin);
+        $scope.pathParts = partsResult.parts;
+        
+        // UI 표시용 (WAIT 제외)
+        $scope.pathDisplayParts = (partsResult.parts || []).filter(function (p) {
+            return p.type !== 'WAIT';
+        });
+
+        // 3. 통계 및 색상
+        var rideCount = 0;
+        var walkCount = 0;
+        var busColorsForList = ['#2E86AB', '#F18F01', '#C73E1D', '#6A4C93', '#2A9D8F', '#E76F51'];
+        
+        var busTransferIndex = -1; 
+        var prevRouteId = null;
+
+        ($scope.pathDisplayParts || []).forEach(function (p) {
+            if (p.mode === 'BUS') {
+                if (p.routeId !== prevRouteId) {
+                    busTransferIndex++;
+                    prevRouteId = p.routeId;
+                }
+                p.viewColor = busColorsForList[busTransferIndex % busColorsForList.length];
+                rideCount++;
+            } else if (p.mode === 'TRAM') {
+                p.viewColor = '#FF69B4'; // 트램 핑크
+                rideCount++;
+            } else if (p.mode === 'WALK') {
+                walkCount++;
+                p.viewColor = '#555555';
+            } else {
+                p.viewColor = '#999999';
+            }
+        });
+
+        $scope.pathRideCount = rideCount;
+        $scope.pathWalkCount = walkCount;
+
+        // 4. 지도 그리기
+        drawCalculatedPath(candData.segments);
+        
+        // 5. 실시간 도착정보 갱신
+        if (typeof $scope.checkAllBusArrivals === 'function') {
+            $scope.checkAllBusArrivals();
+        }
+    }
+
     $scope.solvePath = function () {
-        // 유효성 검사: 사용자가 출발/도착지를 모두 선택했는지 확인
         if (!$scope.pathStartStop || !$scope.pathEndStop) {
             alert('먼저 목록에서 [출발] 정류장과 [도착] 정류장을 선택해주세요.');
             return;
         }
 
-        // 선택된 객체에서 좌표 추출 (API마다 필드명이 다를 수 있어 방어적 코딩)
         var s = $scope.pathStartStop;
         var e = $scope.pathEndStop;
 
@@ -2383,123 +2451,69 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
             return;
         }
 
-        // 이전 경로 표시 상태 초기화(새 계산 시작)
+        // 초기화
         $scope.pathDisplayParts = [];
         $scope.pathRideCount = 0;
         $scope.pathWalkCount = 0;
         $scope.isPathDetailsOpen = false;
+        $scope.pathCandidates = [];
+        $scope.selectedPathCandidate = null;
 
-        // 파라미터 구성
         var params = {
             fromLat: startLat,
             fromLng: startLng,
             toLat: endLat,
             toLng: endLng,
-            snapRadiusM: 450, // 도보 스냅 반경 (450m)
-            maxTransfers: $scope.pathMaxTransfers, // 허용 환승 횟수
+            snapRadiusM: 450,
+            maxTransfers: $scope.pathMaxTransfers,
         };
 
         $http
             .get('/api/path/solve', { params: params })
             .then(function (res) {
                 var data = res.data;
-                if (!data || !data.segments || data.segments.length === 0) {
+                // candidates가 비어있으면 경로 없음
+                if (!data || !data.candidates || data.candidates.length === 0) {
                     alert('경로를 찾을 수 없습니다.');
                     return;
                 }
 
-                // ✅ BUS 구간의 routeId 목록 수집
-                var busRouteIds = [];
-                (data.segments || []).forEach(function (seg) {
-                    var rid = seg.routeId || seg.routeid || seg.route_id;
-                    if (String(seg.mode || '').toUpperCase() === 'BUS' && rid) {
-                        busRouteIds.push(String(rid));
-                    }
+                $scope.pathCandidates = data.candidates;
+
+                // 모든 후보의 BUS routeId를 수집하여 한 번에 프리패치
+                var allRouteIds = [];
+                // 모든 후보의 Segment EndStop을 미리 수집
+                var allSegmentsForStopNames = [];
+
+                data.candidates.forEach(function(cand) {
+                    (cand.segments || []).forEach(function(seg) {
+                        allSegmentsForStopNames.push(seg);
+                        var rid = seg.routeId || seg.routeid || seg.route_id;
+                        if (String(seg.mode || '').toUpperCase() === 'BUS' && rid) {
+                            allRouteIds.push(String(rid));
+                        }
+                    });
                 });
 
-                // ✅ 중복 제거
-                var uniqList = Array.from(new Set(busRouteIds));
+                var uniqRouteIds = Array.from(new Set(allRouteIds));
 
-                // ✅ (핵심) 버스 번호 프리패치가 "완료된 뒤" UI를 구성한다.
                 return $q.all([
-                    prefetchPathBusRouteNosByRouteIds(uniqList),
-                    prefetchPathSegmentEndStopNames(data.segments, 6)
+                    prefetchPathBusRouteNosByRouteIds(uniqRouteIds),
+                    prefetchPathSegmentEndStopNames(allSegmentsForStopNames, 10) // 좀 더 넉넉하게
                 ])
-                    .catch(function (e) {
-                        console.warn('[PATH] prefetch(routeNo/stopNames) failed. keep going.', e);
-                    })
-                    .then(function () {
-                        // 모든 버스 번호가 pathRouteNoMap 캐시에 반영된 상태
-                        $scope.pathTotalMinutes = Math.round(data.totalMinutes);
-                        $scope.pathUsedTransfers = data.usedTransfers;
-                        $scope.pathSegments = data.segments;
-
-                        var partsResult = computePathPartsV2(data.segments, data.usedTransfers, data.transferPenaltyMin);
-
-                        $scope.pathParts = partsResult.parts;
-
-                        // UI 표시용 (WAIT 제외)
-                        $scope.pathDisplayParts = (partsResult.parts || []).filter(function (p) {
-                            return p.type !== 'WAIT';
-                        });
-
-                        // 통계 계산 및 화면 표시용 색상 주입
-                        var rideCount = 0;
-                        var walkCount = 0;
-                        // [신규] Map과 동일한 색상 팔레트
-                        var busColorsForList = ['#2E86AB', '#F18F01', '#C73E1D', '#6A4C93', '#2A9D8F', '#E76F51'];
-
-                        // -----------------------------------------------------
-                        // ★ [수정] 지도(Map)와 동일한 로직으로 색상 부여
-                        // -----------------------------------------------------
-                        var busTransferIndex = -1; // 첫 BUS: index=0
-                        var prevRouteId = null;
-
-                        ($scope.pathDisplayParts || []).forEach(function (p) {
-                            if (p.mode === 'BUS') {
-                                // 노선(ID)이 바뀌면 인덱스 증가 (같은 노선 연속이면 유지)
-                                if (p.routeId !== prevRouteId) {
-                                    busTransferIndex++;
-                                    prevRouteId = p.routeId;
-                                }
-                                p.viewColor = busColorsForList[busTransferIndex % busColorsForList.length];
-                                rideCount++;
-                            } else if (p.mode === 'TRAM') {
-                                // 트램은 고정 색상 (핑크)
-                                p.viewColor = '#FF69B4';
-                                // TRAM도 rideCount에 포함? (기존 로직 유지)
-                                // 트램은 busTransferIndex에 영향 주지 않음 (지도 로직 참조)
-                                rideCount++;
-                            } else if (p.mode === 'WALK') {
-                                walkCount++;
-                                p.viewColor = '#555555'; // 도보 회색
-                            } else {
-                                // ETC
-                                p.viewColor = '#999999';
-                            }
-                        });
-
-
-                        $scope.pathRideCount = rideCount;
-                        $scope.pathWalkCount = walkCount;
-
-                        // [신규] 첫 번째 버스 실시간 도착정보 확인 및 총 소요시간 보정
-                        if (typeof $scope.checkAllBusArrivals === 'function') {
-                            $scope.checkAllBusArrivals();
-                        }
-
-
-                        // 지도에 경로 그리기
-                        drawCalculatedPath(data.segments);
-
-                        $scope.isPathDetailsOpen = false;
-
-                        // [추가] 경로 탐색 완료 시 실시간 정보 갱신(및 자동갱신) 시작
-                        startAutoRefresh();
-
-                        // ✅ Digest 보강(첫 렌더에 확실히 반영)
-                        $timeout(function () {}, 0);
-                    });
+                .catch(function (e) {
+                    console.warn('[PATH] prefetch failed. keep going.', e);
+                })
+                .then(function () {
+                    // 프리패치 완료 후, 0번(가장 빠른 경로) 자동 선택
+                    $scope.selectPathCandidate($scope.pathCandidates[0]);
+                    
+                    // 탑승 상세 열기 (사용자가 바로 볼 수 있게)
+                    // $scope.isPathDetailsOpen = true; 
+                    
+                    startAutoRefresh();
+                    $timeout(function () {}, 0);
+                });
             })
             .catch(function (err) {
                 console.error('경로 검색 오류:', err);

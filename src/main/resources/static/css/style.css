@@ -2119,3 +2119,77 @@ header h1 {
 .path-tl-place {
     font-weight: 700;
 }
+
+
+/* ==========================================================================
+   8) PATH CANDIDATES (환승 옵션 칩)
+   ========================================================================== */
+.path-candidates-chips {
+    display: flex; /* flex-wrap: nowrap; (가로 스크롤) */
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 8px !important;
+    scrollbar-width: thin; /* Firefox */
+}
+.path-candidates-chips::-webkit-scrollbar {
+    height: 6px;
+}
+.path-candidates-chips::-webkit-scrollbar-thumb {
+    background-color: #ccc;
+    border-radius: 4px;
+}
+.path-candidates-chips::-webkit-scrollbar-track {
+    background-color: #f1f3f5;
+}
+
+.path-chip {
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    font-size: 13px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 60px;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.path-chip:hover {
+    background-color: #f8f9fa;
+    border-color: #ced4da;
+    transform: translateY(-1px);
+}
+
+.path-chip.active {
+    background-color: #0b5ed7; /* Primary Blue */
+    border-color: #0a58ca;
+    color: #ffffff;
+    box-shadow: 0 4px 8px rgba(11, 94, 215, 0.3);
+}
+
+.path-chip span {
+    display: block;
+    line-height: 1.2;
+}
+
+.path-chip .chip-label {
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.path-chip .chip-time {
+    font-size: 11px;
+    color: #0b5ed7;
+    font-weight: 600;
+}
+
+.path-chip.active .chip-time {
+    color: #e7f1ff; /* Light Blue text on dark bg */
+}
