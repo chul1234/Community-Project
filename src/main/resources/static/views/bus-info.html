@@ -186,7 +186,7 @@
                             ng-click="selectPathCandidate(cand)"
                         >
                             <span class="chip-label">{{ cand.usedTransfers == 0 ? '직행' : cand.usedTransfers + '회 환승' }}</span>
-                            <span class="chip-time">{{ Math.round(cand.totalMinutes) }}분</span>
+                            <span class="chip-time">{{ cand.displayTime }}분</span>
                         </div>
                     </div>
 

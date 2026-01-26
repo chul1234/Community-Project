@@ -2478,7 +2478,18 @@ function prefetchPathBusRouteNosByRouteIds(routeIds) {
                     return;
                 }
 
-                $scope.pathCandidates = data.candidates;
+                $scope.pathCandidates = data.candidates || [];
+
+                // [수정] 시간 순 정렬 및 화면 표시용 시간 계산
+                $scope.pathCandidates.forEach(function(cand) {
+                    cand.totalMinutes = cand.totalMinutes || 0;
+                    cand.displayTime = Math.round(cand.totalMinutes);
+                });
+
+                // 소요시간 오름차순 정렬 (빠른 순서대로)
+                $scope.pathCandidates.sort(function(a, b) {
+                    return a.totalMinutes - b.totalMinutes;
+                });
 
                 // 모든 후보의 BUS routeId를 수집하여 한 번에 프리패치
                 var allRouteIds = [];

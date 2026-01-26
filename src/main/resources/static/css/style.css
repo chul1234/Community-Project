@@ -1,4 +1,4 @@
-/* 수정됨: bus-info.html 하단(bus-info-grid/패널/테이블/리스트)에서
+﻿/* 수정됨: bus-info.html 하단(bus-info-grid/패널/테이블/리스트)에서
    - 한글 세로쪼개짐(글자 단위 줄바꿈) 방지
    - 긴 텍스트(정류장명/노선명/nodeId)로 레이아웃 깨짐 방지(ellipsis)
    - 테이블 폭 흔들림 방지(table-layout: fixed) + 필요 시 가로스크롤만 허용
@@ -2122,56 +2122,46 @@ header h1 {
 
 
 /* ==========================================================================
-   8) PATH CANDIDATES (환승 옵션 칩)
+   8) PATH CANDIDATES (환승 옵션 - Segmented Control)
    ========================================================================== */
 .path-candidates-chips {
-    display: flex; /* flex-wrap: nowrap; (가로 스크롤) */
-    gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 8px;
-    margin-bottom: 8px !important;
-    scrollbar-width: thin; /* Firefox */
-}
-.path-candidates-chips::-webkit-scrollbar {
-    height: 6px;
-}
-.path-candidates-chips::-webkit-scrollbar-thumb {
-    background-color: #ccc;
-    border-radius: 4px;
-}
-.path-candidates-chips::-webkit-scrollbar-track {
-    background-color: #f1f3f5;
+    display: flex;
+    width: 100%;
+    background-color: #f1f3f5; /* 컨테이너 배경 회색 */
+    padding: 4px;
+    border-radius: 12px;
+    gap: 4px;
+    overflow-x: hidden; /* 스크롤 제거 */
+    margin-bottom: 12px !important;
 }
 
 .path-chip {
+    flex: 1; /* 균등 분할 */
     cursor: pointer;
-    padding: 6px 12px;
-    border-radius: 20px;
-    background: #ffffff;
-    border: 1px solid #dee2e6;
+    padding: 8px 4px;
+    border-radius: 8px;
+    background: transparent;
+    border: none;
     font-size: 13px;
-    white-space: nowrap;
-    flex-shrink: 0;
+    text-align: center;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-width: 60px;
+    min-width: 0; /* 텍스트 넘침 방지 */
     transition: all 0.2s;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    color: #868e96; /* 비활성 텍스트 회색 */
 }
 
 .path-chip:hover {
-    background-color: #f8f9fa;
-    border-color: #ced4da;
-    transform: translateY(-1px);
+    background-color: rgba(0,0,0,0.03);
 }
 
 .path-chip.active {
-    background-color: #0b5ed7; /* Primary Blue */
-    border-color: #0a58ca;
-    color: #ffffff;
-    box-shadow: 0 4px 8px rgba(11, 94, 215, 0.3);
+    background-color: #ffffff; /* 활성 카드 흰색 */
+    color: #0b5ed7; /* 활성 텍스트 파랑 */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08); /* 가벼운 그림자 */
+    font-weight: 800;
 }
 
 .path-chip span {
@@ -2182,14 +2172,16 @@ header h1 {
 .path-chip .chip-label {
     font-weight: 700;
     margin-bottom: 2px;
+    font-size: 13px;
+    color: inherit;
 }
 
 .path-chip .chip-time {
-    font-size: 11px;
-    color: #0b5ed7;
+    font-size: 12px;
     font-weight: 600;
+    color: inherit;
 }
 
 .path-chip.active .chip-time {
-    color: #e7f1ff; /* Light Blue text on dark bg */
+    color: #0b5ed7;
 }
