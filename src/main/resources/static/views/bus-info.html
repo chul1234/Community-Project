@@ -9,7 +9,7 @@
             <h2 class="bus-page-title">버스 노선 관리</h2>
         </div>
 
-        <div class="bus-topbar-right">
+        <div class="bus-topbar-right" ng-if="currentUser.role === 'ADMIN'">
             <!-- 상태 배지 -->
             <span
                 class="badge badge-collector"
