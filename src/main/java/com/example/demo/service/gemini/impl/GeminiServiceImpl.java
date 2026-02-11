@@ -58,10 +58,12 @@ public class GeminiServiceImpl implements IGeminiService {
             // System Instruction
             ObjectNode systemInstruction = requestBody.putObject("systemInstruction");
             systemInstruction.putObject("parts").put("text", "You are a helpful Bus Assistant for Daejeon City. " +
-                    "Use 'get_bus_station' to find stops by name. " +
-                    "Use 'get_shortest_path' to find routes between coordinates. " +
-                    "If a path is found, summarize the route briefly (e.g. 'Take bus 108 at ...'). " +
-                    "Always answer in Korean.");
+                    "If the user asks for a route between two places (A to B), use 'search_route'. " +
+                    "If the user asks for bus arrival time or 'what buses come to [Station]', use 'get_bus_arrival'. " +
+                    "If the user asks for a list of all bus routes passing through a station (static list), use 'get_station_routes'. " +
+                    "For simple station search, use 'get_bus_station'. " +
+                    "Always answer in Korean. " +
+                    "If a path is found, summarize the route briefly.");
 
             // Tools definition
             ArrayNode tools = requestBody.putArray("tools");
@@ -70,26 +72,44 @@ public class GeminiServiceImpl implements IGeminiService {
             // Tool 1: get_bus_station
             ObjectNode tool1 = functionDeclarations.addObject();
             tool1.put("name", "get_bus_station");
-            tool1.put("description", "Search for bus stations by name (e.g., 'City Hall', 'Hanbit Tower'). Returns stations with IDs and coordinates.");
+            tool1.put("description", "Search for bus stations by name (e.g., 'City Hall'). Returns stations with IDs and coordinates.");
             ObjectNode params1 = tool1.putObject("parameters");
             params1.put("type", "OBJECT");
             ObjectNode props1 = params1.putObject("properties");
             props1.putObject("keyword").put("type", "STRING").put("description", "Station name query");
             params1.putArray("required").add("keyword");
 
-            // Tool 2: get_shortest_path
+            // Tool 2: search_route
             ObjectNode tool2 = functionDeclarations.addObject();
-            tool2.put("name", "get_shortest_path");
-            tool2.put("description", "Calculate shortest path between two coordinates.");
+            tool2.put("name", "search_route");
+            tool2.put("description", "Search for a route between two places. User provides start and end names.");
             ObjectNode params2 = tool2.putObject("parameters");
             params2.put("type", "OBJECT");
             ObjectNode props2 = params2.putObject("properties");
-            props2.putObject("fromLat").put("type", "NUMBER");
-            props2.putObject("fromLng").put("type", "NUMBER");
-            props2.putObject("toLat").put("type", "NUMBER");
-            props2.putObject("toLng").put("type", "NUMBER");
+            props2.putObject("startKeyword").put("type", "STRING");
+            props2.putObject("endKeyword").put("type", "STRING");
             ArrayNode req2 = params2.putArray("required");
-            req2.add("fromLat").add("fromLng").add("toLat").add("toLng");
+            req2.add("startKeyword").add("endKeyword");
+
+            // Tool 3: get_bus_arrival
+            ObjectNode tool3 = functionDeclarations.addObject();
+            tool3.put("name", "get_bus_arrival");
+            tool3.put("description", "Get real-time bus arrival information for a specific bus station.");
+            ObjectNode params3 = tool3.putObject("parameters");
+            params3.put("type", "OBJECT");
+            ObjectNode props3 = params3.putObject("properties");
+            props3.putObject("keyword").put("type", "STRING");
+            params3.putArray("required").add("keyword");
+            
+            // Tool 4: get_station_routes (New)
+            ObjectNode tool4 = functionDeclarations.addObject();
+            tool4.put("name", "get_station_routes");
+            tool4.put("description", "Get a comprehensive list of all bus routes that pass through a specific station.");
+            ObjectNode params4 = tool4.putObject("parameters");
+            params4.put("type", "OBJECT");
+            ObjectNode props4 = params4.putObject("properties");
+            props4.putObject("keyword").put("type", "STRING");
+            params4.putArray("required").add("keyword");
 
             // User Content
             ArrayNode contents = requestBody.putArray("contents");
@@ -108,6 +128,10 @@ public class GeminiServiceImpl implements IGeminiService {
 
             JsonNode candidate = response.path("candidates").get(0);
             JsonNode content = candidate.path("content");
+            if (!content.has("parts") || content.path("parts").isEmpty()) {
+                 // Safety block or empty
+                 return Map.of("text", "죄송합니다. 답변을 생성할 수 없습니다. (보안 정책 등)");
+            }
             JsonNode part = content.path("parts").get(0);
 
             // Check if it's a function call
@@ -122,25 +146,31 @@ public class GeminiServiceImpl implements IGeminiService {
                 if ("get_bus_station".equals(funcName)) {
                     String keyword = args.path("keyword").asText();
                     toolResult = searchBusStations(keyword);
-                } else if ("get_shortest_path".equals(funcName)) {
-                    double fromLat = args.path("fromLat").asDouble();
-                    double fromLng = args.path("fromLng").asDouble();
-                    double toLat = args.path("toLat").asDouble();
-                    double toLng = args.path("toLng").asDouble();
-                    toolResult = pathService.solve(fromLat, fromLng, toLat, toLng, 500, 2);
+                } else if ("search_route".equals(funcName)) {
+                    String startKeyword = args.path("startKeyword").asText();
+                    String endKeyword = args.path("endKeyword").asText();
+                    toolResult = processRouteSearch(startKeyword, endKeyword);
                     
                     if (toolResult instanceof Map) {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> casted = (Map<String, Object>) toolResult;
-                        pathData = casted;
+                        Map<?,?> map = (Map<?,?>) toolResult;
+                        if (map.containsKey("totalMinutes")) { // simplistic check if it is path data
+                            pathData = (Map<String, Object>) toolResult;
+                        }
                     }
+                } else if ("get_bus_arrival".equals(funcName)) {
+                    String keyword = args.path("keyword").asText();
+                    toolResult = processBusArrival(keyword);
+                } else if ("get_station_routes".equals(funcName)) {
+                    String keyword = args.path("keyword").asText();
+                    toolResult = processStationRoutes(keyword);
                 }
 
                 // 4. Send Tool Output back (Second Turn)
                 ObjectNode nextRequest = objectMapper.createObjectNode();
-                nextRequest.set("systemInstruction", systemInstruction); // Include system instruction again? safer to include or not? v1beta usually stateless but chat usually maintains. But REST needs history.
-                // Actually system instruction should be persistent if we send full history? 
-                // Let's just include tools again and history.
+                // It's safer NOT to re-send system instruction in the second turn for v1beta if not needed, 
+                // but preserving history is key.
+                // Let's keep system instruction.
+                nextRequest.set("systemInstruction", systemInstruction); 
                 
                 nextRequest.set("tools", requestBody.get("tools"));
                 
@@ -156,16 +186,19 @@ public class GeminiServiceImpl implements IGeminiService {
                 ObjectNode funcRespPart = functionResponseTurn.putArray("parts").addObject();
                 ObjectNode funcResp = funcRespPart.putObject("functionResponse");
                 funcResp.put("name", funcName);
-                funcResp.set("response", objectMapper.valueToTree(Map.of("content", toolResult))); // Wrap in content object
+                funcResp.set("response", objectMapper.valueToTree(Map.of("content", toolResult))); 
                 
                 // Call again
                 JsonNode finalResponse = restTemplate.postForObject(url, nextRequest, JsonNode.class);
                 
                 String finalText = "죄송합니다. 처리 중 오류가 발생했습니다.";
                 if (finalResponse != null && finalResponse.has("candidates") && !finalResponse.path("candidates").isEmpty()) {
-                   JsonNode finalPart = finalResponse.path("candidates").get(0).path("content").path("parts").get(0);
-                   if (finalPart.has("text")) {
-                       finalText = finalPart.get("text").asText();
+                   JsonNode finalContent = finalResponse.path("candidates").get(0).path("content");
+                   if (finalContent.has("parts") && !finalContent.path("parts").isEmpty()) {
+                       JsonNode finalPart = finalContent.path("parts").get(0);
+                       if (finalPart.has("text")) {
+                           finalText = finalPart.get("text").asText();
+                       }
                    }
                 }
 
@@ -190,24 +223,22 @@ public class GeminiServiceImpl implements IGeminiService {
 
     private Object searchBusStations(String keyword) {
         try {
-            // Using existing Open API logic (mimic BusApiController)
             String baseUrl = "http://apis.data.go.kr/1613000/BusSttnInfoInqireService/getSttnNoList";
 
-            java.net.URI uri = org.springframework.web.util.UriComponentsBuilder.fromUriString(baseUrl) // Better than fromHttpUrl
+            java.net.URI uri = org.springframework.web.util.UriComponentsBuilder.fromUriString(baseUrl)
                     .queryParam("serviceKey", TAGO_SERVICE_KEY)
                     .queryParam("_type", "json")
                     .queryParam("cityCode", CITY_CODE)
                     .queryParam("nodeNm", keyword)
                     .queryParam("numOfRows", 5)
                     .build()
-                    .encode() // Encode the components (UTF-8)
+                    .encode() 
                     .toUri();
             
             System.out.println("Calling Bus API: " + uri);
 
             String response = restTemplate.getForObject(uri, String.class);
-            
-            System.out.println("Bus API Response: " + response);
+            // System.out.println("Bus API Response: " + response);
 
             JsonNode root = objectMapper.readTree(response);
             JsonNode items = root.path("response").path("body").path("items").path("item");
@@ -220,6 +251,129 @@ public class GeminiServiceImpl implements IGeminiService {
         } catch (Exception e) {
             e.printStackTrace();
             return Collections.emptyList();
+        }
+    }
+
+    private Object processRouteSearch(String startKeyword, String endKeyword) {
+        // 1. Find Start
+        JsonNode startNodes = (JsonNode) getJsonNodeFromSearch(startKeyword);
+        if (startNodes == null) return "출발지 '" + startKeyword + "'를 찾을 수 없습니다.";
+
+        // 2. Find End
+        JsonNode endNodes = (JsonNode) getJsonNodeFromSearch(endKeyword);
+        if (endNodes == null) return "도착지 '" + endKeyword + "'를 찾을 수 없습니다.";
+
+        // Pick 1st
+        JsonNode start = startNodes.isArray() ? startNodes.get(0) : startNodes;
+        JsonNode end = endNodes.isArray() ? endNodes.get(0) : endNodes;
+
+        double startLat = start.path("gpslati").asDouble();
+        double startLng = start.path("gpslong").asDouble();
+        double endLat = end.path("gpslati").asDouble();
+        double endLng = end.path("gpslong").asDouble();
+        
+        // 3. Solve Path
+        return pathService.solve(startLat, startLng, endLat, endLng, 500, 2);
+    }
+    
+    private Object processBusArrival(String keyword) {
+        // 1. Find Station
+        JsonNode nodes = (JsonNode) getJsonNodeFromSearch(keyword);
+        if (nodes == null) return "정류장 '" + keyword + "'를 찾을 수 없습니다.";
+        
+        JsonNode station = nodes.isArray() ? nodes.get(0) : nodes;
+        String nodeId = station.path("nodeid").asText();
+        String nodeNm = station.path("nodenm").asText();
+        
+        // 2. Call Arrival API
+        try {
+            String baseUrl = "http://apis.data.go.kr/1613000/ArvlInfoInqireService/getSttnAcctoArvlPrearngeInfoList";
+            java.net.URI uri = org.springframework.web.util.UriComponentsBuilder.fromUriString(baseUrl)
+                    .queryParam("serviceKey", TAGO_SERVICE_KEY)
+                    .queryParam("_type", "json")
+                    .queryParam("cityCode", CITY_CODE)
+                    .queryParam("nodeId", nodeId)
+                    .queryParam("numOfRows", 10)
+                    .build().encode().toUri();
+                    
+            String response = restTemplate.getForObject(uri, String.class);
+            JsonNode root = objectMapper.readTree(response);
+            JsonNode items = root.path("response").path("body").path("items").path("item");
+            
+            if (items.isMissingNode()) return nodeNm + " 정류장의 도착 정보가 없습니다.";
+            
+            ArrayNode resultList = objectMapper.createArrayNode();
+            if (items.isArray()) {
+                for (JsonNode item : items) {
+                    addArrivalSummary(resultList, item);
+                }
+            } else {
+                addArrivalSummary(resultList, items);
+            }
+            
+            return resultList;
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "도착 정보를 가져오는 중 오류 발생.";
+        }
+    }
+    
+    private void addArrivalSummary(ArrayNode list, JsonNode item) {
+        ObjectNode s = list.addObject();
+        s.put("busNo", item.path("routeno").asText());
+        s.put("eta", item.path("arrtime").asInt() / 60 + "분 후");
+        s.put("remains", item.path("arrprevstationcnt").asInt() + "정거장 전");
+    }
+
+    private JsonNode getJsonNodeFromSearch(String keyword) {
+        Object res = searchBusStations(keyword);
+        if (res instanceof JsonNode) {
+            return (JsonNode) res;
+        }
+        return null; // Empty list or other error
+    }
+    private Object processStationRoutes(String keyword) {
+        // 1. Find Station
+        JsonNode nodes = (JsonNode) getJsonNodeFromSearch(keyword);
+        if (nodes == null) return "정류장 '" + keyword + "'를 찾을 수 없습니다.";
+        
+        JsonNode station = nodes.isArray() ? nodes.get(0) : nodes;
+        String nodeId = station.path("nodeid").asText();
+        String nodeNm = station.path("nodenm").asText();
+        
+        // 2. Call Through Route API
+        try {
+            String baseUrl = "http://apis.data.go.kr/1613000/BusSttnInfoInqireService/getSttnThrghRouteList";
+            java.net.URI uri = org.springframework.web.util.UriComponentsBuilder.fromUriString(baseUrl)
+                    .queryParam("serviceKey", TAGO_SERVICE_KEY)
+                    .queryParam("_type", "json")
+                    .queryParam("cityCode", CITY_CODE)
+                    .queryParam("nodeId", nodeId)
+                    .queryParam("numOfRows", 50)
+                    .build().encode().toUri();
+                    
+            String response = restTemplate.getForObject(uri, String.class);
+            JsonNode root = objectMapper.readTree(response);
+            JsonNode items = root.path("response").path("body").path("items").path("item");
+            
+            if (items.isMissingNode()) return nodeNm + " 정류장을 경유하는 노선 정보가 없습니다.";
+            
+            // Collect route numbers
+            java.util.List<String> routeNames = new java.util.ArrayList<>();
+            if (items.isArray()) {
+                for (JsonNode item : items) {
+                    routeNames.add(item.path("routeno").asText() + "번");
+                }
+            } else {
+                 routeNames.add(items.path("routeno").asText() + "번");
+            }
+            
+            return Map.of("station", nodeNm, "routes", routeNames);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "경유 노선 정보를 가져오는 중 오류 발생.";
         }
     }
 }
