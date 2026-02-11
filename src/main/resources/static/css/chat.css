@@ -12,13 +12,15 @@
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background-color: #020476; /* Green */
+    background-color: #007bff; /* Green */
     color: white;
     border: none;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     font-size: 24px;
     cursor: pointer;
-    transition: transform 0.2s, background-color 0.2s;
+    transition:
+        transform 0.2s,
+        background-color 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -26,7 +28,7 @@
 
 .chat-toggle-btn:hover {
     transform: scale(1.1);
-    background-color: #020476;
+    background-color: #007bff;
 }
 
 /* Chat Window */
@@ -38,7 +40,7 @@
     height: 500px;
     background-color: white;
     border-radius: 15px;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -46,13 +48,19 @@
 }
 
 @keyframes slideUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Header */
 .chat-header {
-    background-color: #020476;
+    background-color: #007bff;
     color: white;
     padding: 15px;
     display: flex;
@@ -123,12 +131,12 @@
 }
 
 .chat-input:focus {
-    border-color: #020476;
+    border-color: #007bff;
 }
 
 .chat-send-btn {
     padding: 10px 20px;
-    background-color: #020476;
+    background-color: #007bff;
     color: white;
     border: none;
     border-radius: 20px;
@@ -161,10 +169,20 @@
     animation: typing 1.4s infinite ease-in-out both;
 }
 
-.typing-dot:nth-child(1) { animation-delay: -0.32s; }
-.typing-dot:nth-child(2) { animation-delay: -0.16s; }
+.typing-dot:nth-child(1) {
+    animation-delay: -0.32s;
+}
+.typing-dot:nth-child(2) {
+    animation-delay: -0.16s;
+}
 
 @keyframes typing {
-    0%, 80%, 100% { transform: scale(0); }
-    40% { transform: scale(1); }
+    0%,
+    80%,
+    100% {
+        transform: scale(0);
+    }
+    40% {
+        transform: scale(1);
+    }
 }
