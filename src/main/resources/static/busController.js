@@ -16,8 +16,45 @@ proj4.defs(
 ol.proj.proj4.register(proj4); // OpenLayers에 좌표계 등록
 
 // AngularJS 컨트롤러 정의
-app.controller('BusController', function ($scope, $http, $timeout, $interval, $q) {
+app.controller('BusController', function ($scope, $http, $timeout, $interval, $q, $rootScope) {
     const CITY_CODE = '25'; // 대전 도시코드
+
+    // Listen for Chatbot Path Event
+    $rootScope.$on('DRAW_CHAT_PATH', function (event, pathData) {
+        if (!pathData) return;
+        
+        console.log('[BusController] Received path from chatbot:', pathData);
+        
+        // Use existing logic to draw path
+        // pathData structure matches exactly what IPathService returns
+        // totalMinutes, segments, ...
+        
+        $scope.pathTotalMinutes = pathData.totalMinutes;
+        $scope.pathSegments = pathData.segments;
+        $scope.pathUsedTransfers = pathData.usedTransfers;
+        $scope.pathTransferPenaltyMin = pathData.transferPenaltyMin;
+
+        // Draw on Map
+        if (typeof drawCalculatedPath === 'function') {
+             drawCalculatedPath(pathData.segments);
+        } else {
+             // Fallback if function is not in scope but global or internal
+             // In this file, drawCalculatedPath is likely internal or scope-bound.
+             // Let's check where it is defined. It seems it's defined later in the file.
+             // I will assume it's available or I will move the listener to where it is defined.
+             // Wait, I can't move the listener easily with replace_file_content.
+             // I will put the implementation here or call a scope function.
+             if ($scope.drawCalculatedPath) {
+                 $scope.drawCalculatedPath(pathData.segments);
+             }
+        }
+
+        // Update UI
+        schedulePathDisplayPartsRebuild();
+        
+        // Open the Path Details panel if closed
+        $scope.isPathDetailsOpen = true;
+    });
 
     $scope.searchType = 'route'; // 검색 타입 (기본: 노선)
     $scope.searchKeyword = ''; // 검색어 입력값

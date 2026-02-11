@@ -21,3 +21,7 @@ spring:
         multipart:
             max-file-size: 50MB # 파일 하나당 최대 크기
             max-request-size: 100MB # 요청 전체(여러 파일 합) 최대 크기
+
+google:
+  gemini:
+    key: "AIzaSyCjMTZcvvvlDO0lSQxn8ik1DkL5_1UzSJM" # TODO: Replace with your actual Gemini API Key

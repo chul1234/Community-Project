@@ -496,3 +496,44 @@
 </div>
 
 <!-- 수정됨 끝 -->
+
+    <!-- Chat Widget -->
+    <div ng-controller="ChatController" class="chat-widget">
+        <!-- Toggle Button -->
+        <button class="chat-toggle-btn" ng-click="toggleChat()">
+            💬
+        </button>
+
+        <!-- Chat Window -->
+        <div class="chat-window" ng-show="isOpen">
+            <div class="chat-header">
+                <span class="chat-title">대전 버스 도우미 🤖</span>
+                <button class="chat-close-btn" ng-click="toggleChat()">✕</button>
+            </div>
+            
+            <div class="chat-messages">
+                <div class="message" ng-repeat="msg in messages" ng-class="msg.type">
+                    {{ msg.text }}
+                </div>
+                <!-- Typing Indicator -->
+                <div class="message bot typing-indicator" ng-if="isTyping">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <input type="text" 
+                       class="chat-input" 
+                       ng-model="userMessage" 
+                       placeholder="무엇이든 물어보세요..." 
+                       ng-keypress="$event.keyCode == 13 && sendMessage()">
+                <button class="chat-send-btn" 
+                        ng-click="sendMessage()"
+                        ng-disabled="!userMessage.trim() || isTyping">
+                    전송
+                </button>
+            </div>
+        </div>
+    </div>
