@@ -12,7 +12,7 @@
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background-color: #4CAF50; /* Green */
+    background-color: #020476; /* Green */
     color: white;
     border: none;
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
@@ -26,7 +26,7 @@
 
 .chat-toggle-btn:hover {
     transform: scale(1.1);
-    background-color: #45a049;
+    background-color: #020476;
 }
 
 /* Chat Window */
@@ -52,7 +52,7 @@
 
 /* Header */
 .chat-header {
-    background-color: #4CAF50;
+    background-color: #020476;
     color: white;
     padding: 15px;
     display: flex;
@@ -92,8 +92,8 @@
 
 .message.user {
     align-self: flex-end;
-    background-color: #dcf8c6; /* Light Green */
-    color: #333;
+    background-color: #e3f2fd; /* Light Blue */
+    color: #0d47a1;
     border-bottom-right-radius: 2px;
 }
 
@@ -101,7 +101,7 @@
     align-self: flex-start;
     background-color: white;
     color: #333;
-    border: 1px solid #e0e0e0;
+    border: 1px solid #bbdefb;
     border-bottom-left-radius: 2px;
 }
 
@@ -123,12 +123,12 @@
 }
 
 .chat-input:focus {
-    border-color: #4CAF50;
+    border-color: #020476;
 }
 
 .chat-send-btn {
     padding: 10px 20px;
-    background-color: #4CAF50;
+    background-color: #020476;
     color: white;
     border: none;
     border-radius: 20px;
