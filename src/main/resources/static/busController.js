@@ -56,6 +56,43 @@ app.controller('BusController', function ($scope, $http, $timeout, $interval, $q
         $scope.isPathDetailsOpen = true;
     });
 
+    // Listen for Chatbot Station Event (Added)
+    $rootScope.$on('DRAW_CHAT_STATION', function (event, stationData) {
+        if (!stationData || !stationData.lat || !stationData.lng) return;
+        
+        console.log('[BusController] Received station from chatbot:', stationData);
+        
+        if (olMap) {
+            // 1. Map Move
+            var xy = lonLatToMapXY(stationData.lng, stationData.lat);
+            olMap.getView().animate({ center: xy, zoom: 17, duration: 500 });
+            
+            // 2. Draw Marker (Temporary logic using stopSource)
+            var feature = new ol.Feature({ geometry: new ol.geom.Point(xy) });
+            feature.set('stationId', stationData.id);
+            feature.set('stationName', stationData.name);
+            
+            // Style (Red Highlight)
+            feature.setStyle(new ol.style.Style({
+                image: new ol.style.Circle({
+                    radius: 8,
+                    fill: new ol.style.Fill({ color: '#FF4444' }),
+                    stroke: new ol.style.Stroke({ color: '#FFFFFF', width: 2 })
+                }),
+                text: new ol.style.Text({
+                    text: stationData.name,
+                    font: 'bold 14px "Pretendard", sans-serif',
+                    fill: new ol.style.Fill({ color: '#FF4444' }),
+                    stroke: new ol.style.Stroke({ color: '#FFFFFF', width: 3 }),
+                    offsetY: -15
+                })
+            }));
+            
+            // Add to source
+            stopSource.addFeature(feature);
+        }
+    });
+
     $scope.searchType = 'route'; // 검색 타입 (기본: 노선)
     $scope.searchKeyword = ''; // 검색어 입력값
     $scope.searchTerm = ''; // 실제 검색어

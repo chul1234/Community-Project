@@ -15,6 +15,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -155,8 +156,10 @@ public class GeminiServiceImpl implements IGeminiService {
                     
                     if (toolResult instanceof Map) {
                         Map<?,?> map = (Map<?,?>) toolResult;
-                        if (map.containsKey("totalMinutes")) { // simplistic check if it is path data
+                        if (map.containsKey("totalMinutes")) { 
                             pathData = (Map<String, Object>) toolResult;
+                            // LLM에게 줄 요약 정보 생성 (할루시네이션 방지)
+                            toolResult = formatRouteSummary(pathData);
                         }
                     }
                 } else if ("get_bus_arrival".equals(funcName)) {
@@ -209,6 +212,48 @@ public class GeminiServiceImpl implements IGeminiService {
                 if (pathData != null) {
                     result.put("path", pathData);
                 }
+                
+                // [New] Display Station on Map
+                if (("get_bus_arrival".equals(funcName) || "get_bus_station".equals(funcName)) && toolResult != null) {
+                    JsonNode firstStation = null;
+                    
+                    if (toolResult instanceof ArrayNode) {
+                         ArrayNode arr = (ArrayNode) toolResult;
+                         if (arr.size() > 0) {
+                             if ("get_bus_arrival".equals(funcName)) {
+                                 // arrival returns grouped object with station info
+                                 firstStation = arr.get(0);
+                             } else {
+                                 // get_bus_station returns raw item list
+                                 firstStation = arr.get(0);
+                             }
+                         }
+                    } else if (toolResult instanceof JsonNode) {
+                        firstStation = (JsonNode) toolResult;
+                    }
+
+                    if (firstStation != null) {
+                        // Extract common fields (tago api field names)
+                        // Arrival Group: stationId, stationName, gpsLat, gpsLng
+                        // Station Item: nodeid, nodenm, gpslati, gpslong
+                        
+                        String sid = firstStation.has("stationId") ? firstStation.get("stationId").asText() : firstStation.path("nodeid").asText();
+                        String snm = firstStation.has("stationName") ? firstStation.get("stationName").asText() : firstStation.path("nodenm").asText();
+                        double lat = firstStation.has("gpsLat") ? firstStation.get("gpsLat").asDouble() : firstStation.path("gpslati").asDouble();
+                        double lng = firstStation.has("gpsLng") ? firstStation.get("gpsLng").asDouble() : firstStation.path("gpslong").asDouble();
+                        
+                        // Check validity
+                        if (sid != null && !sid.isEmpty() && lat > 0 && lng > 0) {
+                             Map<String, Object> stationData = new HashMap<>();
+                             stationData.put("id", sid);
+                             stationData.put("name", snm);
+                             stationData.put("lat", lat);
+                             stationData.put("lng", lng);
+                             result.put("station", stationData);
+                        }
+                    }
+                }
+                
                 return result;
 
             } else {
@@ -283,42 +328,69 @@ public class GeminiServiceImpl implements IGeminiService {
         JsonNode nodes = (JsonNode) getJsonNodeFromSearch(keyword);
         if (nodes == null) return "정류장 '" + keyword + "'를 찾을 수 없습니다.";
         
-        JsonNode station = nodes.isArray() ? nodes.get(0) : nodes;
-        String nodeId = station.path("nodeid").asText();
-        String nodeNm = station.path("nodenm").asText();
-        
-        // 2. Call Arrival API
-        try {
-            String baseUrl = "http://apis.data.go.kr/1613000/ArvlInfoInqireService/getSttnAcctoArvlPrearngeInfoList";
-            java.net.URI uri = org.springframework.web.util.UriComponentsBuilder.fromUriString(baseUrl)
-                    .queryParam("serviceKey", tagoServiceKey)
-                    .queryParam("_type", "json")
-                    .queryParam("cityCode", CITY_CODE)
-                    .queryParam("nodeId", nodeId)
-                    .queryParam("numOfRows", 10)
-                    .build().encode().toUri();
-                    
-            String response = restTemplate.getForObject(uri, String.class);
-            JsonNode root = objectMapper.readTree(response);
-            JsonNode items = root.path("response").path("body").path("items").path("item");
-            
-            if (items.isMissingNode()) return nodeNm + " 정류장의 도착 정보가 없습니다.";
-            
-            ArrayNode resultList = objectMapper.createArrayNode();
-            if (items.isArray()) {
-                for (JsonNode item : items) {
-                    addArrivalSummary(resultList, item);
-                }
-            } else {
-                addArrivalSummary(resultList, items);
-            }
-            
-            return resultList;
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            return "도착 정보를 가져오는 중 오류 발생.";
+        List<JsonNode> stationList = new java.util.ArrayList<>();
+        if (nodes.isArray()) {
+            for (JsonNode n : nodes) stationList.add(n);
+        } else {
+            stationList.add(nodes);
         }
+        
+        // 상위 3개 정류장만 조회 (API 호출 최소화)
+        int limit = Math.min(stationList.size(), 3);
+        ArrayNode totalResult = objectMapper.createArrayNode();
+        boolean foundAny = false;
+        
+        for (int i = 0; i < limit; i++) {
+            JsonNode station = stationList.get(i);
+            String nodeId = station.path("nodeid").asText();
+            String nodeNm = station.path("nodenm").asText();
+            
+            try {
+                String baseUrl = "http://apis.data.go.kr/1613000/ArvlInfoInqireService/getSttnAcctoArvlPrearngeInfoList";
+                java.net.URI uri = org.springframework.web.util.UriComponentsBuilder.fromUriString(baseUrl)
+                        .queryParam("serviceKey", tagoServiceKey)
+                        .queryParam("_type", "json")
+                        .queryParam("cityCode", CITY_CODE)
+                        .queryParam("nodeId", nodeId)
+                        .queryParam("numOfRows", 10)
+                        .build().encode().toUri();
+                        
+                String response = restTemplate.getForObject(uri, String.class);
+                JsonNode root = objectMapper.readTree(response);
+                JsonNode items = root.path("response").path("body").path("items").path("item");
+                
+                if (!items.isMissingNode()) {
+                    foundAny = true;
+                    // 결과 묶음 객체
+                    ObjectNode stationGroup = totalResult.addObject();
+                    // 이름과 ID를 분리해서 저장 (프론트엔드 좌표 전달용)
+                    stationGroup.put("stationName", nodeNm);
+                    stationGroup.put("stationId", nodeId);
+                    // 좌표 추가 (Search 결과인 stationList에서 가져옴)
+                    if (station.has("gpslati") && station.has("gpslong")) {
+                        stationGroup.put("gpsLat", station.get("gpslati").asDouble());
+                        stationGroup.put("gpsLng", station.get("gpslong").asDouble());
+                    }
+                    
+                    stationGroup.put("displayName", nodeNm + " (" + nodeId + ")");
+                    ArrayNode arrivalList = stationGroup.putArray("arrivals");
+                    
+                    if (items.isArray()) {
+                        for (JsonNode item : items) {
+                            addArrivalSummary(arrivalList, item);
+                        }
+                    } else {
+                        addArrivalSummary(arrivalList, items);
+                    }
+                }
+                
+            } catch (Exception e) {
+                // 특정 정류장 조회 실패해도 계속 진행
+            }
+        }
+        
+        if (!foundAny) return "검색된 정류장(" + limit + "개)에 대한 도착 정보가 없습니다.";
+        return totalResult;
     }
     
     private void addArrivalSummary(ArrayNode list, JsonNode item) {
@@ -376,6 +448,33 @@ public class GeminiServiceImpl implements IGeminiService {
         } catch (Exception e) {
             e.printStackTrace();
             return "경유 노선 정보를 가져오는 중 오류 발생.";
+        }
+    }
+    private String formatRouteSummary(Map<String, Object> pathData) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            double totalMin = (double) pathData.get("totalMinutes");
+            sb.append("총 소요시간: 약 ").append((int)totalMin).append("분. ");
+            
+            List<Map<String, Object>> segments = (List<Map<String, Object>>) pathData.get("segments");
+            if (segments == null || segments.isEmpty()) return "경로를 찾을 수 없습니다.";
+            
+            for (Map<String, Object> seg : segments) {
+                String mode = (String) seg.get("mode");
+                if ("BUS".equals(mode)) {
+                    String routeNo = (String) seg.get("routeNo");
+                    sb.append("[").append(routeNo).append("번 버스]로 이동, ");
+                } else if ("TRAM".equals(mode)) {
+                    // Start/End nodes might be TRAM stations, but '2호선' is fixed in PathService
+                    sb.append("[트램(예정)]으로 이동, ");
+                } else if ("WALK".equals(mode)) {
+                    // sb.append("도보 이동, "); // 도보는 생략하거나 간단히
+                }
+            }
+            sb.append("도착.");
+            return sb.toString();
+        } catch (Exception e) {
+            return "경로 정보 처리 중 오류";
         }
     }
 }

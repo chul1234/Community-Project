@@ -61,6 +61,9 @@ public class PathServiceImpl implements IPathService {
 
     // routeId -> (nodeId -> nodeName) 캐시
     private static final Map<String, Map<String, String>> BUS_ROUTE_STOPNAME_CACHE = new ConcurrentHashMap<>();
+    
+    // routeId -> routeNo 캐시 (예: DJB30300052 -> "105")
+    private static final Map<String, String> BUS_ROUTE_NUMBER_CACHE = new ConcurrentHashMap<>();
 
     private final RestTemplate busNameRestTemplate = new RestTemplate();
     private final ObjectMapper busNameObjectMapper = new ObjectMapper();
@@ -528,6 +531,43 @@ private String safeText(JsonNode node, String field) {
     if (v == null || v.isNull()) return null;
     return v.asText(null);
 }
+
+// =========================
+// 유틸: routeId -> routeNo 조회 (추가됨)
+// =========================
+private String getBusRouteNoByRouteId(String routeId) {
+    if (routeId == null || routeId.isBlank()) return null;
+    
+    // 1. 캐시 확인
+    if (BUS_ROUTE_NUMBER_CACHE.containsKey(routeId)) {
+        return BUS_ROUTE_NUMBER_CACHE.get(routeId);
+    }
+    
+    // 2. API 호출
+    try {
+        String url = "http://apis.data.go.kr/1613000/BusRouteInfoInqireService/getRouteInfoIem"
+                + "?serviceKey=" + TAGO_SERVICE_KEY
+                + "&_type=json"
+                + "&cityCode=" + TAGO_CITY_CODE
+                + "&routeId=" + routeId;
+                
+        String body = busNameRestTemplate.getForObject(url, String.class);
+        JsonNode root = busNameObjectMapper.readTree(body);
+        JsonNode item = root.path("response").path("body").path("items").path("item");
+        
+        String routeNo = safeText(item, "routeno");
+        if (routeNo != null) {
+            BUS_ROUTE_NUMBER_CACHE.put(routeId, routeNo);
+            return routeNo;
+        }
+    } catch (Exception e) {
+        // e.printStackTrace();
+    }
+    
+    // 실패 시 routeId 반환 혹은 null
+    BUS_ROUTE_NUMBER_CACHE.put(routeId, routeId); // 실패해도 캐시에 넣어 재시도 방지
+    return routeId;
+}
 /**
  * 허용 환승 횟수(maxTransfers)를 "승차 횟수 상한(MAX_RIDES)"으로 변환한다.
  *
@@ -719,6 +759,7 @@ private int clampMaxRides(int maxTransfers) {
                 curSeg.put("routeId", e.routeId);
                 if ("BUS".equals(e.mode)) {
                     curSeg.put("updowncd", e.updowncd);
+                    curSeg.put("routeNo", getBusRouteNoByRouteId(e.routeId)); // 노선번호 추가
                 }
                 curSeg.put("minutes", 0.0);
                 curSeg.put("points", new ArrayList<double[]>());

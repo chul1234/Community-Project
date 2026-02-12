@@ -38,10 +38,13 @@ app.controller('ChatController', function ($scope, $http, $timeout, $rootScope) 
                 // Handle Path Visualization
                 if (data.path) {
                     console.log('[Chat] Received path data:', data.path);
-                    // Emit event to BusController (sibling controller)
-                    // We use $rootScope to broadcast since they are siblings or $rootScope.$emit
-                    // Or if they are in same scope hierarchy. Usually safer to use $rootScope.$broadcast
                     $rootScope.$broadcast('DRAW_CHAT_PATH', data.path);
+                }
+                
+                // [New] Handle Station Visualization
+                if (data.station) {
+                    console.log('[Chat] Received station data:', data.station);
+                    $rootScope.$broadcast('DRAW_CHAT_STATION', data.station);
                 }
 
                 $scope.scrollToBottom();
