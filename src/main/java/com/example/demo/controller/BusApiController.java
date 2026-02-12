@@ -3,6 +3,7 @@
 package com.example.demo.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -25,8 +26,9 @@ import com.example.demo.collector.CollectorSwitch;
 public class BusApiController {
 
     // TAGO 공공데이터 서비스키 (URL 인코딩된 형태 그대로 사용)
-    private static final String SERVICE_KEY =
-            "ff623cef3aa0e011104003d8973105076b9f4ce098a93e4b6de36a9f2560529c";
+    // TAGO 공공데이터 서비스키 (URL 인코딩된 형태 그대로 사용)
+    @Value("${tago.service.key}")
+    private String serviceKey;
 
     // 대전 도시코드
     private static final String CITY_CODE = "25";
@@ -55,7 +57,7 @@ public class BusApiController {
     public String getRoutesByNumber(@RequestParam("routeNo") String routeNo) {
 
         String url = "http://apis.data.go.kr/1613000/BusRouteInfoInqireService/getRouteNoList"
-                + "?serviceKey=" + SERVICE_KEY
+                + "?serviceKey=" + serviceKey
                 + "&_type=json"
                 + "&cityCode=" + CITY_CODE
                 + "&routeNo=" + routeNo;
@@ -73,7 +75,7 @@ public class BusApiController {
     public ResponseEntity<String> getRouteStops(@RequestParam("routeId") String routeId) {
 
         String url = "http://apis.data.go.kr/1613000/BusRouteInfoInqireService/getRouteAcctoThrghSttnList"
-                + "?serviceKey=" + SERVICE_KEY
+                + "?serviceKey=" + serviceKey
                 + "&_type=json"
                 + "&cityCode=" + CITY_CODE
                 + "&routeId=" + routeId
@@ -110,7 +112,7 @@ public class BusApiController {
     ) {
 
         String url = "http://apis.data.go.kr/1613000/BusLcInfoInqireService/getRouteAcctoBusLcList"
-                + "?serviceKey=" + SERVICE_KEY
+                + "?serviceKey=" + serviceKey
                 + "&_type=json"
                 + "&cityCode=" + CITY_CODE
                 + "&routeId=" + routeId
@@ -150,7 +152,7 @@ public class BusApiController {
         }
 
         String url = "http://apis.data.go.kr/1613000/ArvlInfoInqireService/getSttnAcctoArvlPrearngeInfoList"
-                + "?serviceKey=" + SERVICE_KEY
+                + "?serviceKey=" + serviceKey
                 + "&_type=json"
                 + "&cityCode=" + CITY_CODE
                 + "&nodeId=" + finalNodeId
@@ -196,7 +198,7 @@ public class BusApiController {
     ) {
 
         String url = "http://apis.data.go.kr/1613000/BusSttnInfoInqireService/getSttnNoList"
-                + "?serviceKey=" + SERVICE_KEY
+                + "?serviceKey=" + serviceKey
                 + "&_type=json"
                 + "&cityCode=" + CITY_CODE
                 + "&nodeNm=" + nodeName
@@ -223,7 +225,7 @@ public class BusApiController {
     ) {
 
         String url = "http://apis.data.go.kr/1613000/BusSttnInfoInqireService/getCrdntPrxmtSttnList"
-                + "?serviceKey=" + SERVICE_KEY
+                + "?serviceKey=" + serviceKey
                 + "&_type=json"
                 + "&gpsLati=" + lat
                 + "&gpsLong=" + lng

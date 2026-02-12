@@ -40,7 +40,9 @@ public class GeminiServiceImpl implements IGeminiService {
     private static final String GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent";
     
     // Service Key for Open API
-    private static final String TAGO_SERVICE_KEY = "ff623cef3aa0e011104003d8973105076b9f4ce098a93e4b6de36a9f2560529c";
+    @Value("${tago.service.key}")
+    private String tagoServiceKey;
+
     private static final String CITY_CODE = "25";
 
     private final RestTemplate restTemplate = new RestTemplate();
@@ -226,7 +228,7 @@ public class GeminiServiceImpl implements IGeminiService {
             String baseUrl = "http://apis.data.go.kr/1613000/BusSttnInfoInqireService/getSttnNoList";
 
             java.net.URI uri = org.springframework.web.util.UriComponentsBuilder.fromUriString(baseUrl)
-                    .queryParam("serviceKey", TAGO_SERVICE_KEY)
+                    .queryParam("serviceKey", tagoServiceKey)
                     .queryParam("_type", "json")
                     .queryParam("cityCode", CITY_CODE)
                     .queryParam("nodeNm", keyword)
@@ -289,7 +291,7 @@ public class GeminiServiceImpl implements IGeminiService {
         try {
             String baseUrl = "http://apis.data.go.kr/1613000/ArvlInfoInqireService/getSttnAcctoArvlPrearngeInfoList";
             java.net.URI uri = org.springframework.web.util.UriComponentsBuilder.fromUriString(baseUrl)
-                    .queryParam("serviceKey", TAGO_SERVICE_KEY)
+                    .queryParam("serviceKey", tagoServiceKey)
                     .queryParam("_type", "json")
                     .queryParam("cityCode", CITY_CODE)
                     .queryParam("nodeId", nodeId)
@@ -346,7 +348,7 @@ public class GeminiServiceImpl implements IGeminiService {
         try {
             String baseUrl = "http://apis.data.go.kr/1613000/BusSttnInfoInqireService/getSttnThrghRouteList";
             java.net.URI uri = org.springframework.web.util.UriComponentsBuilder.fromUriString(baseUrl)
-                    .queryParam("serviceKey", TAGO_SERVICE_KEY)
+                    .queryParam("serviceKey", tagoServiceKey)
                     .queryParam("_type", "json")
                     .queryParam("cityCode", CITY_CODE)
                     .queryParam("nodeId", nodeId)

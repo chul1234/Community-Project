@@ -1,4 +1,8 @@
 spring:
+    # Secret Config Import (Optional: if file missing, app still starts but might fail later if keys needed)
+    config:
+        import: optional:file:./config/application-secret.yml
+
     # MVC 설정: 정적 리소스 경로
     mvc:
         static-path-pattern: /**
@@ -8,7 +12,7 @@ spring:
         driver-class-name: org.mariadb.jdbc.Driver
         url: jdbc:mariadb://localhost:3306/ipp_db
         username: ipp_user_local
-        password: '0000'
+        # password is now in application-secret.yml
 
     # JPA 설정
     jpa:
@@ -24,4 +28,5 @@ spring:
 
 google:
     gemini:
-        key: 'AIzaSyCjMTZcvvvlDO0lSQxn8ik1DkL5_1UzSJM' # Gemini API Key
+        # key is now in application-secret.yml
+
