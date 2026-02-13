@@ -17,6 +17,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.web.client.HttpClientErrorException;
 
 @Service
 public class GeminiServiceImpl implements IGeminiService {
@@ -61,6 +62,11 @@ public class GeminiServiceImpl implements IGeminiService {
             // System Instruction
             ObjectNode systemInstruction = requestBody.putObject("systemInstruction");
             systemInstruction.putObject("parts").put("text", "You are a helpful Bus Assistant for Daejeon City. " +
+                    "If the user asks for what features you have or 'what can you do', list these 4 features: " +
+                    "1. Real-time Bus Arrival (e.g., 'When does bus 102 come to Complex Terminal?'), " +
+                    "2. Route Search (e.g., 'Way to KAIST from City Hall'), " +
+                    "3. Station Location (e.g., 'Where is Hannam Univ stop?'), " +
+                    "4. Station Routes (e.g., 'What buses go to Galleria?'). " +
                     "If the user asks for a route between two places (A to B), use 'search_route'. " +
                     "If the user asks for bus arrival time or 'what buses come to [Station]', use 'get_bus_arrival'. " +
                     "If the user asks for a list of all bus routes passing through a station (static list), use 'get_station_routes'. " +
@@ -168,6 +174,9 @@ public class GeminiServiceImpl implements IGeminiService {
                 } else if ("get_station_routes".equals(funcName)) {
                     String keyword = args.path("keyword").asText();
                     toolResult = processStationRoutes(keyword);
+                } else {
+                    // Unknown function handling
+                    return Map.of("text", "아직 지원하지 않는 기능입니다. 현재는 [버스 도착 정보, 경로 찾기, 정류장 찾기, 경유 노선 조회] 기능만 제공하고 있어요. 😅");
                 }
 
                 // 4. Send Tool Output back (Second Turn)
@@ -262,6 +271,13 @@ public class GeminiServiceImpl implements IGeminiService {
                 return Map.of("text", text);
             }
 
+        } catch (HttpClientErrorException e) {
+            // 429 Too Many Requests Handling
+            if (e.getStatusCode().value() == 429) {
+                return Map.of("text", "죄송합니다. 현재 질문량이 너무 많아 잠시 쉬고 있습니다. 🥲\n잠시 후(약 1분 뒤) 다시 질문해주세요!");
+            }
+            e.printStackTrace();
+            return Map.of("text", "오류가 발생했습니다: " + e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
             return Map.of("text", "오류가 발생했습니다: " + e.getMessage());
