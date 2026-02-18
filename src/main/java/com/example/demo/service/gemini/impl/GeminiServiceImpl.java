@@ -72,6 +72,7 @@ public class GeminiServiceImpl implements IGeminiService {
                     "If the user asks for a list of all bus routes passing through a station (static list), use 'get_station_routes'. " +
                     "For simple station search, use 'get_bus_station'. " +
                     "Always answer in Korean. " +
+                    "If the user input is not related to bus services (e.g. daily conversation, jokes, small talk), respond naturally and witty. " +
                     "If a path is found, summarize the route briefly.");
 
             // Tools definition
@@ -175,8 +176,8 @@ public class GeminiServiceImpl implements IGeminiService {
                     String keyword = args.path("keyword").asText();
                     toolResult = processStationRoutes(keyword);
                 } else {
-                    // Unknown function handling
-                    return Map.of("text", "아직 지원하지 않는 기능입니다. 현재는 [버스 도착 정보, 경로 찾기, 정류장 찾기, 경유 노선 조회] 기능만 제공하고 있어요. 😅");
+                    // Unknown function handling: Feed back to the model so it can respond
+                    toolResult = "The function '" + funcName + "' is not supported. Please answer the user's request naturally using your general knowledge, or apologize if you can't.";
                 }
 
                 // 4. Send Tool Output back (Second Turn)
