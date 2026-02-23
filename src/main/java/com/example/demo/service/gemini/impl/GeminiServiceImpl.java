@@ -55,6 +55,11 @@ public class GeminiServiceImpl implements IGeminiService {
 
     @Override
     public Map<String, Object> getChatResponse(String message) {
+        return getChatResponse(message, null);
+    }
+
+    @Override
+    public Map<String, Object> getChatResponse(String message, List<Map<String, String>> history) {
         try {
             // 1. Construct Request with Tools
             ObjectNode requestBody = objectMapper.createObjectNode();
@@ -123,6 +128,16 @@ public class GeminiServiceImpl implements IGeminiService {
 
             // User Content
             ArrayNode contents = requestBody.putArray("contents");
+            
+            // Append History if it exists
+            if (history != null && !history.isEmpty()) {
+                for (Map<String, String> h : history) {
+                    ObjectNode turn = contents.addObject();
+                    turn.put("role", h.get("role"));
+                    turn.putObject("parts").put("text", h.get("text"));
+                }
+            }
+
             ObjectNode userContent = contents.addObject();
             userContent.put("role", "user");
             userContent.putObject("parts").put("text", message);

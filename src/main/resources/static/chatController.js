@@ -27,7 +27,15 @@ app.controller('ChatController', function ($scope, $http, $timeout, $rootScope) 
         $scope.scrollToBottom();
 
         // Call API
-        $http.post('/api/chat', { message: userMsg })
+        // Send last 20 messages for context (increased to remember more history)
+        const history = $scope.messages
+            .slice(-21, -1) // Get up to 20 previous messages (20+1 because slice end is exclusive)
+            .map(m => ({ role: m.type === 'user' ? 'user' : 'model', text: m.text }));
+
+        $http.post('/api/chat', { 
+            message: userMsg,
+            history: history 
+        })
             .then(function (response) {
                 $scope.isTyping = false;
                 const data = response.data;

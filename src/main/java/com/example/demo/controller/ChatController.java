@@ -3,6 +3,7 @@ package com.example.demo.controller;
 import com.example.demo.service.gemini.IGeminiService;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -16,11 +17,15 @@ public class ChatController {
     }
 
     @PostMapping
-    public Map<String, Object> chat(@RequestBody Map<String, String> payload) {
-        String message = payload.get("message");
+    public Map<String, Object> chat(@RequestBody Map<String, Object> payload) {
+        String message = (String) payload.get("message");
+        List<Map<String, String>> history = (List<Map<String, String>>) payload.get("history");
+        
         if (message == null || message.trim().isEmpty()) {
             return Map.of("text", "메시지를 입력해주세요.");
         }
-        return geminiService.getChatResponse(message);
+        
+        // Pass both message and history to the service
+        return geminiService.getChatResponse(message, history);
     }
 }
