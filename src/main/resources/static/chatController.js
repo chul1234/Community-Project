@@ -4,12 +4,12 @@ app.controller('ChatController', function ($scope, $http, $timeout, $rootScope) 
     $scope.userMessage = '';
     $scope.isTyping = false;
 
-    // Load messages from localStorage if desired, currently empty
-    // $scope.messages = JSON.parse(localStorage.getItem('chatHistory')) || [];
+    // LocalStorage에서 대화 기록 불러오기 (선택 사항)
+    // $scope.messages = JSON.parse(localStorage.getItem('chatMessages')) || [];
 
     $scope.toggleChat = function () {
         $scope.isOpen = !$scope.isOpen;
-        // Auto-scroll to bottom directly
+        // 오토 스크롤: 채팅창이 열릴 때 마지막 메시지로 스크롤
         if ($scope.isOpen) {
             $scope.scrollToBottom();
         }
@@ -18,7 +18,7 @@ app.controller('ChatController', function ($scope, $http, $timeout, $rootScope) 
     $scope.sendMessage = function () {
         if (!$scope.userMessage.trim()) return;
 
-        // Add user message
+        // 유저 메시지 추가
         const msg = { text: $scope.userMessage, type: 'user' };
         $scope.messages.push(msg);
         const userMsg = $scope.userMessage;
@@ -27,29 +27,30 @@ app.controller('ChatController', function ($scope, $http, $timeout, $rootScope) 
         $scope.scrollToBottom();
 
         // Call API
-        // Send last 20 messages for context (increased to remember more history)
+        // 보낸 메시지와 최근 20개의 대화 기록을 함께 전송
         const history = $scope.messages
-            .slice(-21, -1) // Get up to 20 previous messages (20+1 because slice end is exclusive)
-            .map(m => ({ role: m.type === 'user' ? 'user' : 'model', text: m.text }));
+            .slice(-21, -1) //  최근 20개의 메세지
+            .map((m) => ({ role: m.type === 'user' ? 'user' : 'model', text: m.text }));
 
-        $http.post('/api/chat', { 
-            message: userMsg,
-            history: history 
-        })
+        $http
+            .post('/api/chat', {
+                message: userMsg,
+                history: history,
+            })
             .then(function (response) {
                 $scope.isTyping = false;
                 const data = response.data;
-                
-                // Add bot message
+
+                // 봇 메시지 추가
                 $scope.messages.push({ text: data.text, type: 'bot' });
-                
-                // Handle Path Visualization
+
+                // 핸들링: 경로 시각화
                 if (data.path) {
                     console.log('[Chat] Received path data:', data.path);
                     $rootScope.$broadcast('DRAW_CHAT_PATH', data.path);
                 }
-                
-                // [New] Handle Station Visualization
+
+                // 핸들링: 역 시각화
                 if (data.station) {
                     console.log('[Chat] Received station data:', data.station);
                     $rootScope.$broadcast('DRAW_CHAT_STATION', data.station);
@@ -59,7 +60,7 @@ app.controller('ChatController', function ($scope, $http, $timeout, $rootScope) 
             })
             .catch(function (error) {
                 $scope.isTyping = false;
-                $scope.messages.push({ text: "죄송합니다. 오류가 발생했습니다.", type: 'bot' });
+                $scope.messages.push({ text: '죄송합니다. 오류가 발생했습니다.', type: 'bot' });
                 console.error('[Chat] API Error:', error);
                 $scope.scrollToBottom();
             });
