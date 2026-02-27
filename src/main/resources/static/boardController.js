@@ -617,6 +617,43 @@ app.controller('BoardDetailController', function ($scope, $http, $routeParams, $
         }
     };
 
+    // --- AI 요약 기능 ---
+    $scope.isSummarizing = false;
+    $scope.aiSummaryResult = null;
+
+    $scope.summarizePost = function() {
+        if (!$scope.post || !$scope.post.content) {
+            alert('요약할 내용이 없습니다.');
+            return;
+        }
+
+        $scope.isSummarizing = true;
+        // HTML 태그를 제거하여 순수 텍스트만 추출
+        var plainText = $scope.post.content.replace(/<[^>]*>?/gm, '');
+        $scope.aiSummaryResult = "구글 제미나이가 게시글을 열심히 요약하고 있습니다... 🤖⏳";
+
+        var payload = {
+            message: "다음 게시글 내용을 핵심만 딱 3줄로 요약해줘. 친절한 말투로 해줘:\n\n" + plainText,
+            history: [] // 컨텍스트 없이 단발성 요청
+        };
+
+        $http.post('/api/chat', payload)
+            .then(function(response) {
+                if (response.data && response.data.text) {
+                    $scope.aiSummaryResult = response.data.text;
+                } else {
+                    $scope.aiSummaryResult = "요약 결과를 받아오는데 실패했습니다.";
+                }
+            })
+            .catch(function(error) {
+                console.error("AI 요약 중 오류 발생: ", error);
+                $scope.aiSummaryResult = "오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+            })
+            .finally(function() {
+                $scope.isSummarizing = false;
+            });
+    };
+
     // --- 게시글 좋아요 관련 함수들 ---
 
     // 게시글 좋아요 개수 조회 (상세 화면용)

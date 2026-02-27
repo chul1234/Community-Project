@@ -17,7 +17,25 @@
                 </button>
             </span>
 
+            <span style="margin-left: 15px">
+                <button
+                    type="button"
+                    class="action-btn-sm"
+                    ng-click="summarizePost()"
+                    ng-disabled="isSummarizing"
+                    style="background-color: #6f42c1; color: white; border: none;"
+                >
+                    ✨ AI 3줄 요약
+                </button>
+            </span>
+
             <span style="float: right">작성일: {{ post.created_at | date:'yyyy-MM-dd HH:mm' }}</span>
+        </div>
+
+        <!-- AI 요약 결과 창 -->
+        <div ng-if="aiSummaryResult" style="background-color: #f3f0ff; border-left: 4px solid #6f42c1; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+            <h4 style="margin-top: 0; color: #6f42c1; font-size: 16px;">🤖 AI 3줄 요약 결과</h4>
+            <div style="white-space: pre-wrap; font-size: 14px; line-height: 1.6;">{{ aiSummaryResult }}</div>
         </div>
 
         <div
